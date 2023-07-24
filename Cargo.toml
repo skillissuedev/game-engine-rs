@@ -1,0 +1,26 @@
+[package]
+name = "projectbaldej"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+carrier-pigeon = "0.3.0"
+colored = "2.0.0"
+navmesh = "0.12.1"
+glium = "0.32.1"
+ultraviolet = "0.9.1"
+rcrefcell = "1.0.7"
+image = "0.24.6"
+easy-gltf = "1.0.0"
+conrod = "0.62.1"
+conrod_core = "0.76.1"
+conrod_winit = "0.76.1"
+winit = "0.28.6"
+
+[dependencies.conrod_glium]
+path = "../conrod_glium"
+[profile.release]
+debug = 1
+[rust]
+debuginfo-level = 1
+
