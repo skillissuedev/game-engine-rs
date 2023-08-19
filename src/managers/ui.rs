@@ -1,6 +1,5 @@
 conrod_winit::v023_conversion_fns!();
 
-
 #[macro_export]
 macro_rules! convert_key {
     ($keycode:expr) => {{
@@ -41,17 +40,31 @@ macro_rules! convert_key {
             glium::glutin::event::VirtualKeyCode::X => conrod_core::input::keyboard::Key::X,
             glium::glutin::event::VirtualKeyCode::Y => conrod_core::input::keyboard::Key::Y,
             glium::glutin::event::VirtualKeyCode::Z => conrod_core::input::keyboard::Key::Z,
-            glium::glutin::event::VirtualKeyCode::Apostrophe => conrod_core::input::keyboard::Key::Unknown,
-            glium::glutin::event::VirtualKeyCode::Backslash => conrod_core::input::keyboard::Key::Backslash,
-            glium::glutin::event::VirtualKeyCode::Back => conrod_core::input::keyboard::Key::Backspace,
+            glium::glutin::event::VirtualKeyCode::Apostrophe => {
+                conrod_core::input::keyboard::Key::Unknown
+            }
+            glium::glutin::event::VirtualKeyCode::Backslash => {
+                conrod_core::input::keyboard::Key::Backslash
+            }
+            glium::glutin::event::VirtualKeyCode::Back => {
+                conrod_core::input::keyboard::Key::Backspace
+            }
             // K::CapsLock => Key::CapsLock,
-            glium::glutin::event::VirtualKeyCode::Delete => conrod_core::input::keyboard::Key::Delete,
+            glium::glutin::event::VirtualKeyCode::Delete => {
+                conrod_core::input::keyboard::Key::Delete
+            }
             glium::glutin::event::VirtualKeyCode::Comma => conrod_core::input::keyboard::Key::Comma,
             glium::glutin::event::VirtualKeyCode::Down => conrod_core::input::keyboard::Key::Down,
             glium::glutin::event::VirtualKeyCode::End => conrod_core::input::keyboard::Key::End,
-            glium::glutin::event::VirtualKeyCode::Return => conrod_core::input::keyboard::Key::Return,
-            glium::glutin::event::VirtualKeyCode::Equals => conrod_core::input::keyboard::Key::Equals,
-            glium::glutin::event::VirtualKeyCode::Escape => conrod_core::input::keyboard::Key::Escape,
+            glium::glutin::event::VirtualKeyCode::Return => {
+                conrod_core::input::keyboard::Key::Return
+            }
+            glium::glutin::event::VirtualKeyCode::Equals => {
+                conrod_core::input::keyboard::Key::Equals
+            }
+            glium::glutin::event::VirtualKeyCode::Escape => {
+                conrod_core::input::keyboard::Key::Escape
+            }
             glium::glutin::event::VirtualKeyCode::F1 => conrod_core::input::keyboard::Key::F1,
             glium::glutin::event::VirtualKeyCode::F2 => conrod_core::input::keyboard::Key::F2,
             glium::glutin::event::VirtualKeyCode::F3 => conrod_core::input::keyboard::Key::F3,
@@ -67,38 +80,88 @@ macro_rules! convert_key {
             glium::glutin::event::VirtualKeyCode::F13 => conrod_core::input::keyboard::Key::F13,
             glium::glutin::event::VirtualKeyCode::F14 => conrod_core::input::keyboard::Key::F14,
             glium::glutin::event::VirtualKeyCode::F15 => conrod_core::input::keyboard::Key::F15,
-            glium::glutin::event::VirtualKeyCode::Numpad0 => conrod_core::input::keyboard::Key::NumPad0,
-            glium::glutin::event::VirtualKeyCode::Numpad1 => conrod_core::input::keyboard::Key::NumPad1,
-            glium::glutin::event::VirtualKeyCode::Numpad2 => conrod_core::input::keyboard::Key::NumPad2,
-            glium::glutin::event::VirtualKeyCode::Numpad3 => conrod_core::input::keyboard::Key::NumPad3,
-            glium::glutin::event::VirtualKeyCode::Numpad4 => conrod_core::input::keyboard::Key::NumPad4,
-            glium::glutin::event::VirtualKeyCode::Numpad5 => conrod_core::input::keyboard::Key::NumPad5,
-            glium::glutin::event::VirtualKeyCode::Numpad6 => conrod_core::input::keyboard::Key::NumPad6,
-            glium::glutin::event::VirtualKeyCode::Numpad7 => conrod_core::input::keyboard::Key::NumPad7,
-            glium::glutin::event::VirtualKeyCode::Numpad8 => conrod_core::input::keyboard::Key::NumPad8,
-            glium::glutin::event::VirtualKeyCode::Numpad9 => conrod_core::input::keyboard::Key::NumPad9,
-            glium::glutin::event::VirtualKeyCode::NumpadComma => conrod_core::input::keyboard::Key::NumPadDecimal,
-            glium::glutin::event::VirtualKeyCode::NumpadEnter => conrod_core::input::keyboard::Key::NumPadEnter,
-            glium::glutin::event::VirtualKeyCode::NumpadEquals => conrod_core::input::keyboard::Key::NumPadEquals,
-            glium::glutin::event::VirtualKeyCode::LShift => conrod_core::input::keyboard::Key::LShift,
-            glium::glutin::event::VirtualKeyCode::LControl => conrod_core::input::keyboard::Key::LCtrl,
+            glium::glutin::event::VirtualKeyCode::Numpad0 => {
+                conrod_core::input::keyboard::Key::NumPad0
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad1 => {
+                conrod_core::input::keyboard::Key::NumPad1
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad2 => {
+                conrod_core::input::keyboard::Key::NumPad2
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad3 => {
+                conrod_core::input::keyboard::Key::NumPad3
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad4 => {
+                conrod_core::input::keyboard::Key::NumPad4
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad5 => {
+                conrod_core::input::keyboard::Key::NumPad5
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad6 => {
+                conrod_core::input::keyboard::Key::NumPad6
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad7 => {
+                conrod_core::input::keyboard::Key::NumPad7
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad8 => {
+                conrod_core::input::keyboard::Key::NumPad8
+            }
+            glium::glutin::event::VirtualKeyCode::Numpad9 => {
+                conrod_core::input::keyboard::Key::NumPad9
+            }
+            glium::glutin::event::VirtualKeyCode::NumpadComma => {
+                conrod_core::input::keyboard::Key::NumPadDecimal
+            }
+            glium::glutin::event::VirtualKeyCode::NumpadEnter => {
+                conrod_core::input::keyboard::Key::NumPadEnter
+            }
+            glium::glutin::event::VirtualKeyCode::NumpadEquals => {
+                conrod_core::input::keyboard::Key::NumPadEquals
+            }
+            glium::glutin::event::VirtualKeyCode::LShift => {
+                conrod_core::input::keyboard::Key::LShift
+            }
+            glium::glutin::event::VirtualKeyCode::LControl => {
+                conrod_core::input::keyboard::Key::LCtrl
+            }
             glium::glutin::event::VirtualKeyCode::LAlt => conrod_core::input::keyboard::Key::LAlt,
-            glium::glutin::event::VirtualKeyCode::RShift => conrod_core::input::keyboard::Key::RShift,
-            glium::glutin::event::VirtualKeyCode::RControl => conrod_core::input::keyboard::Key::RCtrl,
+            glium::glutin::event::VirtualKeyCode::RShift => {
+                conrod_core::input::keyboard::Key::RShift
+            }
+            glium::glutin::event::VirtualKeyCode::RControl => {
+                conrod_core::input::keyboard::Key::RCtrl
+            }
             glium::glutin::event::VirtualKeyCode::RAlt => conrod_core::input::keyboard::Key::RAlt,
             glium::glutin::event::VirtualKeyCode::Home => conrod_core::input::keyboard::Key::Home,
-            glium::glutin::event::VirtualKeyCode::Insert => conrod_core::input::keyboard::Key::Insert,
+            glium::glutin::event::VirtualKeyCode::Insert => {
+                conrod_core::input::keyboard::Key::Insert
+            }
             glium::glutin::event::VirtualKeyCode::Left => conrod_core::input::keyboard::Key::Left,
-            glium::glutin::event::VirtualKeyCode::LBracket => conrod_core::input::keyboard::Key::LeftBracket,
+            glium::glutin::event::VirtualKeyCode::LBracket => {
+                conrod_core::input::keyboard::Key::LeftBracket
+            }
             glium::glutin::event::VirtualKeyCode::Minus => conrod_core::input::keyboard::Key::Minus,
-            glium::glutin::event::VirtualKeyCode::Numlock => conrod_core::input::keyboard::Key::NumLockClear,
-            glium::glutin::event::VirtualKeyCode::PageDown => conrod_core::input::keyboard::Key::PageDown,
-            glium::glutin::event::VirtualKeyCode::PageUp => conrod_core::input::keyboard::Key::PageUp,
+            glium::glutin::event::VirtualKeyCode::Numlock => {
+                conrod_core::input::keyboard::Key::NumLockClear
+            }
+            glium::glutin::event::VirtualKeyCode::PageDown => {
+                conrod_core::input::keyboard::Key::PageDown
+            }
+            glium::glutin::event::VirtualKeyCode::PageUp => {
+                conrod_core::input::keyboard::Key::PageUp
+            }
             glium::glutin::event::VirtualKeyCode::Pause => conrod_core::input::keyboard::Key::Pause,
-            glium::glutin::event::VirtualKeyCode::Period => conrod_core::input::keyboard::Key::Period,
+            glium::glutin::event::VirtualKeyCode::Period => {
+                conrod_core::input::keyboard::Key::Period
+            }
             glium::glutin::event::VirtualKeyCode::Right => conrod_core::input::keyboard::Key::Right,
-            glium::glutin::event::VirtualKeyCode::RBracket => conrod_core::input::keyboard::Key::RightBracket,
-            glium::glutin::event::VirtualKeyCode::Semicolon => conrod_core::input::keyboard::Key::Semicolon,
+            glium::glutin::event::VirtualKeyCode::RBracket => {
+                conrod_core::input::keyboard::Key::RightBracket
+            }
+            glium::glutin::event::VirtualKeyCode::Semicolon => {
+                conrod_core::input::keyboard::Key::Semicolon
+            }
             glium::glutin::event::VirtualKeyCode::Slash => conrod_core::input::keyboard::Key::Slash,
             glium::glutin::event::VirtualKeyCode::Space => conrod_core::input::keyboard::Key::Space,
             glium::glutin::event::VirtualKeyCode::Tab => conrod_core::input::keyboard::Key::Tab,
@@ -107,5 +170,3 @@ macro_rules! convert_key {
         }
     }};
 }
-
-

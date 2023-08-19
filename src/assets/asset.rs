@@ -1,3 +1,1 @@
-pub trait Asset {
-
-}
+pub trait Asset {}

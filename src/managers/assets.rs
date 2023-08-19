@@ -1,5 +1,5 @@
-use std::env;
 use super::debugger::crash;
+use std::env;
 
 pub fn get_full_asset_path(path: &str) -> String {
     let mut exec_path: String = "".to_string();
@@ -11,8 +11,7 @@ pub fn get_full_asset_path(path: &str) -> String {
                 Some(executable_path_string) => exec_path = executable_path_string.to_owned(), //println!("Path of this executable is: {}", executable_path_string.to_owned() + "/" + path),
                 None => crash("Getting current exe path error!"),
             }
-            
-        },
+        }
         Err(_e) => crash("Getting current exe path error!"),
     };
 
@@ -22,17 +21,16 @@ pub fn get_full_asset_path(path: &str) -> String {
     let mut full_path: String = "".to_string();
 
     for i in 0..full_exec_path_splitted.len() - 1 {
-        full_path += full_exec_path_splitted[i]; 
+        full_path += full_exec_path_splitted[i];
         full_path += "/";
     }
 
     full_path += "assets/";
     full_path += path;
-    
+
     if cfg!(windows) {
         return full_path.replace("/", r"\");
-    } 
+    }
 
-    full_path 
+    full_path
 }
-

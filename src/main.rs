@@ -1,11 +1,11 @@
 use framework::DebugMode;
 
 mod assets;
-mod math_utils;
-mod managers;
+mod components;
 mod framework;
 mod game;
-mod components;
+mod managers;
+mod math_utils;
 mod object;
 
 fn main() {

@@ -1,18 +1,18 @@
-use colored::Colorize;
 use crate::framework::DebugMode;
+use colored::Colorize;
 
 pub static mut DEBUG: DebugMode = DebugMode::None;
 
 #[derive(Debug)]
 pub enum Error {
-    FileLoadingError
+    FileLoadingError,
 }
 
 pub fn crash(text: &str) {
     println!("{}", "project baldej crashed!".red());
     println!("{}\n{}", "Error:".red(), text.red());
     println!("\n\n\n\n");
-    panic!(); 
+    panic!();
 }
 
 pub fn error(text: &str) {
@@ -29,7 +29,7 @@ pub fn print_if_debug(text: &str) {
     unsafe {
         match DEBUG {
             DebugMode::Full => println!("{}", text),
-            _ => ()
+            _ => (),
         }
     }
 }

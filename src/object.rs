@@ -3,12 +3,12 @@ use rcrefcell::RcCell;
 use crate::{components::component::Component, managers::scene};
 
 pub struct Object {
-    pub name: String, 
+    pub name: String,
     pub components_indexes: Vec<usize>,
 }
 
 pub struct GameObject {
-    pub obj: RcCell<Object>
+    pub obj: RcCell<Object>,
 }
 
 impl GameObject {
@@ -18,10 +18,15 @@ impl GameObject {
 }
 
 pub fn new_object(name: &str) -> &mut GameObject {
-    let obj = Object { name: name.to_string(), components_indexes: vec![], };
+    let obj = Object {
+        name: name.to_string(),
+        components_indexes: vec![],
+    };
 
     unsafe {
-        scene::OBJECTS.push(GameObject { obj: RcCell::new(obj) });
+        scene::OBJECTS.push(GameObject {
+            obj: RcCell::new(obj),
+        });
     }
 
     unsafe {
@@ -38,8 +43,8 @@ impl Object {
                         if component.get_component_type() == component_type {
                             return Some(component);
                         }
-                    },
-                    None => continue
+                    }
+                    None => continue,
                 }
             }
         }
@@ -55,8 +60,8 @@ impl Object {
                         if component.get_component_type() == component_type {
                             scene::COMPONENTS[i.clone()] = None;
                         }
-                    },
-                    None => continue
+                    }
+                    None => continue,
                 }
             }
         }
@@ -68,11 +73,10 @@ impl Drop for Object {
         for i in &self.components_indexes {
             unsafe {
                 match scene::COMPONENTS[i.clone()] {
-                    Some(_) => scene::COMPONENTS[i.clone()] = None, 
-                    None => ()
+                    Some(_) => scene::COMPONENTS[i.clone()] = None,
+                    None => (),
                 }
             }
         }
     }
 }
-

@@ -1,9 +1,17 @@
-use std::collections::HashMap;
-use glium::{Display, VertexBuffer, Program, Frame, uniform, Surface, IndexBuffer};
-use rcrefcell::RcCell;
-use ultraviolet::Mat4;
-use crate::{assets::{mesh_asset::MeshAsset, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}, math_utils::deg_to_rad, object::Object};
 use super::{component::Component, transform::BasicTransform};
+use crate::{
+    assets::{mesh_asset::MeshAsset, shader_asset::ShaderAsset, texture_asset::TextureAsset},
+    managers::{
+        debugger::error,
+        render::{self, Vertex},
+    },
+    math_utils::deg_to_rad,
+    object::Object,
+};
+use glium::{uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer};
+use rcrefcell::RcCell;
+use std::collections::HashMap;
+use ultraviolet::Mat4;
 
 pub struct Mesh {
     pub mesh_asset: MeshAsset,
@@ -14,7 +22,7 @@ pub struct Mesh {
     program: Vec<Program>,
     owner: Option<RcCell<Object>>,
     started: bool,
-    error: bool
+    error: bool,
 }
 
 impl Component for Mesh {
@@ -28,18 +36,27 @@ impl Component for Mesh {
 
         for i in 0..self.mesh_asset.objects.len() {
             let object = &self.mesh_asset.objects[i];
-            let indices = IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &object.indices);
+            let indices = IndexBuffer::new(
+                display,
+                glium::index::PrimitiveType::TrianglesList,
+                &object.indices,
+            );
 
             let model_matrix: Mat4;
 
-            match self.owner.as_ref().unwrap().borrow().get_component("Transform") {
+            match self
+                .owner
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .get_component("Transform")
+            {
                 Some(pos) => model_matrix = self.setup_mat(pos.get_data().unwrap()),
                 None => {
-                    error(
-                        &format!(
-                            "Mesh component can't access transform component!\nObject's name: {}",
-                            self.owner.as_ref().unwrap().borrow().name)
-                        );
+                    error(&format!(
+                        "Mesh component can't access transform component!\nObject's name: {}",
+                        self.owner.as_ref().unwrap().borrow().name
+                    ));
                     return;
                 }
             }
@@ -55,9 +72,9 @@ impl Component for Mesh {
                 Some(tx) => texture = tx,
                 None => texture = &empty_texture,
             }
-            
-            let uniforms = uniform!
-            {
+
+            let uniforms = uniform! {
+                mesh: object.transform,
                 model: [
                     *model_matrix.cols[0].as_array(),
                     *model_matrix.cols[1].as_array(),
@@ -83,18 +100,20 @@ impl Component for Mesh {
                 depth: glium::Depth {
                     test: glium::draw_parameters::DepthTest::IfLess,
                     write: true,
-                    .. Default::default()
+                    ..Default::default()
                 },
                 backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-                .. Default::default()
+                ..Default::default()
             };
 
-            target.draw(
-                &self.vertex_buffer[i],
-                &indices.unwrap(),
-                &self.program[i],
-                &uniforms,
-                &draw_params)
+            target
+                .draw(
+                    &self.vertex_buffer[i],
+                    &indices.unwrap(),
+                    &self.program[i],
+                    &uniforms,
+                    &draw_params,
+                )
                 .unwrap();
         }
     }
@@ -113,7 +132,11 @@ impl Component for Mesh {
 }
 
 impl Mesh {
-    pub fn new(mesh_asset: MeshAsset, texture_asset: Option<TextureAsset>, shader_asset: ShaderAsset) -> Mesh {
+    pub fn new(
+        mesh_asset: MeshAsset,
+        texture_asset: Option<TextureAsset>,
+        shader_asset: ShaderAsset,
+    ) -> Mesh {
         Mesh {
             mesh_asset,
             shader_asset,
@@ -123,7 +146,7 @@ impl Mesh {
             program: vec![],
             owner: None,
             started: false,
-            error: false
+            error: false,
         }
     }
 
@@ -131,15 +154,15 @@ impl Mesh {
         let transform_component = BasicTransform::from(transform_data);
         let rotation = transform_component.rotation;
 
-        let mut transform = Mat4::identity(); 
-        transform = transform * Mat4::from_euler_angles(
-            deg_to_rad(rotation.x),
-            deg_to_rad(rotation.y),
-            deg_to_rad(rotation.z));
-        transform = transform *
-            Mat4::from_nonuniform_scale(transform_component.scale);
-        transform = transform *
-            Mat4::from_translation(transform_component.position);
+        let mut transform = Mat4::identity();
+        transform = transform
+            * Mat4::from_euler_angles(
+                deg_to_rad(rotation.x),
+                deg_to_rad(rotation.y),
+                deg_to_rad(rotation.z),
+            );
+        transform = transform * Mat4::from_nonuniform_scale(transform_component.scale);
+        transform = transform * Mat4::from_translation(transform_component.position);
 
         transform
     }
@@ -150,10 +173,13 @@ impl Mesh {
             match vertex_buffer {
                 Ok(buff) => self.vertex_buffer.push(buff),
                 Err(err) => {
-                    error(&format!("Mesh component error:\nvertex buffer creation error!\nErr: {}", err));
+                    error(&format!(
+                        "Mesh component error:\nvertex buffer creation error!\nErr: {}",
+                        err
+                    ));
                     self.error = true;
                     return;
-                },
+                }
             }
         }
 
@@ -161,32 +187,45 @@ impl Mesh {
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
 
         for _i in &self.mesh_asset.objects {
-            let program = Program::from_source(display, &vertex_shader_source, &fragment_shader_source, None);
+            let program = Program::from_source(
+                display,
+                &vertex_shader_source,
+                &fragment_shader_source,
+                None,
+            );
             match program {
                 Ok(prog) => self.program.push(prog),
                 Err(err) => {
-                    error(&format!("Mesh component error:\nprogram creation error!\nErr: {}", err));
+                    error(&format!(
+                        "Mesh component error:\nprogram creation error!\nErr: {}",
+                        err
+                    ));
                     self.error = true;
                     return;
-                },
+                }
             }
         }
 
         if self.texture_asset.is_some() {
             let asset = self.texture_asset.as_ref().unwrap();
-            let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&asset.image_raw, asset.image_dimensions);
+            let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
+                &asset.image_raw,
+                asset.image_dimensions,
+            );
             let texture = glium::texture::texture2d::Texture2d::new(display, image);
 
             match texture {
                 Ok(tx) => self.texture = Some(tx),
                 Err(err) => {
-                    error(&format!("Mesh component error:\ntexture creating error!\nErr: {}", err));
+                    error(&format!(
+                        "Mesh component error:\ntexture creating error!\nErr: {}",
+                        err
+                    ));
                     self.texture = None;
-                },
+                }
             }
-        } 
+        }
 
         self.started = true;
     }
 }
-

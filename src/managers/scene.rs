@@ -1,14 +1,15 @@
 use glium::{Display, Frame};
 use rcrefcell::RcCell;
 
-use crate::{object::{Object, GameObject}, components::component::Component};
+use crate::{
+    components::component::Component,
+    object::{GameObject, Object},
+};
 
 pub static mut OBJECTS: Vec<GameObject> = vec![];
 pub static mut COMPONENTS: Vec<Option<Box<dyn Component>>> = vec![];
 
-pub fn start(display: &Display) {
-
-}
+pub fn start(display: &Display) {}
 
 pub fn update() {
     unsafe {
@@ -35,12 +36,20 @@ pub fn render(display: &Display, target: &mut Frame) {
     }
 }
 
-pub fn add_component(component: Box<dyn Component>, owner: &RcCell<Object>) { 
+pub fn add_component(component: Box<dyn Component>, owner: &RcCell<Object>) {
     unsafe {
         COMPONENTS.push(Some(component));
-        COMPONENTS.last_mut().unwrap().as_mut().unwrap().set_owner(owner.clone());
+        COMPONENTS
+            .last_mut()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .set_owner(owner.clone());
         COMPONENTS.last_mut().unwrap().as_mut().unwrap().start();
 
-        owner.borrow_mut().components_indexes.push(COMPONENTS.len() - 1);
+        owner
+            .borrow_mut()
+            .components_indexes
+            .push(COMPONENTS.len() - 1);
     }
 }
