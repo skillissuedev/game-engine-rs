@@ -2,8 +2,8 @@ use crate::{
     game::game_main,
     managers::{
         assets::get_full_asset_path,
-        render, scene,
-        sound::{self, set_listener_transform},
+        render,
+        sound::{self, set_listener_transform}, systems,
     },
 };
 use conrod_core::{widget, widget_ids, Labelable, Positionable, Sizeable, Ui, Widget};
@@ -28,7 +28,7 @@ widget_ids!(struct Ids { text });
 pub fn start_game(debug_mode: DebugMode) {
     let event_loop = EventLoop::new();
     let wb = WindowBuilder::new();
-    let cb = ContextBuilder::new().with_vsync(true).with_srgb(false);
+    let cb = ContextBuilder::new().with_srgb(false);
     let mut display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
 
     let mut frames_count: usize = 0;
@@ -48,7 +48,6 @@ pub fn start_game(debug_mode: DebugMode) {
     sound::init().unwrap();
 
     game_main::start();
-    scene::start(&mut display);
 
     let mut redraw_ui = true;
 
@@ -59,7 +58,7 @@ pub fn start_game(debug_mode: DebugMode) {
         match ev {
             glium::glutin::event::Event::MainEventsCleared => {
                 game_main::update();
-                scene::update();
+                systems::update();
 
                 set_listener_transform(render::get_camera_position(), render::get_camera_front());
 
@@ -73,7 +72,7 @@ pub fn start_game(debug_mode: DebugMode) {
 
                 render::draw(&mut target);
                 game_main::render();
-                scene::render(&mut display, &mut target);
+                systems::render(&mut display, &mut target);
 
                 if redraw_ui == true {
                     set_ui(&mut ui, &ids, &mut text);
