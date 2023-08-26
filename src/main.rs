@@ -1,12 +1,12 @@
 use framework::DebugMode;
 
 mod assets;
-mod components;
 mod framework;
 mod game;
 mod managers;
 mod math_utils;
-mod object;
+mod objects;
+mod systems;
 
 fn main() {
     #[cfg(debug_assertions)]
