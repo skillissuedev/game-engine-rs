@@ -12,7 +12,7 @@ pub struct SoundAsset {
 }
 
 impl SoundAsset {
-    pub fn load_from_wav(path: &str) -> Result<SoundAsset, SoundError> {
+    pub fn from_wav(path: &str) -> Result<SoundAsset, SoundError> {
         let context = sound::take_context();
 
         let reader = WavReader::open(get_full_asset_path(path));

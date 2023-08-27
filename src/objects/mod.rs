@@ -1,5 +1,3 @@
-use std::rc::{Weak, Rc};
-
 use glium::{Display, Frame};
 use ultraviolet::Vec3;
 use crate::managers::systems::CallList;
@@ -24,9 +22,6 @@ pub trait Object: std::fmt::Debug {
     fn render(&mut self, display: &mut Display, target: &mut Frame);
     fn get_children_list(&self) -> &Vec<Box<dyn Object>>;
     fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>>;
-    fn call(&self, call_id: &str);
-    fn call_mut(&mut self, call_id: &str);
-    fn get_call_list(&self) -> CallList;
     fn get_name(&self) -> &str;
     fn get_object_type(&self) -> &str;
     fn set_name(&mut self, name: &str);
@@ -85,8 +80,9 @@ pub trait Object: std::fmt::Debug {
         let global_transform = self.get_global_transform();
 
         self.get_children_list_mut().into_iter().for_each(|child| {
-            child.update(); 
             child.set_parent_transform(global_transform);
+            child.update(); 
+            child.update_children(); 
         });
     }
 

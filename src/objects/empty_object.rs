@@ -17,8 +17,8 @@ impl EmptyObject {
 
 
 impl Object for EmptyObject {
-    fn start(&mut self) {
-        
+    fn get_object_type(&self) -> &str {
+        "EmptyObject"
     }
 
     fn get_name(&self) -> &str {
@@ -29,26 +29,13 @@ impl Object for EmptyObject {
         self.name = name.to_string();
     }
 
+
+
+    fn start(&mut self) { }
+
     fn update(&mut self) { }
 
     fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
-
-
-
-    fn call(&self, _call_id: &str) { }
-
-    fn call_mut(&mut self, _call_id: &str) { }
-
-    fn get_call_list(&self) -> CallList {
-        CallList {
-            immut_call: vec![],
-            mut_call: vec![]
-        }
-    }
-
-    fn get_object_type(&self) -> &str {
-        "EmptyObject"
-    }
 
 
 

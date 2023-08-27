@@ -1,4 +1,4 @@
-use crate::managers::{systems::CallList, render};
+use crate::managers::render;
 use super::{Object, Transform};
 
 #[derive(Debug)]
@@ -36,12 +36,6 @@ impl Object for CameraPosition {
 
 
 
-    fn call(&self, _call_id: &str) { }
-
-    fn call_mut(&mut self, _call_id: &str) { }
-
-
-
     fn get_local_transform(&self) -> Transform {
         self.transform
     }
@@ -69,14 +63,5 @@ impl Object for CameraPosition {
     fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
-
-    fn get_call_list(&self) -> CallList {
-        CallList { 
-            immut_call: vec![],
-            mut_call: vec![]
-        }
-    }
-
-    
 }
 
