@@ -1,6 +1,5 @@
 use glium::{Display, Frame};
 use ultraviolet::Vec3;
-use crate::managers::systems::CallList;
 
 pub mod empty_object;
 pub mod camera_position;

@@ -1,6 +1,5 @@
 use data_url::DataUrl;
 use gltf::Gltf;
-
 use crate::managers::{
     assets,
     debugger::{error, warn},
@@ -32,7 +31,7 @@ pub struct AnimationChannel {
     pub channel_type: AnimationChannelType,
     pub node_index: usize,
     pub keyframe_timestamps: Vec<f32>,
-    pub keyframe: Vec<Vec<f32>>,
+    pub keyframes: Vec<Vec<f32>>,
 }
 
 #[derive(Debug, Clone)]
@@ -152,8 +151,9 @@ impl MeshAsset {
             }
         }
 
+        let mut animations: Vec<Animation> = Vec::new();
         for anim in gltf.animations() {
-            let channels: Vec<AnimationChannel> = Vec::new();
+            let mut channels: Vec<AnimationChannel> = Vec::new();
             anim.channels().for_each(|channel| {
                 let mut keyframe_timestamps: Vec<f32> = vec![];
                 let mut keyframes: Vec<Vec<f32>> = vec![];
@@ -168,6 +168,7 @@ impl MeshAsset {
                         gltf::accessor::Iter::Sparse(_) => {
                             error(&format!(
                                     "mesh asset loading error\npath: {}\nerror: sparse keyframes are not supported", &full_path));
+                            //return Err(MeshAssetError::SparseKeyframesError);
                         }
                     }
                 }
@@ -179,23 +180,36 @@ impl MeshAsset {
                                 let vector: Vec<f32> = tr.into();
                                 keyframes.push(vector);
                             });
+                
+                            channels.push(AnimationChannel { channel_type: AnimationChannelType::Translation, node_index: channel.target().node().index(), keyframe_timestamps, keyframes });
                         },
                         gltf::animation::util::ReadOutputs::Rotations(rotation) => {
                             let rot_iter = rotation.into_f32();
                             rot_iter.for_each(|rot| {
                                 keyframes.push(rot.into());
                             });
+
+                            channels.push(AnimationChannel { channel_type: AnimationChannelType::Rotation, node_index: channel.target().node().index(), keyframe_timestamps, keyframes });
                         }
                         gltf::animation::util::ReadOutputs::Scales(scale) => {
                             scale.for_each(|sc| {
                                 let vector: Vec<f32> = sc.into();
                                 keyframes.push(vector);
                             });
+
+                            channels.push(AnimationChannel { channel_type: AnimationChannelType::Scale, node_index: channel.target().node().index(), keyframe_timestamps, keyframes });
                         },
                         gltf::animation::util::ReadOutputs::MorphTargetWeights(_) => (),
                     }
                 };
             });
+
+            let animation_name = match anim.name() {
+                Some(name) => name.to_string(), 
+                None => "".to_string()
+            };
+
+            animations.push(Animation { name: animation_name, channels });
         }
         todo!();
         //Ok(MeshAsset { objects })

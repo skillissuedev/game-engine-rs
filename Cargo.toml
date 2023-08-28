@@ -15,7 +15,7 @@ conrod = "0.62.1"
 conrod_core = "0.76.1"
 conrod_winit = "0.76.1"
 winit = "0.28.6"
-gltf = "1.2.0"
+gltf = { version = "1.2.0", features = ["extras", "names"] }
 data-url = "0.1.1"
 hound = "3.5.0"
 conrod_glium = { git = "https://github.com/unknownbruhhaha/conrod_latest_glium" }
