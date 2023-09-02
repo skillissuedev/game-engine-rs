@@ -65,6 +65,7 @@ pub trait System {
 
     fn add_object(&mut self, object: Box<dyn Object>) {
         self.get_objects_list_mut().push(object);
+        self.get_objects_list_mut().last_mut().expect("the last object does not exist(why?..)").start();
     }
 }
 

@@ -21,6 +21,7 @@ hound = "3.5.0"
 conrod_glium = { git = "https://github.com/unknownbruhhaha/conrod_latest_glium" }
 allen = { git = "https://github.com/unknownbruhhaha/linear_model_allen" }
 splines = "4.2.0"
+glam = "0.24.1"
 
 #[dependencies.conrod_glium]
 #path = "../../conrod_latest_glium/conrod_glium"

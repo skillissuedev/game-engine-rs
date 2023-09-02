@@ -1,4 +1,4 @@
-use crate::{managers::systems::CallList, objects::{Object, camera_position::CameraPosition, empty_object::EmptyObject, sound_emitter::{SoundEmitter, SoundEmitterType}}, assets::{sound_asset::SoundAsset, model_asset::{self, ModelAsset}}};
+use crate::{managers::systems::CallList, objects::{Object, camera_position::CameraPosition, empty_object::EmptyObject, sound_emitter::{SoundEmitter, SoundEmitterType}, model_object::ModelObject}, assets::{sound_asset::SoundAsset, model_asset::{self, ModelAsset}}};
 use super::System;
 
 pub struct TestSystem {
@@ -13,10 +13,9 @@ impl System for TestSystem {
 
     fn start(&mut self) {
         let asset = ModelAsset::from_file("models/test_model.gltf");
-        let no_anim_asset = ModelAsset::from_file("models/no_anim_test.gltf");
-        println!("{:?}", asset);
-        println!("\n\n\n");
-        println!("{:?}", no_anim_asset);
+        self.add_object(Box::new(ModelObject::new("cool hot", asset.unwrap())));
+        self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["CubeAction"]);
+        //let no_anim_asset = ModelAsset::from_file("models/no_anim_test.gltf");
     }
 
     fn update(&mut self) {

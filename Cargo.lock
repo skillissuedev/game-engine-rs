@@ -1048,6 +1048,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42218cb640844e3872cc3c153dc975229e080a6c4733b34709ef445610550226"
+
+[[package]]
 name = "glium"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2160,6 +2166,7 @@ dependencies = [
  "conrod_glium",
  "conrod_winit",
  "data-url",
+ "glam",
  "glium",
  "gltf",
  "hound",

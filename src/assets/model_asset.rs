@@ -95,7 +95,6 @@ impl ModelAsset {
         for scene in gltf.scenes() {
             for node in scene.nodes() {
                 let node_index = node.index();
-                //println!("Node '{}'", node.name().unwrap());
                 let mesh_option = node.mesh();
                 match mesh_option {
                     Some(mesh) => {
@@ -199,10 +198,6 @@ impl ModelAsset {
                             let y_axis_spline = Spline::from_vec(y_axis_keys);
                             let z_axis_spline = Spline::from_vec(z_axis_keys);
 
-                            for i in keyframe_timestamps {
-                                println!("time: {} x: {:?}", i, x_axis_spline.clamped_sample(i))
-                            }
-
                             channels.push(AnimationChannel {
                                 channel_type: AnimationChannelType::Translation,
                                 node_index: channel.target().node().index(),
@@ -278,8 +273,6 @@ impl ModelAsset {
             };
 
             animations.push(Animation { name: animation_name, channels });
-
-            println!("{:?}", animations);
         }
         Ok(ModelAsset { objects, animations })
     }
