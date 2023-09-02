@@ -1,6 +1,4 @@
-use ultraviolet::Vec3;
-
-use crate::{managers::{systems::CallList, render}, objects::{Object, camera_position::CameraPosition, empty_object::EmptyObject, sound_emitter::{SoundEmitter, SoundEmitterType}}, assets::sound_asset::SoundAsset};
+use crate::{managers::systems::CallList, objects::{Object, camera_position::CameraPosition, empty_object::EmptyObject, sound_emitter::{SoundEmitter, SoundEmitterType}}, assets::{sound_asset::SoundAsset, model_asset::{self, ModelAsset}}};
 use super::System;
 
 pub struct TestSystem {
@@ -14,11 +12,11 @@ impl System for TestSystem {
 
 
     fn start(&mut self) {
-        self.add_object(Box::new(EmptyObject::new("Test Object")));
-        self.get_objects_list_mut()[0].add_child(Box::new(CameraPosition::new("Position")));
-        self.find_object_mut("Test Object").unwrap().set_position(Vec3::new(50.0, 0.0, 6.0));
-
-        println!("test_object: {:?}", self.find_object_mut("Test Object"));
+        let asset = ModelAsset::from_file("models/test_model.gltf");
+        let no_anim_asset = ModelAsset::from_file("models/no_anim_test.gltf");
+        println!("{:?}", asset);
+        println!("\n\n\n");
+        println!("{:?}", no_anim_asset);
     }
 
     fn update(&mut self) {

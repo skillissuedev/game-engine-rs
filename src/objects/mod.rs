@@ -3,7 +3,7 @@ use ultraviolet::Vec3;
 
 pub mod empty_object;
 pub mod camera_position;
-pub mod mesh_object;
+pub mod model_object;
 pub mod sound_emitter;
 
 

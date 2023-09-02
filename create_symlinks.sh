@@ -1,4 +1,6 @@
 #!/bin/bash
 
-ln -s ../baldej_assets/ target/release/assets
-ln -s ../baldej_assets/ target/debug/assets
+cd target/release/
+ln -s ../../../baldej_assets assets
+cd ../debug/
+ln -s ../../../baldej_assets assets

@@ -1,5 +1,6 @@
 use data_url::DataUrl;
 use gltf::Gltf;
+use splines::{Spline, Key};
 use crate::managers::{
     assets,
     debugger::{error, warn},
@@ -15,7 +16,7 @@ pub struct Object {
 }
 
 #[derive(Debug, Clone)]
-pub struct MeshAsset {
+pub struct ModelAsset {
     pub objects: Vec<Object>,
     pub animations: Vec<Animation>,
 }
@@ -30,8 +31,9 @@ pub struct Animation {
 pub struct AnimationChannel {
     pub channel_type: AnimationChannelType,
     pub node_index: usize,
-    pub keyframe_timestamps: Vec<f32>,
-    pub keyframes: Vec<Vec<f32>>,
+    pub x_axis_spline: Spline<f32, f32>,
+    pub y_axis_spline: Spline<f32, f32>,
+    pub z_axis_spline: Spline<f32, f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -41,8 +43,8 @@ pub enum AnimationChannelType {
     Scale,
 }
 
-impl MeshAsset {
-    pub fn from_file(path: &str) -> Result<MeshAsset, MeshAssetError> {
+impl ModelAsset {
+    pub fn from_file(path: &str) -> Result<ModelAsset, ModelAssetError> {
         let full_path = assets::get_full_asset_path(path);
         let gltf_result = Gltf::open(&full_path);
         let gltf: Gltf;
@@ -53,7 +55,7 @@ impl MeshAsset {
                     "mesh asset loading error!\nasset path: {}\nerror: {:?}",
                     &full_path, err
                 ));
-                return Err(MeshAssetError::LoadError);
+                return Err(ModelAssetError::LoadError);
             }
         }
 
@@ -62,7 +64,7 @@ impl MeshAsset {
             match buffer.source() {
                 gltf::buffer::Source::Bin => {
                     error(&format!("mesh asset loading error!\nasset path: {}\nerror: .glb loading is not supported", &full_path));
-                    return Err(MeshAssetError::GlbError);
+                    return Err(ModelAssetError::GlbError);
                 }
                 gltf::buffer::Source::Uri(uri) => {
                     let url = match DataUrl::process(uri) {
@@ -82,7 +84,7 @@ impl MeshAsset {
                             error(&format!(
                                     "got an error when creating mesh asset\nasset path: {}\nerror: can't decode a buffer: bad base64",
                                     &full_path));
-                            return Err(MeshAssetError::BufferDecodingError);
+                            return Err(ModelAssetError::BufferDecodingError);
                         }
                     }
                 }
@@ -104,6 +106,7 @@ impl MeshAsset {
                             let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
 
                             let mut vertices = Vec::new();
+
                             if let Some(vertex_attribute) = reader.read_positions() {
                                 vertex_attribute.for_each(|vertex| {
                                     vertices.push(Vertex {
@@ -114,6 +117,7 @@ impl MeshAsset {
                             } else {
                                 warn(&format!("mesh asset loading warning\npath: {}\nwarning: no vertices", &full_path));
                             }
+                            
                             /*if let Some(normal_attribute) = reader.read_normals() {
                                 let mut normal_index = 0;
                                 normal_attribute.for_each(|normal| {
@@ -168,7 +172,7 @@ impl MeshAsset {
                         gltf::accessor::Iter::Sparse(_) => {
                             error(&format!(
                                     "mesh asset loading error\npath: {}\nerror: sparse keyframes are not supported", &full_path));
-                            //return Err(MeshAssetError::SparseKeyframesError);
+                            //return Err(ModelAssetError::SparseKeyframesError);
                         }
                     }
                 }
@@ -176,28 +180,92 @@ impl MeshAsset {
                 if let Some(outputs) = reader.read_outputs() {
                     match outputs {
                         gltf::animation::util::ReadOutputs::Translations(translation) => {
+                            let mut x_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut y_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut z_axis_keys: Vec<Key<f32, f32>> = vec![];
+
+                            let mut current_keyframe_id = 0;
                             translation.for_each(|tr| {
                                 let vector: Vec<f32> = tr.into();
                                 keyframes.push(vector);
-                            });
-                
-                            channels.push(AnimationChannel { channel_type: AnimationChannelType::Translation, node_index: channel.target().node().index(), keyframe_timestamps, keyframes });
-                        },
-                        gltf::animation::util::ReadOutputs::Rotations(rotation) => {
-                            let rot_iter = rotation.into_f32();
-                            rot_iter.for_each(|rot| {
-                                keyframes.push(rot.into());
+
+                                x_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], tr[0], splines::Interpolation::Linear));
+                                y_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], tr[1], splines::Interpolation::Linear));
+                                z_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], tr[2], splines::Interpolation::Linear));
+                                current_keyframe_id += 1;
                             });
 
-                            channels.push(AnimationChannel { channel_type: AnimationChannelType::Rotation, node_index: channel.target().node().index(), keyframe_timestamps, keyframes });
+                            let x_axis_spline = Spline::from_vec(x_axis_keys);
+                            let y_axis_spline = Spline::from_vec(y_axis_keys);
+                            let z_axis_spline = Spline::from_vec(z_axis_keys);
+
+                            for i in keyframe_timestamps {
+                                println!("time: {} x: {:?}", i, x_axis_spline.clamped_sample(i))
+                            }
+
+                            channels.push(AnimationChannel {
+                                channel_type: AnimationChannelType::Translation,
+                                node_index: channel.target().node().index(),
+                                x_axis_spline,
+                                y_axis_spline,
+                                z_axis_spline,
+                            });
+                        },
+                        gltf::animation::util::ReadOutputs::Rotations(rotation) => {
+                            let mut x_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut y_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut z_axis_keys: Vec<Key<f32, f32>> = vec![];
+
+                            let rot_iter = rotation.into_f32();
+                            let mut current_keyframe_id = 0;
+                            rot_iter.for_each(|rot| {
+                                keyframes.push(rot.into());
+
+                                x_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[0], splines::Interpolation::Linear));
+                                y_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[1], splines::Interpolation::Linear));
+                                z_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[2], splines::Interpolation::Linear));
+                                current_keyframe_id += 1;
+                            });
+
+                            let x_axis_spline = Spline::from_vec(x_axis_keys);
+                            let y_axis_spline = Spline::from_vec(y_axis_keys);
+                            let z_axis_spline = Spline::from_vec(z_axis_keys);
+
+                            channels.push(AnimationChannel {
+                                channel_type: AnimationChannelType::Rotation,
+                                node_index: channel.target().node().index(),
+                                x_axis_spline,
+                                y_axis_spline,
+                                z_axis_spline,
+                            });
                         }
                         gltf::animation::util::ReadOutputs::Scales(scale) => {
+                            let mut x_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut y_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut z_axis_keys: Vec<Key<f32, f32>> = vec![];
+
+                            let mut current_keyframe_id = 0;
                             scale.for_each(|sc| {
                                 let vector: Vec<f32> = sc.into();
                                 keyframes.push(vector);
+
+                                x_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], sc[0], splines::Interpolation::Linear));
+                                y_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], sc[1], splines::Interpolation::Linear));
+                                z_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], sc[2], splines::Interpolation::Linear));
+                                current_keyframe_id += 1;
                             });
 
-                            channels.push(AnimationChannel { channel_type: AnimationChannelType::Scale, node_index: channel.target().node().index(), keyframe_timestamps, keyframes });
+                            let x_axis_spline = Spline::from_vec(x_axis_keys);
+                            let y_axis_spline = Spline::from_vec(y_axis_keys);
+                            let z_axis_spline = Spline::from_vec(z_axis_keys);
+
+                            channels.push(AnimationChannel {
+                                channel_type: AnimationChannelType::Scale,
+                                node_index: channel.target().node().index(),
+                                x_axis_spline,
+                                y_axis_spline,
+                                z_axis_spline,
+                            });
                         },
                         gltf::animation::util::ReadOutputs::MorphTargetWeights(_) => (),
                     }
@@ -210,16 +278,59 @@ impl MeshAsset {
             };
 
             animations.push(Animation { name: animation_name, channels });
+
+            println!("{:?}", animations);
         }
-        todo!();
-        //Ok(MeshAsset { objects })
+        Ok(ModelAsset { objects, animations })
+    }
+
+    pub fn get_animations_list(&self) -> Option<&Vec<Animation>> {
+        match self.animations.is_empty() {
+            true => None,
+            false => Some(&self.animations),
+        }
+    }
+
+    pub fn get_animations_names_list(&self) -> Option<Vec<String>> {
+        match self.animations.is_empty() {
+            false => {
+                let mut list: Vec<String> = Vec::new();
+                for anim in &self.animations {
+                    list.push(anim.name.clone());
+                }
+
+                return Some(list);
+            }
+            true => return None,
+        }
+    }
+
+    pub fn contains_animation(&self, anim_name: &str) -> bool {
+        for anim in &self.animations {
+            if anim.name == anim_name {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub fn find_animation(&self, anim_name: &str) -> Option<Animation> {
+        for anim in &self.animations {
+            if anim.name == anim_name {
+                return Some(anim.clone());
+            }
+        }
+
+        return None;
     }
 }
 
 #[derive(Debug)]
-pub enum MeshAssetError {
+pub enum ModelAssetError {
     LoadError,
     SparseKeyframesError,
     BufferDecodingError,
     GlbError,
+    ChannelCurveBuildingError,
 }
