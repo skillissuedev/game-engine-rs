@@ -44,9 +44,7 @@ impl Object for ModelObject {
 
 
     fn start(&mut self) {
-        println!("start");
         for obj in &self.asset.objects {
-            println!("object!");
             let matrix = Mat4::from_cols_array_2d(&obj.transform);
             let scale_rot_pos = matrix.to_scale_rotation_translation();
             let rotation = scale_rot_pos.1.to_euler(glam::EulerRot::XYZ);
@@ -64,14 +62,12 @@ impl Object for ModelObject {
     }
 
     fn update(&mut self) {
-        println!("cool");
         match &self.animation_settings.animation {
             None => (),
             Some(animation) => {
                 let anim_settings = &self.animation_settings;
                 let timer = &self.animation_settings.timer;
                 let time_elapsed = timer.expect("no timer(why)").elapsed().as_secs_f32();
-                println!("time elapsed: {}", time_elapsed.clone());
 
                 for channel in &animation.channels {
                     match channel.channel_type {
@@ -101,7 +97,7 @@ impl Object for ModelObject {
                                     let x_scale = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
                                     let y_scale = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                                     let z_scale = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                                    node.transform.position = Vec3::new(x_scale, y_scale, z_scale);
+                                    node.transform.scale = Vec3::new(x_scale, y_scale, z_scale);
                                 }
                             }
                         },
@@ -109,8 +105,6 @@ impl Object for ModelObject {
                 }
             }
         };
-
-        println!("node 0 pos: {:?}", self.nodes_transforms[0].transform.position);
     }
 
     fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
