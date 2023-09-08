@@ -25,6 +25,7 @@ pub struct ModelAsset {
 pub struct Animation {
     pub name: String,
     pub channels: Vec<AnimationChannel>,
+    pub duration: f32
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +157,7 @@ impl ModelAsset {
 
         let mut animations: Vec<Animation> = Vec::new();
         for anim in gltf.animations() {
+            let mut animation_duration: f32 = 0.0;
             let mut channels: Vec<AnimationChannel> = Vec::new();
             anim.channels().for_each(|channel| {
                 let mut keyframe_timestamps: Vec<f32> = vec![];
@@ -174,6 +176,15 @@ impl ModelAsset {
                             //return Err(ModelAssetError::SparseKeyframesError);
                         }
                     }
+                }
+
+                match keyframe_timestamps.last() {
+                    Some(time) => {
+                        if animation_duration < *time {
+                            animation_duration = time.clone();
+                        }
+                    },
+                    None => ()
                 }
 
                 if let Some(outputs) = reader.read_outputs() {
@@ -272,7 +283,7 @@ impl ModelAsset {
                 None => "".to_string()
             };
 
-            animations.push(Animation { name: animation_name, channels });
+            animations.push(Animation { name: animation_name, channels, duration: animation_duration });
         }
         Ok(ModelAsset { objects, animations })
     }

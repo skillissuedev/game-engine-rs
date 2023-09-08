@@ -29,10 +29,9 @@ pub trait Object: std::fmt::Debug {
     fn get_parent_transform(&self) -> Option<Transform>;
     fn set_parent_transform(&mut self, transform: Transform);
 
-    // premade fns:
-    fn call(&mut self, name: &str, args: Vec<&str>) {
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> { None } 
 
-    }
+    // premade fns:
     fn get_global_transform(&self) -> Transform {
         let base_transformations = self.get_local_transform();
         let additional_transformations: Transform;

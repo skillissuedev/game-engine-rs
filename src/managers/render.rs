@@ -14,21 +14,9 @@ pub fn draw(target: &mut Frame) {
 }
 
 /* some consts to make code cleaner */
-const ZERO_VEC3: Vec3 = Vec3 {
-    x: 0.0,
-    y: 0.0,
-    z: 0.0,
-};
-const DEFAULT_UP_VECTOR: Vec3 = Vec3 {
-    x: 0.0,
-    y: 1.0,
-    z: 0.0,
-};
-const DEFAULT_FRONT_VECTOR: Vec3 = Vec3 {
-    x: 0.0,
-    y: 0.0,
-    z: -1.0,
-};
+const ZERO_VEC3: Vec3 = Vec3 { x: 0.0, y: 0.0, z: 0.0 };
+const DEFAULT_UP_VECTOR: Vec3 = Vec3 { x: 0.0, y: 1.0, z: 0.0 };
+const DEFAULT_FRONT_VECTOR: Vec3 = Vec3 { x: 0.0, y: 0.0, z: -1.0 };
 
 pub static mut CAMERA_LOCATION: CameraLocation = CameraLocation {
     position: ZERO_VEC3,

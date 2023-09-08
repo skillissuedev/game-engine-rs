@@ -1,7 +1,6 @@
-use glium::texture::RawImage2d;
-
 use crate::managers::{assets::get_full_asset_path, debugger};
 
+#[derive(Debug)]
 pub struct TextureAsset {
     pub image_raw: Vec<u8>,
     pub image_dimensions: (u32, u32),
