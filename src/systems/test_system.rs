@@ -1,6 +1,5 @@
 use ultraviolet::Vec3;
-
-use crate::{managers::systems::CallList, objects::{Object, camera_position::CameraPosition, empty_object::EmptyObject, sound_emitter::{SoundEmitter, SoundEmitterType}, model_object::ModelObject}, assets::{sound_asset::SoundAsset, model_asset::{self, ModelAsset}, shader_asset::ShaderAsset}};
+use crate::{managers::{systems::CallList, render::get_camera_rotation}, objects::{Object, model_object::ModelObject}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
 use super::System;
 
 pub struct TestSystem {
@@ -14,15 +13,20 @@ impl System for TestSystem {
 
 
     fn start(&mut self) {
-        let asset = ModelAsset::from_file("models/test_model.gltf");
+        //let asset = ModelAsset::from_file("models/test_model.gltf");
+        let asset = ModelAsset::from_file("models/no_anim_test.gltf");
         let mut model_object = Box::new(ModelObject::new("cool hot", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         model_object.set_position(Vec3::new(5.0, 0.0, 0.0));
+        model_object.set_rotation(Vec3::new(0.0, 0.0, 0.0));
         self.add_object(model_object);
-        self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["CubeAction"]);
-        //let no_anim_asset = ModelAsset::from_file("models/no_anim_test.gltf");
+        //self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["CubeAction"]);
     }
 
     fn update(&mut self) {
+        let obj = self.find_object_mut("cool hot").unwrap();
+        let obj_rotation = obj.get_local_transform().rotation.y.clone();
+        obj.set_rotation(Vec3::new(0.0, obj_rotation + 0.01, 0.0));
+        //println!("{:?}", get_camera_rotation());
     }
 
     fn render(&mut self) { }

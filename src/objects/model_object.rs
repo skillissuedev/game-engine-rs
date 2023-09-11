@@ -2,7 +2,7 @@ use std::time::Instant;
 use glam::{Mat4, Quat};
 use glium::{VertexBuffer, Program, IndexBuffer, Display, uniform, Surface};
 use ultraviolet::Vec3;
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}};
+use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}, math_utils::deg_to_rad};
 use super::{Object, Transform};
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl Object for ModelObject {
 
     fn update(&mut self) {
         self.update_animation();
-        println!("{:?}", self.nodes_transforms[0].transform.position);
+        //println!("{:?}", self.nodes_transforms[0].transform.rotation);
     }
 
     fn render(&mut self, display: &mut glium::Display, target: &mut glium::Frame) {
@@ -111,13 +111,7 @@ impl Object for ModelObject {
                 }
             }
             let transform = transform.unwrap();
-
-            let model_matrix: Mat4 = self.setup_mat(transform);
-
-            //Some(pos) => model_matrix = self.setup_mat(pos.get_data().unwrap()),
-                    
-            let view_mat = render::get_view_matrix();
-            let projection_mat = render::get_projection_matrix();
+            let mvp: Mat4 = self.setup_mat(transform);
 
             let texture_option = self.texture.as_ref();
 
@@ -127,27 +121,15 @@ impl Object for ModelObject {
                 Some(tx) => texture = tx,
                 None => texture = &empty_texture,
             }
-            let model_matrix_cols = model_matrix.to_cols_array_2d();
+            let mvp_cols = mvp.to_cols_array_2d();
 
             let uniforms = uniform! {
                 mesh: object.transform,
-                model: [
-                    model_matrix_cols[0],
-                    model_matrix_cols[1],
-                    model_matrix_cols[2],
-                    model_matrix_cols[3],
-                ],
-                view: [
-                    *view_mat.cols[0].as_array(),
-                    *view_mat.cols[1].as_array(),
-                    *view_mat.cols[2].as_array(),
-                    *view_mat.cols[3].as_array(),
-                ],
-                projection: [
-                    *projection_mat.cols[0].as_array(),
-                    *projection_mat.cols[1].as_array(),
-                    *projection_mat.cols[2].as_array(),
-                    *projection_mat.cols[3].as_array(),
+                mvp: [
+                    mvp_cols[0],
+                    mvp_cols[1],
+                    mvp_cols[2],
+                    mvp_cols[3],
                 ],
                 tex: texture,
             };
@@ -279,13 +261,14 @@ impl ModelObject {
         let transform_data = node_transform_data.transform;
 
         let object_translation: [f32; 3] = self.transform.position.into();
-        let object_rotation_vec: [f32; 3] = self.transform.position.into();
+        let object_rotation_vec: [f32; 3] = self.transform.rotation.into();
         let object_scale: [f32; 3] = self.transform.scale.into();
+        let object_rotation_vec = [deg_to_rad(object_rotation_vec[0]), deg_to_rad(object_rotation_vec[1]), deg_to_rad(object_rotation_vec[2])];
 
-        let rot_vec = transform_data.rotation;
-        let node_rotation = Quat::from_euler(glam::EulerRot::XYZ, rot_vec.x, rot_vec.y, rot_vec.z);
-        let object_rotation = Quat::from_euler(glam::EulerRot::XYZ, object_rotation_vec[0], object_rotation_vec[1], object_rotation_vec[2]);
-        let rotation = node_rotation + object_rotation;
+        let node_rotation_vec: [f32; 3] = transform_data.rotation.into();
+        // LINE BELOW!!!
+        let rotation_vector = [object_rotation_vec[0] + node_rotation_vec[0], object_rotation_vec[1] + node_rotation_vec[1], object_rotation_vec[2] + node_rotation_vec[2]];
+        let rotation = Quat::from_euler(glam::EulerRot::XYZ, rotation_vector[0], rotation_vector[1], rotation_vector[2]);
 
         let node_translation = glam::Vec3::new(transform_data.position.x, transform_data.position.y, transform_data.position.z);
         let translation: glam::Vec3 = glam::Vec3::from_array(object_translation) + node_translation;
@@ -295,9 +278,14 @@ impl ModelObject {
 
 
         let transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
-        //println!("{:?}", transform.to_scale_rotation_translation().2);
+        let view = glam::Mat4::from_cols_array_2d(&render::get_view_matrix().into());
+        let proj = glam::Mat4::from_cols_array_2d(&render::get_projection_matrix().into());
 
-        transform
+
+        //println!("{:?}", transform.to_scale_rotation_translation().1);
+        println!("{:?}", rotation.to_euler(glam::EulerRot::XYZ));
+
+        proj * view * transform
     }
 
     fn start_mesh(&mut self, display: &Display) {
