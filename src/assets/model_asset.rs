@@ -1,23 +1,29 @@
 use data_url::DataUrl;
 use gltf::Gltf;
 use splines::{Spline, Key};
-use crate::managers::{
-    assets,
-    debugger::{error, warn},
-    render::Vertex,
-};
+use crate::managers::{assets, debugger::{error, warn}, render::Vertex };
 
 #[derive(Debug, Clone)]
 pub struct Object {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u16>,
     pub transform: [[f32; 4]; 4],
+    pub weights: Vec<[f32; 4]>,
+    pub joints: Vec<[u16; 4]>,
+    pub node_index: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Joint {
+    pub inverse_bind_mat: [[f32; 4]; 4],
+    pub transform_mat: [[f32; 4]; 4],
     pub node_index: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct ModelAsset {
     pub objects: Vec<Object>,
+    pub joints: Vec<Joint>,
     pub animations: Vec<Animation>,
 }
 
@@ -95,63 +101,7 @@ impl ModelAsset {
         let mut objects: Vec<Object> = Vec::new();
         for scene in gltf.scenes() {
             for node in scene.nodes() {
-                let node_index = node.index();
-                let mesh_option = node.mesh();
-                match mesh_option {
-                    Some(mesh) => {
-                        let primitives = mesh.primitives();
-                        let transform = node.transform().matrix();
-
-                        primitives.for_each(|primitive| {
-                            let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
-
-                            let mut vertices = Vec::new();
-
-                            if let Some(vertex_attribute) = reader.read_positions() {
-                                vertex_attribute.for_each(|vertex| {
-                                    vertices.push(Vertex {
-                                        position: vertex,
-                                        tex_coords: Default::default(),
-                                    })
-                                });
-                            } else {
-                                warn(&format!("mesh asset loading warning\npath: {}\nwarning: no vertices", &full_path));
-                            }
-                            
-                            /*if let Some(normal_attribute) = reader.read_normals() {
-                                let mut normal_index = 0;
-                                normal_attribute.for_each(|normal| {
-                                    //vertices[normal_index].normal = normal;
-
-                                    normal_index += 1;
-                                });
-                            }*/
-                            if let Some(tex_coord_attribute) = reader.read_tex_coords(0).map(|v| v.into_f32()) {
-                                let mut tex_coord_index = 0;
-                                tex_coord_attribute.for_each(|tex_coord| {
-                                    vertices[tex_coord_index].tex_coords = tex_coord;
-
-                                    tex_coord_index += 1;
-                                });
-                            } else {
-                                warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
-                            }
-
-                            let mut indices = Vec::new();
-                            if let Some(indices_raw) = reader.read_indices() {
-                                let u32_indices = indices_raw.into_u32().collect::<Vec<u32>>();
-                                u32_indices.iter().for_each(|ind| {
-                                    indices.push(*ind as u16);
-                               });
-                            } else {
-                                warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
-                            }
-
-                            objects.push(Object { vertices, indices, transform, node_index });
-                        });
-                    }
-                    None => (),
-                }
+                add_object_and_children(&node, &buffer_data, &full_path, &mut objects);
             }
         }
 
@@ -282,10 +232,30 @@ impl ModelAsset {
                 Some(name) => name.to_string(), 
                 None => "".to_string()
             };
-
             animations.push(Animation { name: animation_name, channels, duration: animation_duration });
         }
-        Ok(ModelAsset { objects, animations })
+
+        let mut joints: Vec<Joint> = Vec::new();
+
+        for skin in gltf.skins() {
+            let reader = skin.reader(|buffer| Some(&buffer_data[buffer.index()]));
+            let inv_mats_option = reader.read_inverse_bind_matrices();
+            let mut inv_mats: Vec<[[f32; 4]; 4]> = Vec::new();
+            match inv_mats_option {
+                Some(iter) => iter.for_each(|inv_mat| inv_mats.push(inv_mat)),
+                None => warn("mesh asset loading warning\npath: {}\nwarning: no inverse matrices"),
+            }
+
+            let iteration: usize = 0;
+            for joint in skin.joints() {
+                if inv_mats.len() > iteration {
+                    let transform_mat = joint.transform().matrix();
+                    let node_index = joint.index();
+                    joints.push(Joint { inverse_bind_mat: inv_mats[iteration], transform_mat, node_index });
+                }
+            }
+        }
+        Ok(ModelAsset { objects, animations, joints })
     }
 
     pub fn get_animations_list(&self) -> Option<&Vec<Animation>> {
@@ -327,6 +297,80 @@ impl ModelAsset {
         }
 
         return None;
+    }
+}
+
+fn add_object_and_children(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, full_path: &str, objects: &mut Vec<Object>) {
+    let node_index = node.index();
+    let mesh_option = node.mesh();
+
+    match mesh_option {
+        Some(mesh) => {
+            let primitives = mesh.primitives();
+            let transform = node.transform().matrix();
+
+            primitives.for_each(|primitive| {
+                let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
+
+                let mut vertices = Vec::new();
+
+                if let Some(vertex_attribute) = reader.read_positions() {
+                    vertex_attribute.for_each(|vertex| {
+                        vertices.push(Vertex {
+                            position: vertex,
+                            tex_coords: Default::default(),
+                        })
+                    });
+                } else {
+                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no vertices", full_path));
+                }
+
+                /*if let Some(normal_attribute) = reader.read_normals() {
+                  let mut normal_index = 0;
+                  normal_attribute.for_each(|normal| {
+                //vertices[normal_index].normal = normal;
+
+                normal_index += 1;
+                });
+                }*/
+                if let Some(tex_coord_attribute) = reader.read_tex_coords(0).map(|v| v.into_f32()) {
+                    let mut tex_coord_index = 0;
+                    tex_coord_attribute.for_each(|tex_coord| {
+                        vertices[tex_coord_index].tex_coords = tex_coord;
+
+                        tex_coord_index += 1;
+                    });
+                } else {
+                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
+                }
+
+                let mut indices = Vec::new();
+                if let Some(indices_raw) = reader.read_indices() {
+                    let u32_indices = indices_raw.into_u32().collect::<Vec<u32>>();
+                    u32_indices.iter().for_each(|ind| {
+                        indices.push(*ind as u16);
+                    });
+                } else {
+                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
+                }
+
+                let mut joints: Vec<[u16; 4]> = Vec::new();
+                if let Some(joint_iter) = reader.read_joints(0) {
+                    joint_iter.into_u16().for_each(|joint_u16| joints.push(joint_u16));
+                }
+
+                let mut weights: Vec<[f32; 4]> = Vec::new();
+                if let Some(weights_iter) = reader.read_weights(0) {
+                    weights_iter.into_f32().for_each(|weight_f31| weights.push(weight_f31));
+                }
+
+                objects.push(Object { vertices, indices, transform, node_index, joints, weights });
+            });
+        }
+        None => (),
+    };
+    for child in node.children() {
+        add_object_and_children(&child, buffer_data, full_path, objects);
     }
 }
 

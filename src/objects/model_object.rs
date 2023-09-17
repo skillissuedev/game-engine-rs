@@ -218,7 +218,7 @@ impl ModelObject {
 
         match anim_option {
             Some(animation) => {
-                println!("playing animation!!!");
+                //println!("playing animation!!!");
                 self.animation_settings = CurrentAnimationSettings {
                     animation: Some(animation),
                     looping: self.animation_settings.looping,
@@ -240,7 +240,7 @@ impl ModelObject {
                 let timer = &anim_settings.timer;
                 let time_elapsed = timer.expect("no timer(why)").elapsed().as_secs_f32();
                 set_objects_anim_node_transform(&mut animation.channels, &mut self.nodes_transforms, time_elapsed);
-                println!("animation is playing!");
+                //println!("animation is playing!");
 
                 if time_elapsed >= animation.duration {
                     if anim_settings.looping {
@@ -266,7 +266,6 @@ impl ModelObject {
         let object_rotation_vec = [deg_to_rad(object_rotation_vec[0]), deg_to_rad(object_rotation_vec[1]), deg_to_rad(object_rotation_vec[2])];
 
         let node_rotation_vec: [f32; 3] = transform_data.rotation.into();
-        // LINE BELOW!!!
         let rotation_vector = [object_rotation_vec[0] + node_rotation_vec[0], object_rotation_vec[1] + node_rotation_vec[1], object_rotation_vec[2] + node_rotation_vec[2]];
         let rotation = Quat::from_euler(glam::EulerRot::XYZ, rotation_vector[0], rotation_vector[1], rotation_vector[2]);
 
@@ -281,9 +280,6 @@ impl ModelObject {
         let view = glam::Mat4::from_cols_array_2d(&render::get_view_matrix().into());
         let proj = glam::Mat4::from_cols_array_2d(&render::get_projection_matrix().into());
 
-
-        //println!("{:?}", transform.to_scale_rotation_translation().1);
-        println!("{:?}", rotation.to_euler(glam::EulerRot::XYZ));
 
         proj * view * transform
     }

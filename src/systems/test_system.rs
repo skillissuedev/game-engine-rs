@@ -14,7 +14,7 @@ impl System for TestSystem {
 
     fn start(&mut self) {
         //let asset = ModelAsset::from_file("models/test_model.gltf");
-        let asset = ModelAsset::from_file("models/no_anim_test.gltf");
+        let asset = ModelAsset::from_file("models/skeleton_test.gltf");
         let mut model_object = Box::new(ModelObject::new("cool hot", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         model_object.set_position(Vec3::new(5.0, 0.0, 0.0));
         model_object.set_rotation(Vec3::new(0.0, 0.0, 0.0));
