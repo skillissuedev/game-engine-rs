@@ -123,6 +123,8 @@ impl Object for ModelObject {
             }
             let mvp_cols = mvp.to_cols_array_2d();
 
+            let joints_mats: [[[f32; 4]; 4]; 50]; 
+
             let uniforms = uniform! {
                 mesh: object.transform,
                 mvp: [
@@ -131,6 +133,7 @@ impl Object for ModelObject {
                     mvp_cols[2],
                     mvp_cols[3],
                 ],
+                //jointsMats: ,
                 tex: texture,
             };
 

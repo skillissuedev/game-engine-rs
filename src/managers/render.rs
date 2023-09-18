@@ -5,6 +5,8 @@ use ultraviolet::{Mat4, Vec3};
 pub struct Vertex {
     pub position: [f32; 3],
     pub tex_coords: [f32; 2],
+    pub joints: [u16; 4],
+    pub weights: [f32; 4],
 }
 implement_vertex!(Vertex, position, tex_coords);
 

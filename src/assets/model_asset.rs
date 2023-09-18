@@ -8,8 +8,6 @@ pub struct Object {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u16>,
     pub transform: [[f32; 4]; 4],
-    pub weights: Vec<[f32; 4]>,
-    pub joints: Vec<[u16; 4]>,
     pub node_index: usize,
 }
 
@@ -319,6 +317,8 @@ fn add_object_and_children(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, full_p
                         vertices.push(Vertex {
                             position: vertex,
                             tex_coords: Default::default(),
+                            joints: Default::default(),
+                            weights: Default::default()
                         })
                     });
                 } else {
@@ -354,17 +354,23 @@ fn add_object_and_children(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, full_p
                     warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
                 }
 
-                let mut joints: Vec<[u16; 4]> = Vec::new();
+                let mut joint_index: usize = 0;
                 if let Some(joint_iter) = reader.read_joints(0) {
-                    joint_iter.into_u16().for_each(|joint_u16| joints.push(joint_u16));
+                    joint_iter.into_u16().for_each(|joints| {
+                        vertices[joint_index].joints = joints;
+                        joint_index += 1;
+                    });
                 }
 
-                let mut weights: Vec<[f32; 4]> = Vec::new();
+                let mut weight_index: usize = 0;
                 if let Some(weights_iter) = reader.read_weights(0) {
-                    weights_iter.into_f32().for_each(|weight_f31| weights.push(weight_f31));
+                    weights_iter.into_f32().for_each(|weights| {
+                        vertices[joint_index].weights = weights;
+                        weight_index += 1;
+                    });
                 }
 
-                objects.push(Object { vertices, indices, transform, node_index, joints, weights });
+                objects.push(Object { vertices, indices, transform, node_index });
             });
         }
         None => (),
