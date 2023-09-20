@@ -137,7 +137,7 @@ pub enum DebugMode {
 
 fn set_ui(ui: &mut Ui, ids: &Ids, text: &mut String) {
     let mut ui_cell = ui.set_widgets();
-    widget::Button::new()
+    /*widget::Button::new()
         .middle_of(ui_cell.window)
         .y_relative(100.0)
         .y_dimension(conrod_core::position::Dimension::Absolute(100.0))
@@ -146,6 +146,7 @@ fn set_ui(ui: &mut Ui, ids: &Ids, text: &mut String) {
         .label_font_size(32)
         .press_color(conrod_core::Color::Rgba(1.0, 1.0, 1.0, 1.0))
         .set(ids.text, &mut ui_cell);
+    */
 
     /*for event in widget::TextBox::new(&text)
         .middle_of(ui_cell.window)

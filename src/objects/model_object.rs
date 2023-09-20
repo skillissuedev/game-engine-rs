@@ -1,6 +1,6 @@
 use std::time::Instant;
 use glam::{Mat4, Quat};
-use glium::{VertexBuffer, Program, IndexBuffer, Display, uniform, Surface};
+use glium::{VertexBuffer, Program, IndexBuffer, Display, uniform, Surface, uniforms::UniformBuffer};
 use ultraviolet::Vec3;
 use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}, math_utils::deg_to_rad};
 use super::{Object, Transform};
@@ -76,7 +76,6 @@ impl Object for ModelObject {
 
     fn update(&mut self) {
         self.update_animation();
-        //println!("{:?}", self.nodes_transforms[0].transform.rotation);
     }
 
     fn render(&mut self, display: &mut glium::Display, target: &mut glium::Frame) {
@@ -123,9 +122,13 @@ impl Object for ModelObject {
             }
             let mvp_cols = mvp.to_cols_array_2d();
 
-            let joints_mats: [[[f32; 4]; 4]; 50]; 
+            let joints = UniformBuffer::new(display, self.asset.joints_mats).unwrap();
+            let inverse_bind_mats = UniformBuffer::new(display, self.asset.joints_inverse_bind_mats).unwrap();
+            //println!("{:?}", self.asset.joints_mats[0]);
 
             let uniforms = uniform! {
+                jointsMats: &joints,
+                jointsInverseBindMats: &inverse_bind_mats,
                 mesh: object.transform,
                 mvp: [
                     mvp_cols[0],
@@ -133,7 +136,6 @@ impl Object for ModelObject {
                     mvp_cols[2],
                     mvp_cols[3],
                 ],
-                //jointsMats: ,
                 tex: texture,
             };
 
@@ -221,7 +223,6 @@ impl ModelObject {
 
         match anim_option {
             Some(animation) => {
-                //println!("playing animation!!!");
                 self.animation_settings = CurrentAnimationSettings {
                     animation: Some(animation),
                     looping: self.animation_settings.looping,
@@ -243,7 +244,6 @@ impl ModelObject {
                 let timer = &anim_settings.timer;
                 let time_elapsed = timer.expect("no timer(why)").elapsed().as_secs_f32();
                 set_objects_anim_node_transform(&mut animation.channels, &mut self.nodes_transforms, time_elapsed);
-                //println!("animation is playing!");
 
                 if time_elapsed >= animation.duration {
                     if anim_settings.looping {
@@ -294,7 +294,7 @@ impl ModelObject {
                 Ok(buff) => self.vertex_buffer.push(buff),
                 Err(err) => {
                     error(&format!(
-                        "Mesh component error:\nvertex buffer creation error!\nErr: {}",
+                        "Mesh object error:\nvertex buffer creation error!\nErr: {}",
                         err
                     ));
                     self.error = true;
@@ -317,7 +317,7 @@ impl ModelObject {
                 Ok(prog) => self.program.push(prog),
                 Err(err) => {
                     error(&format!(
-                        "Mesh component error:\nprogram creation error!\nErr: {}",
+                        "Mesh object error:\nprogram creation error!\nErr: {}",
                         err
                     ));
                     self.error = true;
@@ -338,7 +338,7 @@ impl ModelObject {
                 Ok(tx) => self.texture = Some(tx),
                 Err(err) => {
                     error(&format!(
-                        "Mesh component error:\ntexture creating error!\nErr: {}",
+                        "Mesh object error:\ntexture creating error!\nErr: {}",
                         err
                     ));
                     self.texture = None;

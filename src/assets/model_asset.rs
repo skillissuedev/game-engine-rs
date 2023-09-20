@@ -1,4 +1,5 @@
 use data_url::DataUrl;
+use glam::Mat4;
 use gltf::Gltf;
 use splines::{Spline, Key};
 use crate::managers::{assets, debugger::{error, warn}, render::Vertex };
@@ -7,6 +8,12 @@ use crate::managers::{assets, debugger::{error, warn}, render::Vertex };
 pub struct Object {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u16>,
+    pub transform: [[f32; 4]; 4],
+    pub node_index: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Node {
     pub transform: [[f32; 4]; 4],
     pub node_index: usize,
 }
@@ -22,7 +29,10 @@ pub struct Joint {
 pub struct ModelAsset {
     pub objects: Vec<Object>,
     pub joints: Vec<Joint>,
+    pub nodes: Vec<Node>,
     pub animations: Vec<Animation>,
+    pub joints_mats: [[[f32; 4]; 4]; 128],
+    pub joints_inverse_bind_mats: [[[f32; 4]; 4]; 128],
 }
 
 #[derive(Debug, Clone)]
@@ -97,9 +107,10 @@ impl ModelAsset {
         }
 
         let mut objects: Vec<Object> = Vec::new();
+        let mut nodes: Vec<Node> = Vec::new();
         for scene in gltf.scenes() {
             for node in scene.nodes() {
-                add_object_and_children(&node, &buffer_data, &full_path, &mut objects);
+                add_object_and_children(&node, &buffer_data, &full_path, &mut objects, &mut nodes, None);
             }
         }
 
@@ -234,7 +245,6 @@ impl ModelAsset {
         }
 
         let mut joints: Vec<Joint> = Vec::new();
-
         for skin in gltf.skins() {
             let reader = skin.reader(|buffer| Some(&buffer_data[buffer.index()]));
             let inv_mats_option = reader.read_inverse_bind_matrices();
@@ -244,16 +254,29 @@ impl ModelAsset {
                 None => warn("mesh asset loading warning\npath: {}\nwarning: no inverse matrices"),
             }
 
-            let iteration: usize = 0;
+            let mut joint_iteration = 0;
             for joint in skin.joints() {
-                if inv_mats.len() > iteration {
-                    let transform_mat = joint.transform().matrix();
-                    let node_index = joint.index();
-                    joints.push(Joint { inverse_bind_mat: inv_mats[iteration], transform_mat, node_index });
-                }
+                joints.push(Joint { 
+                    inverse_bind_mat: inv_mats[joint_iteration], 
+                    transform_mat: joint.transform().matrix(),
+                    node_index: joint.index()
+                });
+                joint_iteration += 1;
             }
         }
-        Ok(ModelAsset { objects, animations, joints })
+
+        if objects.is_empty() {
+            warn("warning when creating model asset.\n0 mesh data found");
+        }
+
+        Ok(ModelAsset { 
+            objects, 
+            animations, 
+            joints: joints.clone(), 
+            nodes, 
+            joints_mats: joints_vec_to_array(joints.clone()), 
+            joints_inverse_bind_mats: joints_vec_to_inverse_mat_array(joints.clone()) 
+        })
     }
 
     pub fn get_animations_list(&self) -> Option<&Vec<Animation>> {
@@ -298,14 +321,73 @@ impl ModelAsset {
     }
 }
 
-fn add_object_and_children(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, full_path: &str, objects: &mut Vec<Object>) {
+fn joints_vec_to_array(joints_vec: Vec<Joint>) -> [[[f32; 4]; 4]; 128] {
+    let identity_mat: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+    let mut joints_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
+    let mut joints_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
+
+    if joints_vec.len() > 128 {
+        warn("model asset warning! model contains more than 128 joints!\nonly 100 joints would be used");
+    }
+    joints_vec.into_iter().for_each(|joint| joints_mat_options_vec.insert(joint.node_index, Some(joint.transform_mat)));
+    
+    for joint_idx in 0..joints_mat_options_vec.len() {
+        match joints_mat_options_vec[joint_idx] {
+            Some(mat) => joints_mat_vec.insert(joint_idx, mat), 
+            None => joints_mat_vec.insert(joint_idx, identity_mat),
+        }
+    }
+    joints_mat_vec.truncate(128);
+
+    let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec.try_into().expect("joints_vec_to_array failed!");
+    joints_array
+}
+
+fn joints_vec_to_inverse_mat_array(joints_vec: Vec<Joint>) -> [[[f32; 4]; 4]; 128] {
+    let identity_mat: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+    let mut inv_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
+    let mut inv_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
+
+    if joints_vec.len() > 128 {
+        warn("model asset warning! model contains more than 128 joints!\nonly 100 joints would be used");
+    }
+    joints_vec.into_iter().for_each(|joint| inv_mat_options_vec.insert(joint.node_index, Some(joint.inverse_bind_mat)));
+    
+    for joint_idx in 0..inv_mat_options_vec.len() {
+        match inv_mat_options_vec[joint_idx] {
+            Some(mat) => inv_mat_vec.insert(joint_idx, mat), 
+            None => inv_mat_vec.insert(joint_idx, identity_mat),
+        }
+    }
+    inv_mat_vec.truncate(128);
+
+    let inv_mat_array: [[[f32; 4]; 4]; 128] = inv_mat_vec.try_into().expect("joints_vec_to_array failed!");
+    inv_mat_array
+}
+
+fn add_object_and_children(
+    node: &gltf::Node, 
+    buffer_data: &Vec<Vec<u8>>, 
+    full_path: &str, 
+    objects: &mut Vec<Object>, 
+    nodes: &mut Vec<Node>, 
+    parent_transform_mat: Option<[[f32; 4]; 4]>) {
+
     let node_index = node.index();
+    let transform = node.transform().matrix();
+
+    let global_transform_mat: Mat4;
+    match parent_transform_mat {
+        Some(parent_tr_mat) => global_transform_mat = Mat4::from_cols_array_2d(&parent_tr_mat) * Mat4::from_cols_array_2d(&transform),
+        None => global_transform_mat = Mat4::from_cols_array_2d(&transform)
+    }
+    let global_transform_mat_cols = global_transform_mat.to_cols_array_2d();
+
     let mesh_option = node.mesh();
 
     match mesh_option {
         Some(mesh) => {
             let primitives = mesh.primitives();
-            let transform = node.transform().matrix();
 
             primitives.for_each(|primitive| {
                 let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
@@ -357,7 +439,8 @@ fn add_object_and_children(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, full_p
                 let mut joint_index: usize = 0;
                 if let Some(joint_iter) = reader.read_joints(0) {
                     joint_iter.into_u16().for_each(|joints| {
-                        vertices[joint_index].joints = joints;
+                        let joints_f32: [f32; 4] = [joints[0] as f32, joints[1] as f32, joints[2] as f32, joints[3] as f32]; 
+                        vertices[joint_index].joints = joints_f32;
                         joint_index += 1;
                     });
                 }
@@ -365,18 +448,21 @@ fn add_object_and_children(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, full_p
                 let mut weight_index: usize = 0;
                 if let Some(weights_iter) = reader.read_weights(0) {
                     weights_iter.into_f32().for_each(|weights| {
-                        vertices[joint_index].weights = weights;
+                        vertices[weight_index].weights = weights;
                         weight_index += 1;
                     });
                 }
 
-                objects.push(Object { vertices, indices, transform, node_index });
+                objects.push(Object { vertices, indices, transform: global_transform_mat_cols, node_index });
             });
         }
         None => (),
     };
+
+    nodes.push(Node { transform: global_transform_mat_cols, node_index: node.index() });
+
     for child in node.children() {
-        add_object_and_children(&child, buffer_data, full_path, objects);
+        add_object_and_children(&child, buffer_data, full_path, objects, nodes, Some(global_transform_mat_cols));
     }
 }
 

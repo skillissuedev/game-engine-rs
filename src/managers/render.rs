@@ -5,10 +5,10 @@ use ultraviolet::{Mat4, Vec3};
 pub struct Vertex {
     pub position: [f32; 3],
     pub tex_coords: [f32; 2],
-    pub joints: [u16; 4],
+    pub joints: [f32; 4],
     pub weights: [f32; 4],
 }
-implement_vertex!(Vertex, position, tex_coords);
+implement_vertex!(Vertex, position, tex_coords, joints, weights);
 
 pub fn draw(target: &mut Frame) {
     target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
