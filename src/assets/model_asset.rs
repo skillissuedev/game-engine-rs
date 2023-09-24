@@ -1,3 +1,4 @@
+
 use data_url::DataUrl;
 use glam::Mat4;
 use gltf::Gltf;
@@ -16,6 +17,7 @@ pub struct Object {
 pub struct Node {
     pub transform: [[f32; 4]; 4],
     pub node_index: usize,
+    pub children_id: Vec<usize>
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +32,7 @@ pub struct ModelAsset {
     pub objects: Vec<Object>,
     pub joints: Vec<Joint>,
     pub nodes: Vec<Node>,
+    pub root_nodes: Vec<Node>,
     pub animations: Vec<Animation>,
     pub joints_mats: [[[f32; 4]; 4]; 128],
     pub joints_inverse_bind_mats: [[[f32; 4]; 4]; 128],
@@ -108,9 +111,16 @@ impl ModelAsset {
 
         let mut objects: Vec<Object> = Vec::new();
         let mut nodes: Vec<Node> = Vec::new();
+        let mut root_nodes: Vec<Node> = Vec::new();
         for scene in gltf.scenes() {
             for node in scene.nodes() {
                 add_object_and_children(&node, &buffer_data, &full_path, &mut objects, &mut nodes, None);
+                let mut children_id: Vec<usize> = Vec::new();
+                for child in node.children() {
+                    children_id.push(child.index());
+                }
+
+                root_nodes.push(Node { transform: node.transform().matrix(), node_index: node.index(), children_id });
             }
         }
 
@@ -274,6 +284,7 @@ impl ModelAsset {
             animations, 
             joints: joints.clone(), 
             nodes, 
+            root_nodes,
             joints_mats: joints_vec_to_array(joints.clone()), 
             joints_inverse_bind_mats: joints_vec_to_inverse_mat_array(joints.clone()) 
         })
@@ -459,12 +470,19 @@ fn add_object_and_children(
         None => (),
     };
 
-    nodes.push(Node { transform: global_transform_mat_cols, node_index: node.index() });
+    let mut children_id: Vec<usize> = vec![];
+    for child in node.children() {
+        children_id.push(child.index());
+    }
+
+    nodes.push(Node { transform: global_transform_mat_cols, node_index: node.index(), children_id });
 
     for child in node.children() {
         add_object_and_children(&child, buffer_data, full_path, objects, nodes, Some(global_transform_mat_cols));
     }
 }
+
+
 
 #[derive(Debug)]
 pub enum ModelAssetError {

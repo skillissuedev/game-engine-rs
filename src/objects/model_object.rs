@@ -1,18 +1,17 @@
 use std::time::Instant;
-use glam::{Mat4, Quat};
+use glam::{Mat4, Quat, Vec3};
 use glium::{VertexBuffer, Program, IndexBuffer, Display, uniform, Surface, uniforms::UniformBuffer};
-use ultraviolet::Vec3;
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}, math_utils::deg_to_rad};
+use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}, math_utils::deg_to_rad};
 use super::{Object, Transform};
 
 #[derive(Debug)]
 pub struct ModelObject {
     pub name: String,
     pub transform: Transform,
-    pub nodes_transforms: Vec<NodeTransform>,
     pub parent_transform: Option<Transform>,
     pub children: Vec<Box<dyn Object>>,
     pub asset: ModelAsset,
+    pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
     pub shader_asset: ShaderAsset,
     pub texture_asset: Option<TextureAsset>,
@@ -25,9 +24,26 @@ pub struct ModelObject {
 
 impl ModelObject {
     pub fn new(name: &str, asset: ModelAsset, texture_asset: Option<TextureAsset>, shader_asset: ShaderAsset) -> Self {
+        let mut nodes_transforms: Vec<NodeTransform> = vec![];
+        for node in &asset.nodes {
+            let node_local_transform_mat = Mat4::from_cols_array_2d(&node.transform);
+            let node_scale_rotation_translation = node_local_transform_mat.to_scale_rotation_translation();
+            let node_rotation = node_scale_rotation_translation.1.to_euler(glam::EulerRot::XYZ);
+
+            nodes_transforms.push(
+                NodeTransform { 
+                    local_position: node_scale_rotation_translation.2,
+                    local_rotation: node_rotation.into(), 
+                    local_scale: node_scale_rotation_translation.0,
+                    global_transform: None, 
+                    node_id: node.node_index
+                }
+            );
+        }
+
         ModelObject {
             transform: Transform::default(),
-            nodes_transforms: vec![],
+            nodes_transforms,
             children: vec![],
             name: name.to_string(),
             parent_transform: None, asset,
@@ -57,25 +73,14 @@ impl Object for ModelObject {
 
 
     fn start(&mut self) {
-        for obj in &self.asset.objects {
-            let matrix = Mat4::from_cols_array_2d(&obj.transform);
-            let scale_rot_pos = matrix.to_scale_rotation_translation();
-            let rotation = scale_rot_pos.1.to_euler(glam::EulerRot::XYZ);
-            let position = scale_rot_pos.2;
-            let scale = scale_rot_pos.0;
 
-            let obj_transform = Transform { 
-                position: Vec3 { x: position.x, y: position.y, z: position.z },
-                rotation: Vec3 { x: rotation.0, y: rotation.1, z: rotation.2 },
-                scale: Vec3 { x: scale.x, y: scale.y, z: scale.z }
-            };
-
-            self.nodes_transforms.push(NodeTransform { transform: obj_transform, node_id: obj.node_index });
-        }
     }
 
     fn update(&mut self) {
         self.update_animation();
+        for node in &self.asset.root_nodes {
+            set_nodes_global_transform(&node, &self.asset.nodes, None, &mut self.nodes_transforms);
+        }
     }
 
     fn render(&mut self, display: &mut glium::Display, target: &mut glium::Frame) {
@@ -88,6 +93,20 @@ impl Object for ModelObject {
 
         for i in 0..self.asset.objects.len() {
             let object = &self.asset.objects[i];
+            let mut node_mat: Mat4 = Mat4::IDENTITY;
+            for node_transform in &self.nodes_transforms {
+                if node_transform.node_id == object.node_index {
+                    println!("local translation: {}", node_transform.local_position);
+                    println!("global: {:?}\n\n", node_transform.global_transform);
+                    match node_transform.global_transform {
+                        Some(node_tr) => node_mat = node_tr,
+                        None => error(
+                            &format!("model object\ngot an error in render()\nnode transform's global_transform is None\node_index is {}", node_transform.node_id)),
+                    }
+                }
+            }
+            let mut node_mat_cols: [[f32; 4]; 4] = node_mat.to_cols_array_2d();
+
             let indices = IndexBuffer::new(
                 display,
                 glium::index::PrimitiveType::TrianglesList,
@@ -109,8 +128,7 @@ impl Object for ModelObject {
                     return;
                 }
             }
-            let transform = transform.unwrap();
-            let mvp: Mat4 = self.setup_mat(transform);
+            let mvp: Mat4 = self.setup_mat();
 
             let texture_option = self.texture.as_ref();
 
@@ -124,7 +142,6 @@ impl Object for ModelObject {
 
             let joints = UniformBuffer::new(display, self.asset.joints_mats).unwrap();
             let inverse_bind_mats = UniformBuffer::new(display, self.asset.joints_inverse_bind_mats).unwrap();
-            //println!("{:?}", self.asset.joints_mats[0]);
 
             let uniforms = uniform! {
                 jointsMats: &joints,
@@ -137,6 +154,12 @@ impl Object for ModelObject {
                     mvp_cols[3],
                 ],
                 tex: texture,
+                nodeMatrix: [
+                    node_mat_cols[0],
+                    node_mat_cols[1],
+                    node_mat_cols[2],
+                    node_mat_cols[3],
+                ]
             };
 
             let draw_params = glium::DrawParameters {
@@ -260,29 +283,18 @@ impl ModelObject {
         }
     }
 
-    fn setup_mat(&self, node_transform_data: &NodeTransform) -> Mat4 {
-        let transform_data = node_transform_data.transform;
+    fn setup_mat(&self) -> Mat4 {
+        let model_object_translation: [f32; 3] = self.transform.position.into();
+        let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
+        let model_object_scale: [f32; 3] = self.transform.scale.into();
+        let model_object_rotation_vec = 
+            [deg_to_rad(model_object_rotation_vec[0]), deg_to_rad(model_object_rotation_vec[1]), deg_to_rad(model_object_rotation_vec[2])];
+        let model_object_rotation_quat = 
+            Quat::from_euler(glam::EulerRot::XYZ, model_object_rotation_vec[0], model_object_rotation_vec[1], model_object_rotation_vec[2]);
 
-        let object_translation: [f32; 3] = self.transform.position.into();
-        let object_rotation_vec: [f32; 3] = self.transform.rotation.into();
-        let object_scale: [f32; 3] = self.transform.scale.into();
-        let object_rotation_vec = [deg_to_rad(object_rotation_vec[0]), deg_to_rad(object_rotation_vec[1]), deg_to_rad(object_rotation_vec[2])];
-
-        let node_rotation_vec: [f32; 3] = transform_data.rotation.into();
-        let rotation_vector = [object_rotation_vec[0] + node_rotation_vec[0], object_rotation_vec[1] + node_rotation_vec[1], object_rotation_vec[2] + node_rotation_vec[2]];
-        let rotation = Quat::from_euler(glam::EulerRot::XYZ, rotation_vector[0], rotation_vector[1], rotation_vector[2]);
-
-        let node_translation = glam::Vec3::new(transform_data.position.x, transform_data.position.y, transform_data.position.z);
-        let translation: glam::Vec3 = glam::Vec3::from_array(object_translation) + node_translation;
-
-        let node_scale = glam::Vec3::new(transform_data.scale.x, transform_data.scale.y, transform_data.scale.z);
-        let scale: glam::Vec3 = glam::Vec3::from_array(object_scale) + node_scale;
-
-
-        let transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+        let transform = Mat4::from_scale_rotation_translation(model_object_scale.into(), model_object_rotation_quat, model_object_translation.into());
         let view = glam::Mat4::from_cols_array_2d(&render::get_view_matrix().into());
         let proj = glam::Mat4::from_cols_array_2d(&render::get_projection_matrix().into());
-
 
         proj * view * transform
     }
@@ -359,7 +371,7 @@ fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_t
                         let x_pos = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let y_pos = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_pos = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.transform.position = Vec3::new(x_pos, y_pos, z_pos);
+                        node.local_position = Vec3::new(x_pos, y_pos, z_pos);
                     }
                 }
             },
@@ -369,7 +381,7 @@ fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_t
                         let x_rot = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let y_rot = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_rot = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.transform.rotation = Vec3::new(x_rot, y_rot, z_rot);
+                        node.local_rotation = Vec3::new(x_rot, y_rot, z_rot);
                     }
                 }
             },
@@ -379,11 +391,57 @@ fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_t
                         let x_scale = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let y_scale = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_scale = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.transform.scale = Vec3::new(x_scale, y_scale, z_scale);
+                        node.local_scale = Vec3::new(x_scale, y_scale, z_scale);
                     }
                 }
             },
         }
+    }
+}
+
+fn set_nodes_global_transform
+    (node: &model_asset::Node, nodes_list: &Vec<model_asset::Node>, parent_transform_mat: Option<Mat4>, nodes_transforms: &mut Vec<NodeTransform>) {
+
+    let node_index = node.node_index;
+    let mut node_transform: Option<&mut NodeTransform> = None;
+
+    for transform in nodes_transforms.into_iter() {
+        if transform.node_id == node_index {
+            node_transform = Some(transform);
+        }
+    }
+
+    if node_transform.is_none() {
+        error("model object error\ngot an error in set_nodes_global_transform()\nnode transform not found");
+        return;
+    }
+    let node_transform = node_transform.expect("node transform was None(why)");
+
+    let local_rotation = node_transform.local_rotation;
+    let local_rotation_quat = Quat::from_euler(glam::EulerRot::XYZ, local_rotation.x, local_rotation.y, local_rotation.z);
+    let local_transform = Mat4::from_scale_rotation_translation(node_transform.local_scale, local_rotation_quat, node_transform.local_position);
+
+
+    let global_transform_mat: Mat4;
+    match parent_transform_mat {
+        Some(parent_tr_mat) => global_transform_mat = parent_tr_mat * local_transform,
+        None => global_transform_mat = local_transform
+    }
+
+    node_transform.global_transform = Some(global_transform_mat);
+
+    
+    let mut children_nodes: Vec<&model_asset::Node> = vec![];
+    for child_id in &node.children_id {
+        for current_node in nodes_list {
+            if &current_node.node_index == child_id {
+                children_nodes.push(current_node);
+            }
+        }
+    }
+
+    for child in children_nodes {
+        set_nodes_global_transform(child, nodes_list, Some(global_transform_mat), nodes_transforms);
     }
 }
 
@@ -396,10 +454,14 @@ pub struct CurrentAnimationSettings {
 
 #[derive(Debug)]
 pub struct NodeTransform {
-    pub transform: Transform,
+    pub local_position: Vec3,
+    pub local_rotation: Vec3,
+    pub local_scale: Vec3,
+    pub global_transform: Option<Mat4>,
     pub node_id: usize
 }
 
+#[derive(Debug)]
 pub enum ModelObjectError {
     AnimationNotFound
 }

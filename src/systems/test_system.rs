@@ -13,13 +13,14 @@ impl System for TestSystem {
 
 
     fn start(&mut self) {
-        //let asset = ModelAsset::from_file("models/test_model.gltf");
-        let asset = ModelAsset::from_file("models/skeleton_test.gltf");
+        let asset = ModelAsset::from_file("models/test_model.gltf");
+        //let asset = ModelAsset::from_file("models/skeleton_test.gltf");
         let mut model_object = Box::new(ModelObject::new("cool hot", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
-        model_object.set_position(Vec3::new(2.0, 0.0, 0.0));
+        model_object.set_position(Vec3::new(3.0, 0.0, 0.0));
         model_object.set_rotation(Vec3::new(0.0, 0.0, 0.0));
         self.add_object(model_object);
-        //self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["CubeAction"]);
+        self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["CubeAction"]);
+        self.find_object_mut("cool hot").unwrap().call("set_looping", vec!["true"]);
     }
 
     fn update(&mut self) {
