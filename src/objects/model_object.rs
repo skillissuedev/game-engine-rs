@@ -96,8 +96,6 @@ impl Object for ModelObject {
             let mut node_mat: Mat4 = Mat4::IDENTITY;
             for node_transform in &self.nodes_transforms {
                 if node_transform.node_id == object.node_index {
-                    println!("local translation: {}", node_transform.local_position);
-                    println!("global: {:?}\n\n", node_transform.global_transform);
                     match node_transform.global_transform {
                         Some(node_tr) => node_mat = node_tr,
                         None => error(
@@ -105,7 +103,6 @@ impl Object for ModelObject {
                     }
                 }
             }
-            let mut node_mat_cols: [[f32; 4]; 4] = node_mat.to_cols_array_2d();
 
             let indices = IndexBuffer::new(
                 display,
@@ -128,7 +125,7 @@ impl Object for ModelObject {
                     return;
                 }
             }
-            let mvp: Mat4 = self.setup_mat();
+            let mvp: Mat4 = self.setup_mat(transform.unwrap());
 
             let texture_option = self.texture.as_ref();
 
@@ -154,12 +151,6 @@ impl Object for ModelObject {
                     mvp_cols[3],
                 ],
                 tex: texture,
-                nodeMatrix: [
-                    node_mat_cols[0],
-                    node_mat_cols[1],
-                    node_mat_cols[2],
-                    node_mat_cols[3],
-                ]
             };
 
             let draw_params = glium::DrawParameters {
@@ -283,16 +274,44 @@ impl ModelObject {
         }
     }
 
-    fn setup_mat(&self) -> Mat4 {
+    fn setup_mat(&self, node_transform: &NodeTransform) -> Mat4 {
+        match node_transform.global_transform {
+            Some(_) => (),
+            None => {
+                error("model object error\nerror in setup_mat()\nnode_transform's global_transform is None");
+                return Mat4::IDENTITY;
+            },
+        }
+        let node_global_transform = node_transform.global_transform.unwrap();
+        let scale_rotation_translation = node_global_transform.to_scale_rotation_translation();
+        let rotation_vector = scale_rotation_translation.1.to_euler(glam::EulerRot::XYZ);
+        let translation_vector = scale_rotation_translation.2;
+        let scale_vector = scale_rotation_translation.0;
+
+        let scale_rotation_translation = node_transform.global_transform;
         let model_object_translation: [f32; 3] = self.transform.position.into();
         let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
         let model_object_scale: [f32; 3] = self.transform.scale.into();
         let model_object_rotation_vec = 
             [deg_to_rad(model_object_rotation_vec[0]), deg_to_rad(model_object_rotation_vec[1]), deg_to_rad(model_object_rotation_vec[2])];
-        let model_object_rotation_quat = 
-            Quat::from_euler(glam::EulerRot::XYZ, model_object_rotation_vec[0], model_object_rotation_vec[1], model_object_rotation_vec[2]);
 
-        let transform = Mat4::from_scale_rotation_translation(model_object_scale.into(), model_object_rotation_quat, model_object_translation.into());
+        let full_translation = 
+            Vec3::new(
+                model_object_translation[0] + translation_vector.x, 
+                model_object_translation[1] + translation_vector.y, 
+                model_object_translation[2] + translation_vector.z);
+        let full_scale = 
+            Vec3::new(
+                model_object_scale[0] + scale_vector.x, 
+                model_object_scale[1] + scale_vector.y, 
+                model_object_scale[2] + scale_vector.z);
+        let full_rotation = 
+            [model_object_rotation_vec[0] + rotation_vector.0, model_object_rotation_vec[1] + rotation_vector.1, model_object_rotation_vec[2] + rotation_vector.2];
+        let rotation_quat = 
+            Quat::from_euler(glam::EulerRot::XYZ, full_rotation[0], full_rotation[1], full_rotation[2]);
+
+
+        let transform = Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
         let view = glam::Mat4::from_cols_array_2d(&render::get_view_matrix().into());
         let proj = glam::Mat4::from_cols_array_2d(&render::get_projection_matrix().into());
 
