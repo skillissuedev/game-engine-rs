@@ -114,7 +114,7 @@ impl ModelAsset {
         let mut root_nodes: Vec<Node> = Vec::new();
         for scene in gltf.scenes() {
             for node in scene.nodes() {
-                add_object_and_children(&node, &buffer_data, &full_path, &mut objects, &mut nodes, None);
+                add_object_and_children(&node, &buffer_data, &full_path, &mut objects, &mut nodes, Some(node.transform().matrix()));
                 let mut children_id: Vec<usize> = Vec::new();
                 for child in node.children() {
                     children_id.push(child.index());

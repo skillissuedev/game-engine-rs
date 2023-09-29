@@ -1,7 +1,7 @@
 use std::time::Instant;
 use glam::{Mat4, Quat, Vec3};
 use glium::{VertexBuffer, Program, IndexBuffer, Display, uniform, Surface, uniforms::UniformBuffer};
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::error}, math_utils::deg_to_rad};
+use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn}}, math_utils::deg_to_rad};
 use super::{Object, Transform};
 
 #[derive(Debug)]
@@ -36,7 +36,8 @@ impl ModelObject {
                     local_rotation: node_rotation.into(), 
                     local_scale: node_scale_rotation_translation.0,
                     global_transform: None, 
-                    node_id: node.node_index
+                    node_id: node.node_index,
+                    parent_global_transform: None
                 }
             );
         }
@@ -137,7 +138,7 @@ impl Object for ModelObject {
             }
             let mvp_cols = mvp.to_cols_array_2d();
 
-            let joints = UniformBuffer::new(display, self.asset.joints_mats).unwrap();
+            let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
             let inverse_bind_mats = UniformBuffer::new(display, self.asset.joints_inverse_bind_mats).unwrap();
 
             let uniforms = uniform! {
@@ -249,6 +250,43 @@ impl ModelObject {
         }
     }
 
+    fn get_joints_transforms(&self) -> [[[f32; 4]; 4]; 128] {
+        let mut joints_vec: Vec<&NodeTransform> = Vec::new();
+        for joint in &self.asset.joints {
+            for node_transform in &self.nodes_transforms {
+                if node_transform.node_id == joint.node_index {
+                    joints_vec.push(node_transform);
+                }
+            }
+        }
+
+
+        let identity_mat: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        let mut joints_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
+        let mut joints_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
+
+        if joints_vec.len() > 128 {
+            warn("model object warning! model contains more than 128 joints!\nonly 100 joints would be used");
+        }
+        joints_vec.into_iter().for_each(|joint| {
+            match joint.global_transform {
+                Some(global_tr) => joints_mat_options_vec.insert(joint.node_id, Some(global_tr.to_cols_array_2d())),
+                None => warn("model object warning\njoints_transforms_vec_to_array(): joint's global transform is none")
+            }
+        });
+
+        for joint_idx in 0..joints_mat_options_vec.len() {
+            match joints_mat_options_vec[joint_idx] {
+                Some(mat) => joints_mat_vec.insert(joint_idx, mat), 
+                None => joints_mat_vec.insert(joint_idx, identity_mat),
+            }
+        }
+        joints_mat_vec.truncate(128);
+
+        let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec.try_into().expect("joints_vec_to_array failed!");
+        joints_array
+    }
+
     fn update_animation(&mut self) {
         let anim_settings = &mut self.animation_settings;
         let animation_option = &mut anim_settings.animation;
@@ -288,7 +326,6 @@ impl ModelObject {
         let translation_vector = scale_rotation_translation.2;
         let scale_vector = scale_rotation_translation.0;
 
-        let scale_rotation_translation = node_transform.global_transform;
         let model_object_translation: [f32; 3] = self.transform.position.into();
         let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
         let model_object_scale: [f32; 3] = self.transform.scale.into();
@@ -443,11 +480,15 @@ fn set_nodes_global_transform
 
     let global_transform_mat: Mat4;
     match parent_transform_mat {
-        Some(parent_tr_mat) => global_transform_mat = parent_tr_mat * local_transform,
+        Some(parent_tr_mat) => {
+            global_transform_mat = parent_tr_mat * local_transform;
+            node_transform.parent_global_transform = Some(parent_tr_mat);
+        },
         None => global_transform_mat = local_transform
     }
 
     node_transform.global_transform = Some(global_transform_mat);
+    
 
     
     let mut children_nodes: Vec<&model_asset::Node> = vec![];
@@ -477,6 +518,7 @@ pub struct NodeTransform {
     pub local_rotation: Vec3,
     pub local_scale: Vec3,
     pub global_transform: Option<Mat4>,
+    pub parent_global_transform: Option<Mat4>,
     pub node_id: usize
 }
 
