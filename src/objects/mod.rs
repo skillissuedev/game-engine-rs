@@ -1,11 +1,10 @@
-use glium::{Display, Frame};
-use ultraviolet::Vec3;
+use glium::{Frame, Display};
+use glam::Vec3;
 
 pub mod empty_object;
 pub mod camera_position;
 pub mod model_object;
 pub mod sound_emitter;
-
 
 pub trait Object: std::fmt::Debug {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -124,6 +123,13 @@ pub struct Transform {
 
 impl Default for Transform {
     fn default() -> Self {
-        Transform { position: Vec3::zero(), rotation: Vec3::zero(), scale: Vec3::zero() }
+        Transform { position: Vec3::ZERO, rotation: Vec3::ZERO, scale: Vec3::ZERO }
     }
+}
+
+pub enum ObjectType {
+    EmptyObject,
+    ModelObject,
+    SoundEmitterObject,
+    CameraPositionObject
 }

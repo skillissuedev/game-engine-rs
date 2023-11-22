@@ -62,6 +62,19 @@ impl ShaderAsset {
     }
 }
 
+pub fn get_default_vertex_shader_path() -> String {
+    unsafe {
+        DEFAULT_VERTEX_SHADER_PATH.into()
+    }
+}
+
+pub fn get_default_fragment_shader_path() -> String {
+    unsafe {
+        DEFAULT_FRAGMENT_SHADER_PATH.into()
+    }
+}
+
+
 #[derive(Debug)]
 pub enum ShaderError {
     FragShaderLoadErr,

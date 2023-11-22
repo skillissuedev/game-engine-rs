@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 use crate::managers::render;
 use super::{Object, Transform};
 
@@ -28,8 +30,9 @@ impl Object for CameraPosition {
     fn start(&mut self) { }
 
     fn update(&mut self) {
-        render::set_camera_position(self.get_global_transform().position);
-        render::set_camera_rotation(self.get_global_transform().rotation);
+        let global_transform = self.get_global_transform();
+        render::set_camera_position(global_transform.position);
+        render::set_camera_rotation(global_transform.rotation);
     }
 
     fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
@@ -64,4 +67,3 @@ impl Object for CameraPosition {
         &mut self.children
     }
 }
-

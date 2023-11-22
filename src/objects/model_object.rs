@@ -1,7 +1,7 @@
 use std::time::Instant;
 use glam::{Mat4, Quat, Vec3};
-use glium::{VertexBuffer, Program, IndexBuffer, Display, uniform, Surface, uniforms::UniformBuffer};
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn}}, math_utils::deg_to_rad};
+use glium::{VertexBuffer, Program, IndexBuffer, uniform, Surface, uniforms::UniformBuffer, Display};
+use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}}, math_utils::deg_to_rad};
 use super::{Object, Transform};
 
 #[derive(Debug)]
@@ -84,7 +84,7 @@ impl Object for ModelObject {
         }
     }
 
-    fn render(&mut self, display: &mut glium::Display, target: &mut glium::Frame) {
+    fn render(&mut self, display: &mut Display, target: &mut glium::Frame) {
         if self.error {
             return;
         }
@@ -126,7 +126,9 @@ impl Object for ModelObject {
                     return;
                 }
             }
-            let mvp: Mat4 = self.setup_mat(transform.unwrap());
+            let setup_mat_result = self.setup_mat(transform.unwrap());
+            let mvp: Mat4 = setup_mat_result.mvp;
+            let model: Mat4 = setup_mat_result.model;
 
             let texture_option = self.texture.as_ref();
 
@@ -137,6 +139,7 @@ impl Object for ModelObject {
                 None => texture = &empty_texture,
             }
             let mvp_cols = mvp.to_cols_array_2d();
+            let model_cols = model.to_cols_array_2d();
 
             let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
             let inverse_bind_mats = UniformBuffer::new(display, self.asset.joints_inverse_bind_mats).unwrap();
@@ -151,7 +154,14 @@ impl Object for ModelObject {
                     mvp_cols[2],
                     mvp_cols[3],
                 ],
+                model: [
+                    model_cols[0],
+                    model_cols[1],
+                    model_cols[2],
+                    model_cols[3],
+                ],
                 tex: texture,
+                lightPos: render::get_light_position().to_array(),
             };
 
             let draw_params = glium::DrawParameters {
@@ -161,6 +171,7 @@ impl Object for ModelObject {
                     ..Default::default()
                 },
                 backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+                polygon_mode: glium::draw_parameters::PolygonMode::Fill,
                 ..Default::default()
             };
 
@@ -224,6 +235,9 @@ impl Object for ModelObject {
 
             return None;
         }
+
+        
+
         return None;
     }
 }
@@ -312,12 +326,16 @@ impl ModelObject {
         }
     }
 
-    fn setup_mat(&self, node_transform: &NodeTransform) -> Mat4 {
+    fn setup_mat(&self, node_transform: &NodeTransform) -> SetupMatrixResult {
         match node_transform.global_transform {
             Some(_) => (),
             None => {
                 error("model object error\nerror in setup_mat()\nnode_transform's global_transform is None");
-                return Mat4::IDENTITY;
+                //return Mat4::IDENTITY;
+                return SetupMatrixResult {
+                    mvp: Mat4::IDENTITY,
+                    model: Mat4::IDENTITY,
+                };
             },
         }
         let node_global_transform = node_transform.global_transform.unwrap();
@@ -349,10 +367,15 @@ impl ModelObject {
 
 
         let transform = Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
-        let view = glam::Mat4::from_cols_array_2d(&render::get_view_matrix().into());
-        let proj = glam::Mat4::from_cols_array_2d(&render::get_projection_matrix().into());
+        let view = render::get_view_matrix();
+        let proj = render::get_projection_matrix();
 
-        proj * view * transform
+        let mvp = proj * view * transform;
+
+        SetupMatrixResult {
+            mvp,
+            model: transform,
+        }
     }
 
     fn start_mesh(&mut self, display: &Display) {
@@ -374,7 +397,7 @@ impl ModelObject {
         let vertex_shader_source = &self.shader_asset.vertex_shader_source;
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
 
-        for _i in &self.asset.objects {
+        for _ in &self.asset.objects {
             let program = Program::from_source(
                 display,
                 &vertex_shader_source,
@@ -413,6 +436,36 @@ impl ModelObject {
                 }
             }
         }
+        else {
+            let asset_result = TextureAsset::default_texture();
+            match asset_result {
+                Ok(asset) => {
+                    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
+                        &asset.image_raw,
+                        asset.image_dimensions,
+                    );
+                    let texture = glium::texture::texture2d::Texture2d::new(display, image);
+
+                    match texture {
+                        Ok(tx) => self.texture = Some(tx),
+                        Err(err) => {
+                            error(&format!(
+                                    "Mesh object error:\ntexture creating error!\nErr: {}",
+                                    err
+                            ));
+                            self.texture = None;
+                        }
+                    }
+                }
+                Err(err) => {
+                    debugger::error(&format!(
+                        "model object({}) - failed to open a default texture.\nerror: {:?}",
+                        self.name, err
+                    ));
+                    self.texture = None;
+                },
+            }
+        };
 
         self.started = true;
     }
@@ -513,6 +566,12 @@ pub struct CurrentAnimationSettings {
 }
 
 #[derive(Debug)]
+pub struct SetupMatrixResult {
+    pub mvp: Mat4,
+    pub model: Mat4
+}
+
+#[derive(Debug)]
 pub struct NodeTransform {
     pub local_position: Vec3,
     pub local_rotation: Vec3,
@@ -526,4 +585,3 @@ pub struct NodeTransform {
 pub enum ModelObjectError {
     AnimationNotFound
 }
-

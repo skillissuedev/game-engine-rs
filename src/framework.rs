@@ -1,29 +1,12 @@
 use crate::{
     game::game_main,
     managers::{
-        assets::get_full_asset_path,
         render,
         sound::{self, set_listener_transform}, systems,
     },
 };
-use conrod_core::{widget, widget_ids, Labelable, Positionable, Sizeable, Ui, Widget};
-use conrod_glium::{
-    glium_events_conversion::{handle_glium_event, WasEventHandled},
-    Renderer,
-};
-use glium::{
-    backend::glutin,
-    glutin::{
-        event::WindowEvent,
-        event_loop::{ControlFlow, EventLoop},
-        window::WindowBuilder,
-        ContextBuilder,
-    },
-    Display,
-};
-use std::{str::FromStr, time::Instant};
-
-widget_ids!(struct Ids { text });
+use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
+use std::time::Instant;
 
 pub fn start_game(debug_mode: DebugMode) {
     let event_loop = EventLoop::new();
@@ -34,22 +17,9 @@ pub fn start_game(debug_mode: DebugMode) {
     let mut frames_count: usize = 0;
     let mut now = std::time::Instant::now();
 
-    let mut ui = conrod_core::UiBuilder::new([2560 as f64, 1080 as f64]).build();
-    ui.fonts
-        .insert_from_file(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf"))
-        .expect("failed to add fonts");
-
-    let ids = Ids::new(ui.widget_id_generator());
-    let mut text = String::from_str("edit deez").unwrap();
-
-    let image_map = conrod_core::image::Map::<glium::texture::Texture2d>::new();
-    let mut renderer = Renderer::new(&display).unwrap();
-
     sound::init().unwrap();
 
     game_main::start();
-
-    let mut redraw_ui = true;
 
     let mut win_w = 0;
     let mut win_h = 0;
@@ -74,23 +44,9 @@ pub fn start_game(debug_mode: DebugMode) {
                 game_main::render();
                 systems::render(&mut display, &mut target);
 
-                if redraw_ui == true {
-                    set_ui(&mut ui, &ids, &mut text);
-                    ui.has_changed();
-                    redraw_ui = false;
-                }
-                let primitives = ui.draw();
-                renderer.fill(&display, primitives, &image_map);
-                renderer.draw(&display, &mut target, &image_map).unwrap();
-
                 target.finish().unwrap();
             }
             glutin::glutin::event::Event::WindowEvent { event, .. } => {
-                match handle_glium_event(&mut ui, &event, display.gl_window().window()) {
-                    WasEventHandled::Yes => redraw_ui = true,
-                    WasEventHandled::No => (),
-                }
-
                 match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => (),
@@ -133,32 +89,6 @@ pub enum DebugMode {
     None,
     ShowFps,
     Full,
-}
-
-fn set_ui(ui: &mut Ui, ids: &Ids, text: &mut String) {
-    let mut ui_cell = ui.set_widgets();
-    /*widget::Button::new()
-        .middle_of(ui_cell.window)
-        .y_relative(100.0)
-        .y_dimension(conrod_core::position::Dimension::Absolute(100.0))
-        .x_dimension(conrod_core::position::Dimension::Absolute(300.0))
-        .label("test button")
-        .label_font_size(32)
-        .press_color(conrod_core::Color::Rgba(1.0, 1.0, 1.0, 1.0))
-        .set(ids.text, &mut ui_cell);
-    */
-
-    /*for event in widget::TextBox::new(&text)
-        .middle_of(ui_cell.window)
-        .x_dimension(conrod_core::position::Dimension::Absolute(500.0))
-        .y_dimension(conrod_core::position::Dimension::Absolute(50.0))
-        .set(ids.text, &mut ui_cell) {
-
-        match event {
-            widget::text_box::Event::Enter => (),
-            widget::text_box::Event::Update(string) => *text = string,
-        }
-    }*/
 }
 
 fn set_audio_listener_transformations() {

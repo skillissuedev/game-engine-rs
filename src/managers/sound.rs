@@ -1,5 +1,5 @@
 use allen::{AllenError, Context, Device, Orientation};
-use ultraviolet::Vec3;
+use glam::Vec3;
 
 use crate::managers::debugger::error;
 

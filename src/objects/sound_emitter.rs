@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 use allen::Source;
-use ultraviolet::Vec3;
+use glam::Vec3;
 use crate::{assets::sound_asset::SoundAsset, managers::{sound::{self, SoundError}, debugger::{error, warn}}};
 use super::{Transform, Object};
-
 
 pub struct SoundEmitter {
     pub name: String,

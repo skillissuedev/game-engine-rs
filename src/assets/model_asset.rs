@@ -1,9 +1,11 @@
 
+use std::path::Path;
+
 use data_url::DataUrl;
 use glam::Mat4;
 use gltf::Gltf;
 use splines::{Spline, Key};
-use crate::managers::{assets, debugger::{error, warn}, render::Vertex };
+use crate::managers::{assets::{self, get_full_asset_path}, debugger::{error, warn, self}, render::Vertex };
 
 #[derive(Debug, Clone)]
 pub struct Object {
@@ -85,26 +87,42 @@ impl ModelAsset {
                     return Err(ModelAssetError::GlbError);
                 }
                 gltf::buffer::Source::Uri(uri) => {
-                    let url = match DataUrl::process(uri) {
-                        Ok(url) => url,
-                        Err(_) => {
-                            // This is probably not a `data` URI? Maybe it's a https:// link or something?
-                            continue;
+                    let url: DataUrl;
+                    match DataUrl::process(uri) {
+                        Ok(url_result) => {
+                            url = url_result;
+                            match url.decode_to_vec() {
+                                Ok(res) => {
+                                    buffer_data.push(res.0);
+                                }
+                                Err(_) => {
+                                    // The base64 was malformed!
+                                    error(&format!(
+                                            "got an error when creating mesh asset\nasset path: {}\nerror: can't decode a buffer: bad base64",
+                                            &full_path));
+                                    return Err(ModelAssetError::BufferDecodingError);
+                                }
+                            }
+                        },
+                        Err(err) => {
+                            match err {
+                                data_url::DataUrlError::NotADataUrl => {
+                                    let bin_path = get_full_asset_path(&Path::new(path).with_extension("bin").into_os_string().into_string().unwrap());
+                                    match std::fs::read(bin_path) {
+                                        Ok(bin) => buffer_data.push(bin),
+                                        Err(err) => {
+                                            debugger::error(&format!(
+                                                "model asset loading error\nfailed to read bin file\nerr: {}",
+                                                err));
+                                            return Err(ModelAssetError::FailedToReadBin);
+                                        },
+                                    };
+                                },
+                                _ => ()
+                            }
                         }
                     };
 
-                    match url.decode_to_vec() {
-                        Ok(res) => {
-                            buffer_data.push(res.0);
-                        }
-                        Err(_) => {
-                            // The base64 was malformed!
-                            error(&format!(
-                                    "got an error when creating mesh asset\nasset path: {}\nerror: can't decode a buffer: bad base64",
-                                    &full_path));
-                            return Err(ModelAssetError::BufferDecodingError);
-                        }
-                    }
                 }
             }
         }
@@ -409,6 +427,7 @@ fn add_object_and_children(
                     vertex_attribute.for_each(|vertex| {
                         vertices.push(Vertex {
                             position: vertex,
+                            normal: Default::default(),
                             tex_coords: Default::default(),
                             joints: Default::default(),
                             weights: Default::default()
@@ -418,14 +437,17 @@ fn add_object_and_children(
                     warn(&format!("mesh asset loading warning\npath: {}\nwarning: no vertices", full_path));
                 }
 
-                /*if let Some(normal_attribute) = reader.read_normals() {
-                  let mut normal_index = 0;
-                  normal_attribute.for_each(|normal| {
-                //vertices[normal_index].normal = normal;
+                if let Some(normal_attribute) = reader.read_normals() {
+                    let mut normal_index = 0;
+                    normal_attribute.for_each(|normal| {
+                        vertices[normal_index].normal = normal;
 
-                normal_index += 1;
-                });
-                }*/
+                        normal_index += 1;
+                    });
+                } else {
+                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no normals", full_path));
+                }
+
                 if let Some(tex_coord_attribute) = reader.read_tex_coords(0).map(|v| v.into_f32()) {
                     let mut tex_coord_index = 0;
                     tex_coord_attribute.for_each(|tex_coord| {
@@ -487,8 +509,9 @@ fn add_object_and_children(
 #[derive(Debug)]
 pub enum ModelAssetError {
     LoadError,
-    SparseKeyframesError,
+    //SparseKeyframesError,
     BufferDecodingError,
     GlbError,
-    ChannelCurveBuildingError,
+    FailedToReadBin
+    //ChannelCurveBuildingError,
 }

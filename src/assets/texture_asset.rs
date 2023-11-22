@@ -1,5 +1,7 @@
 use crate::managers::{assets::get_full_asset_path, debugger};
 
+pub static mut DEFAULT_TEXTURE_PATH: &str = "textures/default_texture.png";
+
 #[derive(Debug)]
 pub struct TextureAsset {
     pub image_raw: Vec<u8>,
@@ -18,8 +20,8 @@ impl TextureAsset {
         match image {
             Err(error) => {
                 debugger::error(&format!(
-                    "failed to create image asset\nimage error: {:?}",
-                    error
+                    "failed to create image asset(path: {})\nimage error: {:?}",
+                    path, error
                 ));
                 return Err(TextureAssetError::LoadError);
             }
@@ -49,5 +51,41 @@ impl TextureAsset {
         },
         }
         */
+    }
+
+    pub fn default_texture() -> Result<TextureAsset, TextureAssetError> {
+        let image = image::open(get_full_asset_path(&get_default_texture_path()));
+        match image {
+            Err(error) => {
+                debugger::error(&format!(
+                    "failed to create image asset(default_texture)\nimage error: {:?}",
+                    error
+                ));
+                return Err(TextureAssetError::LoadError);
+            }
+            _ => (),
+        }
+
+        let image = image.unwrap().to_rgba8();
+        let image_dimensions = image.dimensions();
+
+        let image = image.into_raw();
+
+        Ok(TextureAsset {
+            image_raw: image,
+            image_dimensions,
+        })
+    }
+}
+
+pub fn set_default_texture_path(path: &'static str) {
+    unsafe {
+        DEFAULT_TEXTURE_PATH = path;
+    }
+}
+
+pub fn get_default_texture_path() -> String {
+    unsafe {
+        DEFAULT_TEXTURE_PATH.into()
     }
 }

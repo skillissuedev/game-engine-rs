@@ -7,28 +7,23 @@ edition = "2021"
 carrier-pigeon = "0.3.0"
 colored = "2.0.0"
 navmesh = "0.12.1"
-glium = "0.32.1"
 ultraviolet = "0.9.1"
 rcrefcell = "1.0.7"
 image = "0.24.6"
-conrod = "0.62.1"
-conrod_core = "0.76.1"
-conrod_winit = "0.76.1"
-winit = "0.28.6"
 gltf = { version = "1.2.0", features = ["extras", "names"] }
 data-url = "0.1.1"
 hound = "3.5.0"
-conrod_glium = { git = "https://github.com/unknownbruhhaha/conrod_latest_glium" }
-allen = { git = "https://github.com/unknownbruhhaha/linear_model_allen" }
+#conrod_glium = { git = "https://github.com/unknownbruhhaha/conrod_latest_glium" }
 splines = "4.2.0"
 glam = "0.24.1"
 serde_bare = "0.5.0"
 serde = { version = "1.0.188", features = [ "derive" ] }
-
-#[dependencies.conrod_glium]
-#path = "../../conrod_latest_glium/conrod_glium"
-#[dependencies.allen]
-#path = "../../linear_model_allen/"
+dyon = "0.49.1"
+allen = { git = "https://github.com/unknownbruhhaha/linear_model_allen" }
+mlua = { version = "0.9.1", features = ["luajit"] }
+glium = "0.32.1"
+once_cell = "1.18.0"
+#bitcode = "0.5.0"
 
 [profile.release]
 debug = 1

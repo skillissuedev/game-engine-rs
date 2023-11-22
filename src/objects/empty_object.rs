@@ -1,3 +1,5 @@
+use glium::Display;
+
 use super::{Object, Transform};
 
 #[derive(Debug)]
@@ -16,6 +18,13 @@ impl EmptyObject {
 
 
 impl Object for EmptyObject {
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+        if name == "test" {
+            println!("test message {}", args[0])
+        }
+        None
+    }
+
     fn get_object_type(&self) -> &str {
         "EmptyObject"
     }
@@ -34,7 +43,7 @@ impl Object for EmptyObject {
 
     fn update(&mut self) { }
 
-    fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
+    fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
 
 
