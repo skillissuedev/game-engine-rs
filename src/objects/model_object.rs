@@ -94,16 +94,6 @@ impl Object for ModelObject {
 
         for i in 0..self.asset.objects.len() {
             let object = &self.asset.objects[i];
-            let mut node_mat: Mat4 = Mat4::IDENTITY;
-            for node_transform in &self.nodes_transforms {
-                if node_transform.node_id == object.node_index {
-                    match node_transform.global_transform {
-                        Some(node_tr) => node_mat = node_tr,
-                        None => error(
-                            &format!("model object\ngot an error in render()\nnode transform's global_transform is None\node_index is {}", node_transform.node_id)),
-                    }
-                }
-            }
 
             let indices = IndexBuffer::new(
                 display,
@@ -126,6 +116,7 @@ impl Object for ModelObject {
                     return;
                 }
             }
+
             let setup_mat_result = self.setup_mat(transform.unwrap());
             let mvp: Mat4 = setup_mat_result.mvp;
             let model: Mat4 = setup_mat_result.model;
@@ -219,6 +210,41 @@ impl Object for ModelObject {
         if name == "play_animation" && !args.is_empty() {
             let _ = self.play_animation(args[0]);
             return None;
+        }
+
+        if name == "set_position" {
+            if args.len() == 3 {
+                let x = match args[0].parse::<f32>() {
+                    Ok(x_num) => x_num,
+                    Err(_) => {
+                        error("set_position model object error - wrong args(1st arg is not number)");
+                        return None;
+                    },
+                };
+
+                let y = match args[1].parse::<f32>() {
+                    Ok(y_num) => y_num,
+                    Err(_) => {
+                        error("set_position model object error - wrong args(2st arg is not number)");
+                        return None;
+                    },
+                };
+
+                let z = match args[2].parse::<f32>() {
+                    Ok(z_num) => z_num,
+                    Err(_) => {
+                        error("set_position model object error - wrong args(3st arg is not number)");
+                        return None;
+                    },
+                };
+
+                let _ = self.set_position(Vec3::new(x, y, z));
+
+                return None;
+            } else {
+                error("set_position model object error - wrong args(args.len should be = 3 and all of them should be numbers)");
+                return None;
+            }
         }
 
         if name == "set_looping" && !args.is_empty() {
@@ -338,6 +364,7 @@ impl ModelObject {
                 };
             },
         }
+
         let node_global_transform = node_transform.global_transform.unwrap();
         let scale_rotation_translation = node_global_transform.to_scale_rotation_translation();
         let rotation_vector = scale_rotation_translation.1.to_euler(glam::EulerRot::XYZ);

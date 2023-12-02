@@ -142,6 +142,10 @@ impl Object for SoundEmitter {
     fn set_local_transform(&mut self, transform: Transform) {
         self.transform = transform;
     }
+
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+        None
+    }
 }
 
 impl Debug for SoundEmitter {

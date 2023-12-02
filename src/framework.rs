@@ -2,7 +2,7 @@ use crate::{
     game::game_main,
     managers::{
         render,
-        sound::{self, set_listener_transform}, systems,
+        sound::{self, set_listener_transform}, systems, input,
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
@@ -29,6 +29,7 @@ pub fn start_game(debug_mode: DebugMode) {
             glium::glutin::event::Event::MainEventsCleared => {
                 game_main::update();
                 systems::update();
+                input::update();
 
                 set_listener_transform(render::get_camera_position(), render::get_camera_front());
 
@@ -47,6 +48,7 @@ pub fn start_game(debug_mode: DebugMode) {
                 target.finish().unwrap();
             }
             glutin::glutin::event::Event::WindowEvent { event, .. } => {
+                input::reg_event(&event);
                 match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => (),

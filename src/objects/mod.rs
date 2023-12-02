@@ -1,5 +1,6 @@
 use glium::{Frame, Display};
 use glam::Vec3;
+use serde::{Serialize, Deserialize};
 
 pub mod empty_object;
 pub mod camera_position;
@@ -28,7 +29,10 @@ pub trait Object: std::fmt::Debug {
     fn get_parent_transform(&self) -> Option<Transform>;
     fn set_parent_transform(&mut self, transform: Transform);
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> { None } 
+    fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<&str> { 
+        println!("call function is not implemented in this object.");
+        return None; 
+    } 
 
     // premade fns:
     fn get_global_transform(&self) -> Transform {
@@ -114,7 +118,7 @@ pub trait Object: std::fmt::Debug {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Transform {
     pub position: Vec3,
     pub rotation: Vec3, 

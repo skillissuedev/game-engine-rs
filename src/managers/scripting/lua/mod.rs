@@ -3,7 +3,7 @@ pub mod lua_functions;
 use std::{fs, collections::HashMap};
 use mlua::{Lua, Function};
 use once_cell::sync::Lazy;
-use crate::{objects::{Object, empty_object::EmptyObject}, managers::{debugger, assets, systems::CallList, scripting::lua::lua_functions::add_lua_vm_to_list}, systems::System};
+use crate::{objects::{Object, empty_object::EmptyObject, model_object::ModelObject, sound_emitter::{SoundEmitter, SoundEmitterType}, camera_position::CameraPosition}, managers::{debugger, assets, systems::CallList, scripting::lua::lua_functions::add_lua_vm_to_list}, systems::System, assets::{model_asset::ModelAsset, texture_asset::TextureAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset}};
 
 static mut SYSTEMS_LUA_VMS: Lazy<HashMap<String, Lua>> = Lazy::new(|| return HashMap::new() ); // String is system's id and Lua is it's vm
 
@@ -77,7 +77,64 @@ impl LuaSystem {
     fn new_empty_object(&mut self, name: &str) {
         let object = EmptyObject::new(name);
 
-        self.objects.push(Box::new(object));
+        self.add_object(Box::new(object));
+    }
+
+    fn new_model_object(
+        &mut self, name: &str, model_asset_path: &str, texture_asset_path: &str, vertex_shader_asset_path: &str, fragment_shader_asset_path: &str) {
+        let asset = ModelAsset::from_file(model_asset_path);
+        let texture = TextureAsset::from_file(texture_asset_path);
+        let shader = ShaderAsset::load_from_file(ShaderAssetPath {
+            vertex_shader_path: vertex_shader_asset_path.to_string(),
+            fragment_shader_path: fragment_shader_asset_path.to_string()
+        });
+
+        let asset = match asset {
+            Ok(asset) => asset,
+            Err(err) => {
+                debugger::error(&format!("new model object call error(system {})\nmodel asset loading error: {:?}", self.id, err));
+                return;
+            },
+        };
+
+        let texture = match texture {
+            Ok(texture) => texture,
+            Err(err) => {
+                debugger::error(&format!("new model object call error(system {})\ntexture asset loading error: {:?}", self.id, err));
+                return;
+            },
+        };
+
+        let shader = match shader {
+            Ok(shader) => shader,
+            Err(err) => {
+                debugger::error(&format!("new model object call error(system {})\nshader asset loading error: {:?}", self.id, err));
+                return;
+            },
+        };
+
+        let object = ModelObject::new(name, asset, Some(texture), shader);
+
+        self.add_object(Box::new(object));
+    }
+
+    fn new_sound_emitter_object(&mut self, name: &str, asset_path: &str, is_positional: SoundEmitterType) {
+        let asset_result = SoundAsset::from_wav(asset_path);
+        match asset_result {
+            Ok(asset) => {
+                let object_result = SoundEmitter::new(name, &asset, is_positional);
+                match object_result {
+                    Ok(object) => self.add_object(Box::new(object)),
+                    Err(err) => debugger::error(&format!("new sound emitter object call error(system {})\nobject creation error: {:?}", self.id, err)),
+                }
+            },
+            Err(err) => debugger::error(&format!("new sound emitter object call error(system {})\nsound asset loading error: {:?}", self.id, err)),
+        };
+    }
+
+    fn new_camera_position_object(&mut self, name: &str) {
+        let object = CameraPosition::new(name);
+        self.add_object(Box::new(object));
     }
 }
 
@@ -131,6 +188,62 @@ impl System for LuaSystem {
                     },
                     _ => {
                         debugger::error(&format!("failed to call new_empty_object() in system {}, can't get first argument in vector", system_id));
+                        None
+                    },
+                }
+            },
+
+            "new_camera_position_object" => {
+                match args.get(0) {
+                    Some(name) => {
+                        self.new_camera_position_object(&name);
+                        None
+                    },
+                    _ => {
+                        debugger::error(&format!("failed to call new_camera_position_object() in system {}, can't get first argument in vector", system_id));
+                        None
+                    },
+                }
+            },
+
+            "new_sound_emitter_object" => {
+                match args.len() {
+                    3 => {
+                        let name = &args[0];
+                        let asset = &args[1];
+                        let sound_emitter_type = match args[2].as_ref() {
+                            "true" => SoundEmitterType::Positional, 
+                            "false" => SoundEmitterType::Simple,
+                            _ => {
+                                debugger::error(&format!("failed to call new_sound_emitter_object() in system {}, arg 'is_positional' is wrong, should be 'true' or 'false'", system_id));
+                                return None;
+                            }
+                        };
+
+                        self.new_sound_emitter_object(name, asset, sound_emitter_type);
+                        None
+                    },
+                    _ => {
+                        debugger::error(&format!("failed to call new_sound_emitter_object() in system {}, args cound is not 3", system_id));
+                        None
+                    },
+                }
+            }
+
+            "new_model_object" => {
+                match args.len() {
+                    5 => {
+                        let name = &args[0];
+                        let asset = &args[1];
+                        let texture = &args[2];
+                        let vert_shader = &args[3];
+                        let frag_shader = &args[4];
+
+                        self.new_model_object(name, &asset, texture, &vert_shader, &frag_shader);
+                        None
+                    },
+                    _ => {
+                        debugger::error(&format!("failed to call new_model_object() in system {}, args cound is not 5", system_id));
                         None
                     },
                 }

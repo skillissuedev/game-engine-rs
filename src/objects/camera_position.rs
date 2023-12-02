@@ -1,5 +1,3 @@
-use glam::Vec3;
-
 use crate::managers::render;
 use super::{Object, Transform};
 
@@ -65,5 +63,9 @@ impl Object for CameraPosition {
 
     fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
+    }
+
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+        None
     }
 }
