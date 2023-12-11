@@ -1,6 +1,4 @@
-use glium::glutin::event::{VirtualKeyCode, MouseButton};
-
-use crate::{managers::{systems::add_system, scripting::lua::LuaSystem, self, input}, systems::test_system::TestSystem};
+use crate::{managers::{systems::add_system, scripting::lua::LuaSystem}, systems::test_system::TestSystem};
 
 
 pub fn start() {

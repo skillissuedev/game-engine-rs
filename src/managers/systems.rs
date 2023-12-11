@@ -1,7 +1,6 @@
 use glium::{Frame, Display};
 use crate::systems::System;
 
-
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 
 pub fn get_system_with_id(id: &str) -> Option<&Box<dyn System>> {

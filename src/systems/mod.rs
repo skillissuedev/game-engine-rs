@@ -3,7 +3,7 @@ pub mod test_system;
 
 
 use glium::{Frame, Display};
-use crate::{objects::Object, managers::systems::CallList};
+use crate::{objects::Object, managers::{systems::CallList, networking::{Message, MessageReceiver, MessageReliability, self, NetworkError, NetworkingMode}, debugger}};
 
 
 pub trait System {
@@ -18,6 +18,12 @@ pub trait System {
     fn system_id(&self) -> &str;
     fn is_destroyed(&self) -> bool;
     fn set_destroyed(&mut self, is_destroyed: bool);
+    fn reg_message(&mut self, message: Message);
+
+
+    fn send_message(&mut self, reliability: MessageReliability, message: Message) -> Result<(), NetworkError> {
+        networking::send_message(reliability, message)
+    }
 
     fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {
         for object in self.get_objects_list() {

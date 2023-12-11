@@ -287,6 +287,10 @@ impl System for LuaSystem {
     fn set_destroyed(&mut self, is_destroyed: bool) {
         self.is_destroyed = is_destroyed;
     }
+
+    fn reg_message(&mut self, message: crate::managers::networking::Message) {
+        todo!()
+    }
 }
 
 fn get_lua_vm_ref<'a>(system_id: String) -> Option<&'a Lua> {

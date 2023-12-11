@@ -1,4 +1,6 @@
-use crate::{managers::systems::CallList, objects::Object};
+use glium::glutin::event::VirtualKeyCode;
+
+use crate::{managers::{systems::CallList, networking::{MessageReceiver, MessageReliability, Message}, input::{self, InputEventType}}, objects::Object};
 use super::System;
 
 pub struct TestSystem {
@@ -30,6 +32,7 @@ impl System for TestSystem {
         //self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["CubeAction"]);
         //self.find_object_mut("cool hot").unwrap().call("play_animation", vec!["ArmatureAction"]);
         //self.find_object_mut("cool hot").unwrap().call("set_looping", vec!["true"]);
+        input::new_bind("send_test_msg", vec![InputEventType::Key(VirtualKeyCode::Return)]);
     }
 
     fn update(&mut self) {
@@ -40,6 +43,14 @@ impl System for TestSystem {
         //obj.set_scale(Vec3::new(2.0, 2.0, 2.0));
         //obj.set_rotation(Vec3::new(0.0, obj_rotation.y + 0.01, 0.0));
         //println!("{:?}", get_camera_rotation());
+        if input::is_bind_pressed("send_test_msg") {
+            self.send_message(MessageReliability::Reliable, Message {
+                receiver: MessageReceiver::Everybody,
+                system_id: self.system_id().into(),
+                message_id: "nice".into(),
+                message: "msg".into(),
+            });
+        }
     }
 
     fn render(&mut self) { }
@@ -70,5 +81,9 @@ impl System for TestSystem {
     }
     fn get_objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.objects
+    }
+
+    fn reg_message(&mut self, message: Message) {
+        println!("{}", message.message);
     }
 }
