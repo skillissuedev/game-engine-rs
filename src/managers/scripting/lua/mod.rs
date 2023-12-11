@@ -1,7 +1,7 @@
 pub mod lua_functions;
 
 use std::{fs, collections::HashMap};
-use mlua::{Lua, Function};
+use mlua::{Lua, Function, StdLib, LuaOptions};
 use once_cell::sync::Lazy;
 use crate::{objects::{Object, empty_object::EmptyObject, model_object::ModelObject, sound_emitter::{SoundEmitter, SoundEmitterType}, camera_position::CameraPosition}, managers::{debugger, assets, systems::CallList, scripting::lua::lua_functions::add_lua_vm_to_list}, systems::System, assets::{model_asset::ModelAsset, texture_asset::TextureAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset}};
 
@@ -46,7 +46,14 @@ impl LuaSystem {
     pub fn new(id: &str, script_path: &str) -> Result<LuaSystem, LuaSystemError> {
         match fs::read_to_string(assets::get_full_asset_path(&script_path)) {
             Ok(script) => {
-                let lua: Lua = Lua::new();
+                let lua: Lua = match Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()) {
+                    Ok(lua) => lua,
+                    Err(err) => {
+                        debugger::error(&format!("lua system creation error!\nlua creation error\nerror: {}", err));
+                        return Err(LuaSystemError::ScriptLoadingError);
+                    },
+                };
+
                 let load_result = lua.load(script).exec();
 
                 match load_result {
@@ -328,7 +335,8 @@ fn call_lua_function(system_id: &str, lua: &Lua, function_name: &str) -> Result<
 #[derive(Debug)]
 pub enum LuaSystemError {
     ScriptLoadingError,
-    LuaExecutingError
+    LuaExecutingError,
+    LuaCreationError
 }
 
 /*#[derive(Debug, Clone)]

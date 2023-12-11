@@ -2,7 +2,7 @@ use crate::{managers::{systems::add_system, scripting::lua::LuaSystem}, systems:
 
 
 pub fn start() {
-    add_system(Box::new(TestSystem::new()));
+    //add_system(Box::new(TestSystem::new()));
     /*let dyon_sys = DyonSystem::new("dyon system", "scripts/dyon/test.dyon");
     match dyon_sys {
         Ok(system) => {
