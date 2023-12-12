@@ -1,9 +1,10 @@
 pub mod lua_functions;
 
 use std::{fs, collections::HashMap};
+use ez_al::sound_source::SoundSourceType;
 use mlua::{Lua, Function, StdLib, LuaOptions};
 use once_cell::sync::Lazy;
-use crate::{objects::{Object, empty_object::EmptyObject, model_object::ModelObject, sound_emitter::{SoundEmitter, SoundEmitterType}, camera_position::CameraPosition}, managers::{debugger, assets, systems::CallList, scripting::lua::lua_functions::add_lua_vm_to_list}, systems::System, assets::{model_asset::ModelAsset, texture_asset::TextureAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset}};
+use crate::{objects::{Object, empty_object::EmptyObject, model_object::ModelObject, sound_emitter::SoundEmitter, camera_position::CameraPosition}, managers::{debugger, assets, systems::CallList, scripting::lua::lua_functions::add_lua_vm_to_list}, systems::System, assets::{model_asset::ModelAsset, texture_asset::TextureAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset}};
 
 static mut SYSTEMS_LUA_VMS: Lazy<HashMap<String, Lua>> = Lazy::new(|| return HashMap::new() ); // String is system's id and Lua is it's vm
 
@@ -125,7 +126,7 @@ impl LuaSystem {
         self.add_object(Box::new(object));
     }
 
-    fn new_sound_emitter_object(&mut self, name: &str, asset_path: &str, is_positional: SoundEmitterType) {
+    fn new_sound_emitter_object(&mut self, name: &str, asset_path: &str, is_positional: SoundSourceType) {
         let asset_result = SoundAsset::from_wav(asset_path);
         match asset_result {
             Ok(asset) => {
@@ -219,8 +220,8 @@ impl System for LuaSystem {
                         let name = &args[0];
                         let asset = &args[1];
                         let sound_emitter_type = match args[2].as_ref() {
-                            "true" => SoundEmitterType::Positional, 
-                            "false" => SoundEmitterType::Simple,
+                            "true" => SoundSourceType::Positional, 
+                            "false" => SoundSourceType::Simple,
                             _ => {
                                 debugger::error(&format!("failed to call new_sound_emitter_object() in system {}, arg 'is_positional' is wrong, should be 'true' or 'false'", system_id));
                                 return None;

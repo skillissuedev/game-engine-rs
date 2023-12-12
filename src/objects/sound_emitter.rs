@@ -1,7 +1,7 @@
 use std::fmt::Debug;
-use allen::Source;
+use ez_al::{sound_source::{SoundSource, SoundSourceType}, SoundError};
 use glam::Vec3;
-use crate::{assets::sound_asset::SoundAsset, managers::{sound::{self, SoundError}, debugger::{error, warn}}};
+use crate::{assets::sound_asset::SoundAsset, managers::debugger::warn};
 use super::{Transform, Object};
 
 pub struct SoundEmitter {
@@ -9,71 +9,49 @@ pub struct SoundEmitter {
     pub transform: Transform,
     pub parent_transform: Option<Transform>,
     pub children: Vec<Box<dyn Object>>,
-    pub emitter_type: SoundEmitterType,
-    source: Source,
-}
-
-#[derive(Debug)]
-pub enum SoundEmitterType {
-    Simple,
-    Positional,
+    pub source_type: SoundSourceType,
+    pub source: SoundSource
 }
 
 impl SoundEmitter {
-    pub fn new(name: &str, asset: &SoundAsset, emitter_type: SoundEmitterType) -> Result<SoundEmitter, SoundError> {
-        let context = sound::take_context();
-        let source_result = context.new_source();
-        let source: Source;
-        match source_result {
-            Ok(src) => source = src,
+    pub fn new(name: &str, asset: &SoundAsset, emitter_type: SoundSourceType) -> Result<SoundEmitter, SoundError> {
+        let source = SoundSource::new(&asset.wav, emitter_type.clone());
+        match source {
+            Ok(source) => {
+                return Ok(SoundEmitter {
+                    name: name.to_string(),
+                    transform: Transform::default(),
+                    parent_transform: None,
+                    children: vec![],
+                    source_type: emitter_type,
+                    source,
+                });
+            },
             Err(err) => {
-                error(&format!("error when creating sound emitter\nfailed to create OpenAL sound source\nerr: {}", err));
-                sound::return_context(context);
-                return Err(SoundError::SourceCreationFailedError(err));
-            }
+                return Err(err);
+            },
         }
-
-        let _ = source.set_buffer(Some(&asset.buffer));
-        match emitter_type {
-            SoundEmitterType::Simple => source.set_relative(true).unwrap(),
-            SoundEmitterType::Positional => {
-                let _ = source.set_reference_distance(0.0);
-                let _ = source.set_rolloff_factor(1.0);
-                let _ = source.set_min_gain(0.0);
-            }
-        }
-
-        sound::return_context(context);
-
-        return Ok(SoundEmitter {
-            name: name.to_string(),
-            transform: Transform::default(),
-            parent_transform: None,
-            children: vec![],
-            emitter_type,
-            source,
-        });
     }
 
     pub fn set_looping(&mut self, should_loop: bool) {
-        let _ = self.source.set_looping(should_loop);
+        self.source.set_looping(should_loop);
     }
 
     pub fn is_looping(&self) -> bool {
-        self.source.is_looping().unwrap()
+        self.source.is_looping()
     }
 
     pub fn play_sound(&mut self) {
-        let _ = self.source.play();
+        self.source.play_sound();
     }
 
     pub fn set_max_distance(&mut self, distance: f32) -> Result<(), SoundError> {
-        match self.emitter_type {
-            SoundEmitterType::Simple => {
+        match self.source_type {
+            SoundSourceType::Simple => {
                 warn("tried to set max distance when emitter type is simple");
                 return Err(SoundError::WrongEmitterType);
             }
-            SoundEmitterType::Positional => {
+            SoundSourceType::Positional => {
                 let _ = self.source.set_max_distance(distance);
                 return Ok(());
             }
@@ -81,21 +59,17 @@ impl SoundEmitter {
     }
 
     pub fn get_max_distance(&mut self) -> Result<f32, SoundError> {
-        match self.emitter_type {
-            SoundEmitterType::Simple => {
+        match self.source_type {
+            SoundSourceType::Simple => {
                 warn("tried to get max distance when emitter type is simple");
                 return Err(SoundError::WrongEmitterType);
             }
-            SoundEmitterType::Positional => return Ok(self.source.max_distance().unwrap()),
+            SoundSourceType::Positional => return Ok(self.source.get_max_distance().unwrap()),
         }
     }
 
     pub fn update_sound_transforms(&mut self, sound_position: Vec3) {
-        let position_result_result = self.source.set_position(sound_position.into());
-        match position_result_result {
-            Ok(()) => (),
-            Err(error) => warn(&format!("error when trying to set sound emiiter position\nerorr: {:?}", error)),
-        }
+        let _ = self.source.update(sound_position.into());
     }
 }
 
@@ -144,6 +118,9 @@ impl Object for SoundEmitter {
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+        if name == "play" {
+            self.play_sound();
+        }
         None
     }
 }
@@ -157,7 +134,7 @@ impl Debug for SoundEmitter {
             .field("transform", &self.transform)
             .field("parent_transform", &self.parent_transform)
             .field("children", &self.children)
-            .field("emitter_type", &self.emitter_type)
+            .field("emitter_type", &self.source_type)
             .field("looping", &self.is_looping())
             .finish()
     }

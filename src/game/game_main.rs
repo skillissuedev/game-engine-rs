@@ -2,7 +2,7 @@ use crate::{managers::{systems::add_system, scripting::lua::LuaSystem}, systems:
 
 
 pub fn start() {
-    //add_system(Box::new(TestSystem::new()));
+    add_system(Box::new(TestSystem::new()));
     /*let dyon_sys = DyonSystem::new("dyon system", "scripts/dyon/test.dyon");
     match dyon_sys {
         Ok(system) => {
@@ -12,8 +12,8 @@ pub fn start() {
         Err(err) => panic!("got an error when trying to create a dyon system!\nerr: {:?}", err)
     }*/
 
-    let lua = LuaSystem::new("lua_sys".into(), "scripts/lua/test.lua".into()).unwrap();
-    add_system(Box::new(lua));
+    //let lua = LuaSystem::new("lua_sys".into(), "scripts/lua/test.lua".into()).unwrap();
+    //add_system(Box::new(lua));
 }
 
 pub fn update() {
