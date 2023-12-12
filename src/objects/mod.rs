@@ -7,6 +7,9 @@ pub mod camera_position;
 pub mod model_object;
 pub mod sound_emitter;
 
+
+static mut LAST_OBJECT_ID: u128 = 0;
+
 pub trait Object: std::fmt::Debug {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Object")
@@ -28,6 +31,9 @@ pub trait Object: std::fmt::Debug {
     fn set_local_transform(&mut self, transform: Transform);
     fn get_parent_transform(&self) -> Option<Transform>;
     fn set_parent_transform(&mut self, transform: Transform);
+
+    fn set_id(&mut self, object_id: ObjectId);
+    fn get_id(&self) -> &ObjectId;
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<&str> { 
         println!("call function is not implemented in this object.");
@@ -131,9 +137,25 @@ impl Default for Transform {
     }
 }
 
-pub enum ObjectType {
+/*pub enum ObjectType {
     EmptyObject,
     ModelObject,
     SoundEmitterObject,
     CameraPositionObject
+}*/
+
+#[derive(Debug)]
+pub struct ObjectId(u128);
+
+impl ObjectId {
+    pub fn raw(&self) -> u128 {
+        self.0
+    }
+}
+
+pub fn generate_object_id() -> ObjectId {
+    unsafe {
+        LAST_OBJECT_ID += 1;
+        return ObjectId(LAST_OBJECT_ID)
+    }
 }

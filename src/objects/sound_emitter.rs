@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use ez_al::{sound_source::{SoundSource, SoundSourceType}, SoundError};
 use glam::Vec3;
 use crate::{assets::sound_asset::SoundAsset, managers::debugger::warn};
-use super::{Transform, Object};
+use super::{Transform, Object, ObjectId, generate_object_id};
 
 pub struct SoundEmitter {
     pub name: String,
@@ -10,7 +10,8 @@ pub struct SoundEmitter {
     pub parent_transform: Option<Transform>,
     pub children: Vec<Box<dyn Object>>,
     pub source_type: SoundSourceType,
-    pub source: SoundSource
+    pub source: SoundSource,
+    id: ObjectId
 }
 
 impl SoundEmitter {
@@ -25,6 +26,7 @@ impl SoundEmitter {
                     children: vec![],
                     source_type: emitter_type,
                     source,
+                    id: generate_object_id()
                 });
             },
             Err(err) => {
@@ -82,27 +84,31 @@ impl Object for SoundEmitter {
 
     fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
 
+    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
+        &self.children
+    }
+    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+        &mut self.children
+    }
+
     fn get_name(&self) -> &str {
         self.name.as_str()
-    }
-    fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
     }
 
     fn get_object_type(&self) -> &str {
         "SoundEmitter"
     }
 
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
-        &self.children
-    }
-
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
-        &mut self.children
+    fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
     }
 
     fn get_local_transform(&self) -> Transform {
         self.transform
+    }
+
+    fn set_local_transform(&mut self, transform: Transform) {
+        self.transform = transform;
     }
 
     fn get_parent_transform(&self) -> Option<Transform> {
@@ -113,8 +119,12 @@ impl Object for SoundEmitter {
         self.parent_transform = Some(transform);
     }
 
-    fn set_local_transform(&mut self, transform: Transform) {
-        self.transform = transform;
+    fn set_id(&mut self, object_id: ObjectId) {
+        self.id = object_id
+    }
+
+    fn get_id(&self) -> &ObjectId {
+        &self.id
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {

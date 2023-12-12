@@ -1,7 +1,6 @@
-use ez_al::sound_source::SoundSourceType;
 use glium::glutin::event::VirtualKeyCode;
 
-use crate::{managers::{systems::CallList, networking::{MessageReceiver, MessageReliability, Message}, input::{self, InputEventType}}, objects::{Object, sound_emitter::SoundEmitter}, assets::sound_asset::SoundAsset};
+use crate::{managers::{systems::CallList, networking::{MessageReceiver, MessageReliability, Message}, input::{self, InputEventType}}, objects::Object};
 use super::System;
 
 pub struct TestSystem {
