@@ -1,4 +1,4 @@
-use ez_al::{sound_asset::WavAsset, SoundError};
+use ez_al::{WavAsset, SoundError};
 
 use crate::managers::{assets::get_full_asset_path, debugger};
 

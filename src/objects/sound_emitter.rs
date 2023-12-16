@@ -1,8 +1,8 @@
 use std::fmt::Debug;
-use ez_al::{sound_source::{SoundSource, SoundSourceType}, SoundError};
+use ez_al::{SoundSource, SoundSourceType, SoundError};
 use glam::Vec3;
-use crate::{assets::sound_asset::SoundAsset, managers::debugger::warn};
-use super::{Transform, Object, ObjectId, generate_object_id};
+use crate::{assets::sound_asset::SoundAsset, managers::{debugger::warn, physics::ObjectBodyParameters}};
+use super::{Transform, Object};
 
 pub struct SoundEmitter {
     pub name: String,
@@ -11,7 +11,7 @@ pub struct SoundEmitter {
     pub children: Vec<Box<dyn Object>>,
     pub source_type: SoundSourceType,
     pub source: SoundSource,
-    id: ObjectId
+    body: Option<ObjectBodyParameters>
 }
 
 impl SoundEmitter {
@@ -26,7 +26,7 @@ impl SoundEmitter {
                     children: vec![],
                     source_type: emitter_type,
                     source,
-                    id: generate_object_id()
+                    body: None
                 });
             },
             Err(err) => {
@@ -51,7 +51,7 @@ impl SoundEmitter {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to set max distance when emitter type is simple");
-                return Err(SoundError::WrongEmitterType);
+                return Err(SoundError::WrongSoundSourceType);
             }
             SoundSourceType::Positional => {
                 let _ = self.source.set_max_distance(distance);
@@ -64,7 +64,7 @@ impl SoundEmitter {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to get max distance when emitter type is simple");
-                return Err(SoundError::WrongEmitterType);
+                return Err(SoundError::WrongSoundSourceType);
             }
             SoundSourceType::Positional => return Ok(self.source.get_max_distance().unwrap()),
         }
@@ -87,6 +87,7 @@ impl Object for SoundEmitter {
     fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }
+
     fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
@@ -94,7 +95,6 @@ impl Object for SoundEmitter {
     fn get_name(&self) -> &str {
         self.name.as_str()
     }
-
     fn get_object_type(&self) -> &str {
         "SoundEmitter"
     }
@@ -119,12 +119,12 @@ impl Object for SoundEmitter {
         self.parent_transform = Some(transform);
     }
 
-    fn set_id(&mut self, object_id: ObjectId) {
-        self.id = object_id
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
     }
 
-    fn get_id(&self) -> &ObjectId {
-        &self.id
+    fn get_body_parameters(&mut self) -> Option<ObjectBodyParameters> {
+        self.body
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {

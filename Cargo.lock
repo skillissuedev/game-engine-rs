@@ -35,17 +35,6 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd"
-dependencies = [
- "getrandom",
- "once_cell",
- "version_check",
-]
-
-[[package]]
-name = "ahash"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91429305e9f0a25f6205c5b8e0d2db09e0708a7a6df0f42212bb56c32c8ac97a"
@@ -74,19 +63,6 @@ dependencies = [
  "approx 0.3.2",
  "num-complex 0.2.4",
  "num-traits",
-]
-
-[[package]]
-name = "allen"
-version = "0.2.1"
-source = "git+https://github.com/unknownbruhhaha/linear_model_allen#1e9335bccdc26ede62021c67f00627dda5a9dcf2"
-dependencies = [
- "bindgen",
- "cmake",
- "lazy_static",
- "num-derive",
- "num-traits",
- "thiserror",
 ]
 
 [[package]]
@@ -190,15 +166,6 @@ name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
-
-[[package]]
-name = "bincode"
-version = "1.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "bindgen"
@@ -319,19 +286,6 @@ dependencies = [
  "slotmap",
  "thiserror",
  "vec_map",
-]
-
-[[package]]
-name = "carrier-pigeon"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597384d47a53c991cf8171a331c4c8e8e07407bf444fd6f11419ce3293b647a6"
-dependencies = [
- "bincode",
- "crossbeam-channel",
- "hashbrown 0.12.3",
- "log",
- "serde",
 ]
 
 [[package]]
@@ -973,11 +927,12 @@ dependencies = [
 
 [[package]]
 name = "ez_al"
-version = "0.1.0"
-source = "git+https://github.com/unknownbruhhaha/ez_al#fdcc4b24bf22ba888084d33f8d06afb38bd05cba"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d52c886103783874fbcf5f8b5db361f985943ba2469353b7b2ba954b43f7897"
 dependencies = [
- "allen",
  "hound",
+ "linear_model_allen",
 ]
 
 [[package]]
@@ -1465,9 +1420,6 @@ name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-dependencies = [
- "ahash 0.7.7",
-]
 
 [[package]]
 name = "hashbrown"
@@ -1475,7 +1427,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
- "ahash 0.8.6",
+ "ahash",
  "allocator-api2",
 ]
 
@@ -1811,6 +1763,20 @@ name = "libm"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
+
+[[package]]
+name = "linear_model_allen"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0964e5478c33bbf01f192d0eb8e6ac4f016fde0804dd06d87cbfc43cc905f8b1"
+dependencies = [
+ "bindgen",
+ "cmake",
+ "lazy_static",
+ "num-derive",
+ "num-traits",
+ "thiserror",
+]
 
 [[package]]
 name = "linux-raw-sys"
@@ -2617,7 +2583,6 @@ dependencies = [
 name = "projectbaldej"
 version = "0.1.0"
 dependencies = [
- "carrier-pigeon",
  "colored",
  "data-url",
  "dyon",
@@ -2633,7 +2598,6 @@ dependencies = [
  "once_cell",
  "rapier3d",
  "rayon",
- "rcrefcell",
  "renet",
  "serde",
  "serde_bare",
@@ -2849,12 +2813,6 @@ dependencies = [
  "crossbeam-deque 0.8.3",
  "crossbeam-utils 0.8.16",
 ]
-
-[[package]]
-name = "rcrefcell"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd37f0a34913c65cbe4b33197cc8b39533bc5eac1008c303b9dc20ce2eda937f"
 
 [[package]]
 name = "rdrand"

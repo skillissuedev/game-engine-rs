@@ -2,7 +2,7 @@ use crate::{
     game::game_main,
     managers::{
         render,
-        sound::{self, set_listener_transform}, systems, input, networking,
+        sound::{self, set_listener_transform}, systems, input, networking, physics,
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
@@ -37,6 +37,7 @@ pub fn start_game(debug_mode: DebugMode) {
     event_loop.run(move |ev, _, control_flow| {
         match ev {
             glium::glutin::event::Event::MainEventsCleared => {
+                physics::update();
                 game_main::update();
                 systems::update();
                 input::update();

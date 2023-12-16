@@ -84,11 +84,11 @@ pub fn get_projection_matrix() -> Mat4 {
 fn update_camera_vectors() {
     unsafe {
         let front = Vec3 {
-            x: CAMERA_LOCATION.rotation.x.to_radians().cos()
-                * CAMERA_LOCATION.rotation.y.to_radians().cos(),
-            y: CAMERA_LOCATION.rotation.y.to_radians().sin(),
-            z: CAMERA_LOCATION.rotation.y.to_radians().sin()
+            x: CAMERA_LOCATION.rotation.y.to_radians().sin()
                 * CAMERA_LOCATION.rotation.x.to_radians().cos(),
+            y: CAMERA_LOCATION.rotation.y.to_radians().sin(),
+            z: CAMERA_LOCATION.rotation.x.to_radians().cos()
+                * CAMERA_LOCATION.rotation.y.to_radians().cos(),
         };
         CAMERA_LOCATION.front = front.normalize();
         // Also re-calculate the Right and Up vector

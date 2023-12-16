@@ -2,13 +2,12 @@ use glium::{Frame, Display};
 use glam::Vec3;
 use serde::{Serialize, Deserialize};
 
+use crate::managers::physics::{ObjectBodyParameters, BodyType, self};
+
 pub mod empty_object;
 pub mod camera_position;
 pub mod model_object;
 pub mod sound_emitter;
-
-
-static mut LAST_OBJECT_ID: u128 = 0;
 
 pub trait Object: std::fmt::Debug {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -31,9 +30,8 @@ pub trait Object: std::fmt::Debug {
     fn set_local_transform(&mut self, transform: Transform);
     fn get_parent_transform(&self) -> Option<Transform>;
     fn set_parent_transform(&mut self, transform: Transform);
-
-    fn set_id(&mut self, object_id: ObjectId);
-    fn get_id(&self) -> &ObjectId;
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>);
+    fn get_body_parameters(&mut self) -> Option<ObjectBodyParameters>;
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<&str> { 
         println!("call function is not implemented in this object.");
@@ -122,6 +120,22 @@ pub trait Object: std::fmt::Debug {
         object.set_parent_transform(self.get_global_transform());
         self.get_children_list_mut().push(object);
     }
+
+    fn build_object_rigid_body(&mut self, body_type: Option<BodyType>, mass: f32) {
+        match body_type {
+            Some(body_type) => {
+                self.set_body_parameters(Some(physics::new_rigid_body(body_type, Some(self.get_global_transform()), mass)))
+            },
+            None => {
+                match self.get_body_parameters() {
+                    Some(body) => {
+                        physics::remove_rigid_body(body);
+                    },
+                    None => (),
+                }
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -144,18 +158,3 @@ impl Default for Transform {
     CameraPositionObject
 }*/
 
-#[derive(Debug)]
-pub struct ObjectId(u128);
-
-impl ObjectId {
-    pub fn raw(&self) -> u128 {
-        self.0
-    }
-}
-
-pub fn generate_object_id() -> ObjectId {
-    unsafe {
-        LAST_OBJECT_ID += 1;
-        return ObjectId(LAST_OBJECT_ID)
-    }
-}

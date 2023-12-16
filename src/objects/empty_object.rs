@@ -1,6 +1,7 @@
 use glium::Display;
+use crate::managers::physics::ObjectBodyParameters;
 
-use super::{Object, Transform, ObjectId, generate_object_id};
+use super::{Object, Transform};
 
 #[derive(Debug)]
 pub struct EmptyObject {
@@ -8,12 +9,12 @@ pub struct EmptyObject {
     pub transform: Transform,
     pub parent_transform: Option<Transform>,
     pub children: Vec<Box<dyn Object>>,
-    id: ObjectId
+    pub body: Option<ObjectBodyParameters>
 }
 
 impl EmptyObject {
     pub fn new(name: &str) -> Self {
-        EmptyObject { transform: Transform::default(), children: vec![], name: name.to_string(), parent_transform: None, id: generate_object_id() }
+        EmptyObject { transform: Transform::default(), children: vec![], name: name.to_string(), parent_transform: None, body: None }
     }
 }
 
@@ -63,19 +64,18 @@ impl Object for EmptyObject {
         self.parent_transform = Some(transform);
     }
 
-    fn set_id(&mut self, object_id: ObjectId) {
-        self.id = object_id;
-    }
-
-
-    fn get_id(&self) -> &ObjectId {
-        &self.id
-    }
-
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
         if name == "test" {
             println!("test message {}", args[0])
         }
         None
+    }
+
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
+    }
+
+    fn get_body_parameters(&mut self) -> Option<ObjectBodyParameters> {
+        self.body
     }
 }

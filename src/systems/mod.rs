@@ -1,9 +1,7 @@
 pub mod test_system;
 
-
-
 use glium::{Frame, Display};
-use crate::{objects::Object, managers::{systems::CallList, networking::{Message, MessageReceiver, MessageReliability, self, NetworkError, NetworkingMode}, debugger}};
+use crate::{objects::Object, managers::{systems::CallList, networking::{Message, MessageReliability, self, NetworkError}}};
 
 
 pub trait System {

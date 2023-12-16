@@ -6,6 +6,8 @@ use renet::{
     transport::{ServerConfig, NetcodeServerTransport, ServerAuthentication, NetcodeClientTransport, ClientAuthentication}, DisconnectReason
 };
 use serde::{Serialize, Deserialize};
+use crate::objects::Transform;
+
 use super::{debugger, systems::get_system_mut_with_id};
 
 static mut MAX_BYTES_PER_TICK: u64 = 100 * 1024 * 1024;
@@ -57,7 +59,19 @@ pub struct Message {
     pub receiver: MessageReceiver,
     pub system_id: String,
     pub message_id: String,
-    pub message: String
+    pub message: MessageContents
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MessageContents {
+    SyncObject(SyncObjectMessage),
+    Custom(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SyncObjectMessage {
+    pub object_name: String, 
+    pub transform: Transform
 }
 
 
@@ -367,3 +381,20 @@ fn generate_client_id() -> u64 {
         },
     }
 }
+
+pub fn is_server() -> bool {
+    match get_current_networking_mode() {
+        NetworkingMode::Server(_) => true,
+        NetworkingMode::Client(_) => false,
+        NetworkingMode::Disconnected(_) => false
+    }
+}
+
+pub fn is_client() -> bool {
+    match get_current_networking_mode() {
+        NetworkingMode::Server(_) => false,
+        NetworkingMode::Client(_) => true,
+        NetworkingMode::Disconnected(_) => false
+    }
+}
+

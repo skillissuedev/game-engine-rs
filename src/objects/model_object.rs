@@ -1,13 +1,12 @@
 use std::time::Instant;
 use glam::{Mat4, Quat, Vec3};
 use glium::{VertexBuffer, Program, IndexBuffer, uniform, Surface, uniforms::UniformBuffer, Display};
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}}, math_utils::deg_to_rad};
-use super::{Object, Transform, ObjectId, generate_object_id};
+use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}, physics::ObjectBodyParameters}, math_utils::deg_to_rad};
+use super::{Object, Transform};
 
 #[derive(Debug)]
 pub struct ModelObject {
     pub name: String,
-    id: ObjectId,
     pub transform: Transform,
     pub parent_transform: Option<Transform>,
     pub children: Vec<Box<dyn Object>>,
@@ -21,6 +20,7 @@ pub struct ModelObject {
     program: Vec<Program>,
     started: bool,
     error: bool,
+    body: Option<ObjectBodyParameters>
 }
 
 impl ModelObject {
@@ -55,7 +55,7 @@ impl ModelObject {
             vertex_buffer: vec![], program: vec![],
             started: false, error: false,
             animation_settings: CurrentAnimationSettings { animation: None, looping: false, timer: None },
-            id: generate_object_id(),
+            body: None
         }
     }
 }
@@ -173,7 +173,6 @@ impl Object for ModelObject {
         &mut self.children
     }
 
-
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -182,11 +181,10 @@ impl Object for ModelObject {
         "ModelObject"
     }
 
+
     fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
     }
-
-
 
     fn get_local_transform(&self) -> Transform {
         self.transform
@@ -196,6 +194,8 @@ impl Object for ModelObject {
         self.transform = transform
     }
 
+
+
     fn get_parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
@@ -204,13 +204,12 @@ impl Object for ModelObject {
         self.parent_transform = Some(transform);
     }
 
-
-    fn set_id(&mut self, object_id: ObjectId) {
-        self.id = object_id;
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
     }
 
-    fn get_id(&self) -> &ObjectId {
-        &self.id
+    fn get_body_parameters(&mut self) -> Option<ObjectBodyParameters> {
+        self.body
     }
 
 
