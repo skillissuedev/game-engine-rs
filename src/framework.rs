@@ -2,17 +2,19 @@ use crate::{
     game::game_main,
     managers::{
         render,
-        sound::{self, set_listener_transform}, systems, input, networking, physics,
+        sound::{self, set_listener_transform}, systems, input, networking::{self, NetworkingMode}, physics,
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 pub fn start_game(debug_mode: DebugMode) {
     let event_loop = EventLoop::new();
     let mut display: Option<Display>;
     match networking::get_current_networking_mode() {
-        networking::NetworkingMode::Server(_) => display = None,
+        networking::NetworkingMode::Server(_) => {
+            display = None;
+        },
         _ => {
             let wb = WindowBuilder::new();
             let cb = ContextBuilder::new().with_srgb(false);
@@ -34,23 +36,42 @@ pub fn start_game(debug_mode: DebugMode) {
     let mut win_w = 0;
     let mut win_h = 0;
 
+
+    let frame_time = Duration::from_millis(49);
+    let mut update_counter = 0;
+
+
     event_loop.run(move |ev, _, control_flow| {
+
+
+        physics::update();
+        game_main::update();
+        systems::update();
+        input::update();
+        networking::update(Instant::now().duration_since(last_frame));
+        update_counter += 1;
+
+        if let NetworkingMode::Server(_) = networking::get_current_networking_mode() {
+            let time_since_last_frame = last_frame.elapsed();
+            if time_since_last_frame < frame_time {
+                let wait_time = frame_time - time_since_last_frame;
+                let wait_until = Instant::now() + wait_time;
+                *control_flow = ControlFlow::WaitUntil(wait_until);
+            }
+            last_frame = Instant::now();
+        }
+
         match ev {
             glium::glutin::event::Event::MainEventsCleared => {
-                physics::update();
-                game_main::update();
-                systems::update();
-                input::update();
-                networking::update(Instant::now().duration_since(last_frame));
-
                 match networking::get_current_networking_mode() {
                     networking::NetworkingMode::Server(_) => (),
                     _ => {
                         set_listener_transform(render::get_camera_position(), render::get_camera_front());
                         win_w = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().width;
                         win_h = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().height;
+
                         unsafe {
-                            render::ASPECT_RATIO = win_w as f32 / win_h as f32;
+                            render::ASPECT_RATIO = (win_w / win_h) as f32 ;
                         }
 
                         let mut target = display.as_ref().expect("display is none(should be only in server mode)").draw();
@@ -60,10 +81,10 @@ pub fn start_game(debug_mode: DebugMode) {
                         systems::render(&mut display.as_mut().expect("display is none(should be only in server mode)"), &mut target);
 
                         target.finish().unwrap();
+                        last_frame = Instant::now();
                     }
                 }
 
-                last_frame = Instant::now();
             }
             glutin::glutin::event::Event::WindowEvent { event, .. } => {
                 input::reg_event(&event);
@@ -79,7 +100,15 @@ pub fn start_game(debug_mode: DebugMode) {
             DebugMode::None => (),
             _ => {
                 match networking::get_current_networking_mode() {
-                    networking::NetworkingMode::Server(_) => (),
+                    networking::NetworkingMode::Server(_) => {
+                        let fps = get_fps(&now, &frames_count);
+                        if fps.is_some() {
+                            let fps = fps.unwrap();
+                            println!("fps: {}", fps);
+                            frames_count = 0;
+                            now = Instant::now();
+                        }
+                    },
                     _ => {
                         let fps = get_fps(&now, &frames_count);
                         if fps.is_some() {

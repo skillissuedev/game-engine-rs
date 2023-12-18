@@ -16,7 +16,6 @@ splines = "4.2.0"
 glam = { version = "0.24.1", features = ["serde"] }
 serde_bare = "0.5.0"
 serde = { version = "1.0.188", features = ["derive"] }
-dyon = "0.49.1"
 ez_al = "0.1.1" 
 mlua = { version = "0.9.1", features = ["luajit"] }
 glium = "0.32.1"

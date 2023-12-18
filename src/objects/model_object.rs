@@ -245,7 +245,7 @@ impl Object for ModelObject {
                     },
                 };
 
-                let _ = self.set_position(Vec3::new(x, y, z));
+                let _ = self.set_position(Vec3::new(x, y, z), true);
 
                 return None;
             } else {

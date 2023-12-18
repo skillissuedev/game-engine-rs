@@ -127,7 +127,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Some(system) => {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
-                        Some(object) => object.set_position(Vec3::new(pos_x, pos_y, pos_z)),
+                        Some(object) => object.set_position(Vec3::new(pos_x, pos_y, pos_z), true),
                         None => debugger::error("failed to call set_object_position, object not found"),
                     }
                 },
@@ -154,7 +154,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Some(system) => {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
-                        Some(object) => object.set_rotation(Vec3::new(rot_x, rot_y, rot_z)),
+                        Some(object) => object.set_rotation(Vec3::new(rot_x, rot_y, rot_z), true),
                         None => debugger::error("failed to call set_object_rotation, object not found"),
                     }
                 },
@@ -181,7 +181,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Some(system) => {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
-                        Some(object) => object.set_position(Vec3::new(sc_x, sc_y, sc_z)),
+                        Some(object) => object.set_scale(Vec3::new(sc_x, sc_y, sc_z)),
                         None => debugger::error("failed to call set_object_scale, object not found"),
                     }
                 },

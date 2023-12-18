@@ -145,18 +145,6 @@ impl Object for CameraPosition {
         self.get_children_list_mut().into_iter().for_each(|child| child.render(display, target));
     }
 
-    fn set_position(&mut self, position: glam::Vec3) {
-        let mut transform = self.get_local_transform();
-        transform.position = position;
-        self.set_local_transform(transform);
-    }
-
-    fn set_rotation(&mut self, rotation: glam::Vec3) {
-        let mut transform = self.get_local_transform();
-        transform.rotation = rotation;
-        self.set_local_transform(transform);
-    }
-
     fn set_scale(&mut self, scale: glam::Vec3) {
         let mut transform = self.get_local_transform();
         transform.scale = scale;

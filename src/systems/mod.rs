@@ -55,6 +55,8 @@ pub trait System {
     }
 
     fn update_objects(&mut self) {
+        //println!("update objects!");
+        self.get_objects_list_mut().into_iter().for_each(|object| object.update_transform());
         self.get_objects_list_mut().into_iter().for_each(|object| object.update());
         self.get_objects_list_mut().into_iter().for_each(|object| object.update_children());
     }

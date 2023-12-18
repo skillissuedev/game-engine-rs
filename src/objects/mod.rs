@@ -46,6 +46,8 @@ pub trait Object: std::fmt::Debug {
             Some(transform) => additional_transformations = transform,
             None => additional_transformations = Transform::default(),
         }
+        //dbg!(self.get_local_transform());
+        //dbg!(base_transformations.position + additional_transformations.position);
 
         Transform {
             position: base_transformations.position + additional_transformations.position,
@@ -84,6 +86,19 @@ pub trait Object: std::fmt::Debug {
         return None;
     }
 
+    
+    fn update_transform(&mut self) {
+        if let Some(parameters) = self.get_body_parameters() {
+            let position_and_rotation_option = physics::get_body_transformations(parameters);
+            //dbg!(position_and_rotation_option);
+
+            if let Some((pos, rot)) = position_and_rotation_option {
+                self.set_position(pos, false);
+                self.set_rotation(rot, false);
+            }
+        }
+    }
+
     fn update_children(&mut self) {
         let global_transform = self.get_global_transform();
 
@@ -98,16 +113,28 @@ pub trait Object: std::fmt::Debug {
         self.get_children_list_mut().into_iter().for_each(|child| child.render(display, target));
     }
 
-    fn set_position(&mut self, position: Vec3) {
+    fn set_position(&mut self, position: Vec3, set_rigid_body_position: bool) {
         let mut transform = self.get_local_transform();
         transform.position = position;
         self.set_local_transform(transform);
+
+        if let Some(parameters) = self.get_body_parameters() {
+            if set_rigid_body_position == true {
+                physics::set_body_position(parameters, position);
+            }
+        }
     }
 
-    fn set_rotation(&mut self, rotation: Vec3) {
+    fn set_rotation(&mut self, rotation: Vec3, set_rigid_body_rotation: bool) {
         let mut transform = self.get_local_transform();
         transform.rotation = rotation;
         self.set_local_transform(transform);
+
+        if let Some(parameters) = self.get_body_parameters() {
+            if set_rigid_body_rotation == true {
+                physics::set_body_rotation(parameters, rotation);
+            }
+        }
     }
 
     fn set_scale(&mut self, scale: Vec3) {
@@ -124,6 +151,7 @@ pub trait Object: std::fmt::Debug {
     fn build_object_rigid_body(&mut self, body_type: Option<BodyType>, mass: f32) {
         match body_type {
             Some(body_type) => {
+                dbg!(self.get_global_transform());
                 self.set_body_parameters(Some(physics::new_rigid_body(body_type, Some(self.get_global_transform()), mass)))
             },
             None => {

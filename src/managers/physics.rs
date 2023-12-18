@@ -8,7 +8,7 @@ use rapier3d::{
     pipeline::{PhysicsPipeline, QueryPipeline},
     math::{Point, Real}
 };
-use crate::{objects::Transform, math_utils::{deg_vec_to_rad, rad_vec_to_deg}};
+use crate::{objects::Transform, math_utils::{deg_vec_to_rad, rad_vec_to_deg, deg_to_rad}};
 use super::debugger;
 
 
@@ -118,6 +118,7 @@ pub fn new_rigid_body(body_type: BodyType, transform: Option<Transform>, mass: f
     }
 
     let collider = collider_builder.build();
+
     unsafe {
         let rigid_body_handle = RIGID_BODY_SET.insert(rigid_body);
         let collider_handle = COLLIDER_SET.insert_with_parent(collider, rigid_body_handle, &mut RIGID_BODY_SET);
@@ -126,6 +127,7 @@ pub fn new_rigid_body(body_type: BodyType, transform: Option<Transform>, mass: f
             collider_handle: Some(collider_handle),
         };
 
+        println!("pos: {:?}", RIGID_BODY_SET.get(rigid_body_handle).unwrap().translation());
         return body_parameters;
     }
 }
@@ -184,7 +186,7 @@ impl ObjectBodyParameters {
                                 Some(COLLIDER_SET.insert_with_parent(new_collider, self.rigid_body_handle, &mut RIGID_BODY_SET));
                         }
                     },
-                    None => todo!(),
+                    None => (),
                 }
             },
             None => debugger::error(&format!("set_collider error!\nfailed to get rigid body with handle {:?}", self.rigid_body_handle)),
@@ -250,7 +252,7 @@ pub enum BodyColliderType {
     TriangleMesh(Vec<[f32; 3]>, Vec<[u32; 3]>)
 }
 
-pub fn get_body_position(body_parameters: ObjectBodyParameters) -> Option<(Vec3, Vec3)> {
+pub fn get_body_transformations(body_parameters: ObjectBodyParameters) -> Option<(Vec3, Vec3)> {
     unsafe {
         match RIGID_BODY_SET.get(body_parameters.rigid_body_handle) {
             Some(body) => {
@@ -260,21 +262,78 @@ pub fn get_body_position(body_parameters: ObjectBodyParameters) -> Option<(Vec3,
 
                 Some((position, rotation))
             },
-            None => todo!(),
+            None => {
+                debugger::error(&format!("get_body_transformations error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
+                return None;
+            }
         }
     }
 }
 
-pub fn set_body_position(body_parameters: ObjectBodyParameters, position: Vec3, rotation: Vec3) {
+pub fn set_body_transformations(body_parameters: ObjectBodyParameters, position: Vec3, rotation: Vec3) {
     unsafe {
         match RIGID_BODY_SET.get_mut(body_parameters.rigid_body_handle) {
             Some(body) => {
-                body.set_translation(position.into(), true);
-                let quat = Quat::from_euler(glam::EulerRot::XYZ, rotation.x, rotation.y, rotation.z);
-                body.set_rotation(quat.into(), true);
+                set_body_position(body_parameters, position);
+                set_body_rotation(body_parameters, position);
             },
-            None => todo!(),
+            None => debugger::error(&format!("set_body_transformations error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle)),
         }
     }
 }
+
+
+pub fn set_body_position(body_parameters: ObjectBodyParameters, position: Vec3) {
+    unsafe {
+        match RIGID_BODY_SET.get_mut(body_parameters.rigid_body_handle) {
+            Some(body) => body.set_translation(position.into(), true),
+            None => debugger::error(&format!("set_body_position error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle)),
+        }
+    }
+}
+
+pub fn get_body_position(body_parameters: ObjectBodyParameters) -> Option<Vec3> {
+    unsafe {
+        match RIGID_BODY_SET.get(body_parameters.rigid_body_handle) {
+            Some(body) => Some((*body.translation()).into()),
+            None => {
+                debugger::error(&format!("get_body_position error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
+                None
+            }
+        }
+    }
+}
+
+pub fn set_body_rotation(body_parameters: ObjectBodyParameters, rotation_deg: Vec3) {
+    unsafe {
+        match RIGID_BODY_SET.get_mut(body_parameters.rigid_body_handle) {
+            Some(body) => {
+                let quat = Quat::from_euler(glam::EulerRot::XYZ,
+                    deg_to_rad(rotation_deg.x), deg_to_rad(rotation_deg.y), deg_to_rad(rotation_deg.z));
+                body.set_rotation(quat.into(), true);
+            }
+            None => {
+                debugger::error(&format!("set_body_rotation error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
+            }
+        }
+    }
+}
+
+pub fn get_body_rotation(body_parameters: ObjectBodyParameters) -> Option<Vec3> {
+    unsafe {
+        match RIGID_BODY_SET.get(body_parameters.rigid_body_handle) {
+            Some(body) => {
+                let rot_quat: Quat = (*body.rotation()).into();
+                let rotation = rad_vec_to_deg(rot_quat.to_euler(glam::EulerRot::XYZ).into());
+
+                return Some(rotation);
+            }
+            None => {
+                debugger::error(&format!("get_body_rotation error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
+                return None;
+            },
+        }
+    }
+}
+
 
