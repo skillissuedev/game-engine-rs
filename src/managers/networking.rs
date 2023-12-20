@@ -2,7 +2,7 @@ use std::{net::{SocketAddr, IpAddr, Ipv4Addr, UdpSocket}, time::{SystemTime, Dur
 use machineid_rs::{IdBuilder, HWIDComponent};
 use once_cell::sync::Lazy;
 use renet::{
-    RenetServer, ConnectionConfig, ClientId, DefaultChannel, RenetClient, ServerEvent,
+    RenetServer, ConnectionConfig, DefaultChannel, RenetClient, ServerEvent,
     transport::{ServerConfig, NetcodeServerTransport, ServerAuthentication, NetcodeClientTransport, ClientAuthentication}, DisconnectReason
 };
 use serde::{Serialize, Deserialize};
@@ -34,7 +34,7 @@ pub enum MessageReliability {
     Unreliable
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum MessageReceiver {
     Everybody,
     EverybodyExcept(u64),
@@ -54,7 +54,7 @@ pub enum ClientStatus {
     Connected,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
     pub receiver: MessageReceiver,
     pub system_id: String,
@@ -62,13 +62,13 @@ pub struct Message {
     pub message: MessageContents
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum MessageContents {
     SyncObject(SyncObjectMessage),
     Custom(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SyncObjectMessage {
     pub object_name: String, 
     pub transform: Transform
@@ -119,13 +119,13 @@ pub fn new_server(port: u16, max_players: usize) -> Result<(), NetworkError> {
     let socket: UdpSocket = UdpSocket::bind(server_address).unwrap();
 
     let server_config = ServerConfig {
-        current_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap(),
         max_clients: max_players,
         protocol_id: 0,
-        public_addresses: vec![server_address],
+        public_addr: server_address,
         authentication: ServerAuthentication::Unsecure
     };
-    let transport = NetcodeServerTransport::new(server_config, socket).unwrap();
+    let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let transport = NetcodeServerTransport::new(current_time, server_config, socket).unwrap();
 
     let handle = ServerHandle { server, transport };
     println!("creating server");
@@ -180,9 +180,11 @@ impl ServerHandle {
         };
 
         match message.receiver {
-            MessageReceiver::Everybody => self.server.broadcast_message(renet_message_reliability, message_bytes_vec),
-            MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(ClientId::from_raw(client_id), renet_message_reliability, message_bytes_vec),
-            MessageReceiver::OneClient(client_id) => self.server.send_message(ClientId::from_raw(client_id), renet_message_reliability, message_bytes_vec),
+            MessageReceiver::Everybody => {
+                self.server.broadcast_message(renet_message_reliability, message_bytes_vec);
+            },
+            MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(client_id, renet_message_reliability, message_bytes_vec),
+            MessageReceiver::OneClient(client_id) => self.server.send_message(client_id, renet_message_reliability, message_bytes_vec),
         };
 
         return Ok(())
@@ -199,11 +201,11 @@ impl ServerHandle {
             match ev {
                 ServerEvent::ClientConnected { client_id } => {
                     println!("client connected! client_id: {}", client_id);
-                    set_network_event(NetworkEvent::ClientConnected(client_id.raw()));
+                    set_network_event(NetworkEvent::ClientConnected(client_id));
                 },
                 ServerEvent::ClientDisconnected { client_id, reason } => {
                     println!("client disconnected! client_id: {}", client_id);
-                    set_network_event(NetworkEvent::ClientDisconnected(client_id.raw(), reason.to_string()));
+                    set_network_event(NetworkEvent::ClientDisconnected(client_id, reason.to_string()));
                 },
             }
         }
@@ -277,13 +279,13 @@ impl ClientHandle {
     }
 
     fn set_client_status(&mut self) {
-        if self.client.is_connected() {
+        if self.transport.is_connected() {
             if let ClientStatus::Connecting = self.status {
                 set_network_event(NetworkEvent::ConnectedSuccessfully);
                 println!("Connected successfully!");
             }
             self.status = ClientStatus::Connected;
-        } else if self.client.is_connecting() {
+        } else if self.transport.is_connecting() {
             self.status = ClientStatus::Connecting
         } else if let Some(reason) = self.client.disconnect_reason() {
             set_current_networking_mode(NetworkingMode::Disconnected(Some(reason)));
@@ -398,3 +400,19 @@ pub fn is_client() -> bool {
     }
 }
 
+pub fn disconnect() {
+    unsafe {
+        match &mut CURRENT_NETWORKING_MODE {
+            NetworkingMode::Server(_) => {
+                debugger::error("failed to disconnect!\ncurrent networking mode is Server");
+            },
+            NetworkingMode::Client(client) => {
+                client.client.disconnect();
+            },
+            NetworkingMode::Disconnected(_) => {
+                debugger::error("failed to disconnect!\ncurrent networking mode is Disconnected");
+            },
+
+        }
+    }
+}

@@ -1,14 +1,14 @@
 use crate::{
-    game::game_main,
+    game::game_main::{self, update},
     managers::{
         render,
         sound::{self, set_listener_transform}, systems, input, networking::{self, NetworkingMode}, physics,
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
-use std::time::{Instant, Duration};
+use std::{time::{Instant, Duration}, num::NonZeroU32};
 
-pub fn start_game(debug_mode: DebugMode) {
+pub fn start_game_with_render(debug_mode: DebugMode) {
     let event_loop = EventLoop::new();
     let mut display: Option<Display>;
     match networking::get_current_networking_mode() {
@@ -16,7 +16,7 @@ pub fn start_game(debug_mode: DebugMode) {
             display = None;
         },
         _ => {
-            let wb = WindowBuilder::new();
+            let wb = WindowBuilder::new().with_title("projectbaldej");
             let cb = ContextBuilder::new().with_srgb(false);
             display = Some(Display::new(wb, cb, &event_loop).expect("failed to create glium display"));
         },
@@ -37,22 +37,14 @@ pub fn start_game(debug_mode: DebugMode) {
     let mut win_h = 0;
 
 
-    let frame_time = Duration::from_millis(49);
-    let mut update_counter = 0;
+    let frame_time = Duration::from_millis(16);
 
 
     event_loop.run(move |ev, _, control_flow| {
-
-
-        physics::update();
-        game_main::update();
-        systems::update();
-        input::update();
-        networking::update(Instant::now().duration_since(last_frame));
-        update_counter += 1;
+        let time_since_last_frame = last_frame.elapsed();
+        update_game(time_since_last_frame);
 
         if let NetworkingMode::Server(_) = networking::get_current_networking_mode() {
-            let time_since_last_frame = last_frame.elapsed();
             if time_since_last_frame < frame_time {
                 let wait_time = frame_time - time_since_last_frame;
                 let wait_until = Instant::now() + wait_time;
@@ -84,12 +76,14 @@ pub fn start_game(debug_mode: DebugMode) {
                         last_frame = Instant::now();
                     }
                 }
-
             }
             glutin::glutin::event::Event::WindowEvent { event, .. } => {
                 input::reg_event(&event);
                 match event {
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit;
+                        networking::disconnect();
+                    },
                     _ => (),
                 }
             }
@@ -104,7 +98,7 @@ pub fn start_game(debug_mode: DebugMode) {
                         let fps = get_fps(&now, &frames_count);
                         if fps.is_some() {
                             let fps = fps.unwrap();
-                            println!("fps: {}", fps);
+                            //println!("fps: {}", fps);
                             frames_count = 0;
                             now = Instant::now();
                         }
@@ -118,7 +112,7 @@ pub fn start_game(debug_mode: DebugMode) {
                                 .expect("display is none(should be only in server mode)")
                                 .gl_window()
                                 .window()
-                                .set_title(&format!("very cool window: {fps} fps"));
+                                .set_title(&format!("projectbaldej: {fps} fps"));
                             frames_count = 0;
                             now = Instant::now();
                         }
@@ -129,6 +123,31 @@ pub fn start_game(debug_mode: DebugMode) {
 
         frames_count += 1;
     });
+}
+
+pub fn start_game_without_render() {
+    println!("starting game without render");
+    game_main::start();
+
+    let tickrate_tick = Duration::from_millis(16);
+    let clock = chron::Clock::new(NonZeroU32::new(60).unwrap());
+
+    for tick in clock {
+        match tick {
+            chron::clock::Tick::Update => {
+                update_game(tickrate_tick);
+            },
+            chron::clock::Tick::Render { interpolation: _ } => { }
+        }
+    }
+}
+
+fn update_game(delta_time: Duration) {
+    physics::update();
+    input::update();
+    networking::update(delta_time);
+    game_main::update();
+    systems::update();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {

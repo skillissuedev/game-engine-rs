@@ -175,7 +175,7 @@ pub struct Transform {
 
 impl Default for Transform {
     fn default() -> Self {
-        Transform { position: Vec3::ZERO, rotation: Vec3::ZERO, scale: Vec3::ZERO }
+        Transform { position: Vec3::ZERO, rotation: Vec3::ZERO, scale: Vec3::ONE }
     }
 }
 

@@ -22,6 +22,7 @@ fn main() {
         if arg1 == "server" {
             println!("runnning game as server");
             managers::networking::new_server(9999, 10).unwrap();
+            framework::start_game_without_render();
         }
     }
     match get_current_networking_mode() {
@@ -33,10 +34,6 @@ fn main() {
         },
     }
 
-
     #[cfg(debug_assertions)]
-    framework::start_game(DebugMode::ShowFps);
-
-    #[cfg(not(debug_assertions))]
-    framework::start_game(DebugMode::ShowFps);
+    framework::start_game_with_render(DebugMode::ShowFps);
 }
