@@ -1,20 +1,21 @@
 use glium::Display;
 use crate::managers::physics::ObjectBodyParameters;
 
-use super::{Object, Transform};
+use super::{Object, Transform, gen_object_id};
 
 #[derive(Debug)]
 pub struct EmptyObject {
-    pub name: String,
-    pub transform: Transform,
-    pub parent_transform: Option<Transform>,
-    pub children: Vec<Box<dyn Object>>,
-    pub body: Option<ObjectBodyParameters>
+    name: String,
+    transform: Transform,
+    parent_transform: Option<Transform>,
+    children: Vec<Box<dyn Object>>,
+    body: Option<ObjectBodyParameters>,
+    id: u128
 }
 
 impl EmptyObject {
     pub fn new(name: &str) -> Self {
-        EmptyObject { transform: Transform::default(), children: vec![], name: name.to_string(), parent_transform: None, body: None }
+        EmptyObject { transform: Transform::default(), children: vec![], name: name.to_string(), parent_transform: None, body: None, id: gen_object_id() }
     }
 }
 
@@ -64,18 +65,22 @@ impl Object for EmptyObject {
         self.parent_transform = Some(transform);
     }
 
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
+    }
+
+    fn get_body_parameters(&self) -> Option<ObjectBodyParameters> {
+        self.body
+    }
+
+    fn get_object_id(&self) -> &u128 {
+        &self.id
+    }
+
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
         if name == "test" {
             println!("test message {}", args[0])
         }
         None
-    }
-
-    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
-        self.body = rigid_body
-    }
-
-    fn get_body_parameters(&mut self) -> Option<ObjectBodyParameters> {
-        self.body
     }
 }

@@ -1,5 +1,8 @@
-use glium::{implement_vertex, Frame, Surface};
-use glam::{Mat4, Vec3};
+use glium::{implement_vertex, Frame, Surface, VertexBuffer, IndexBuffer, index::PrimitiveType, Display, Program, uniform};
+use glam::{Mat4, Vec3, Quat};
+use crate::math_utils::deg_to_rad;
+
+use super::physics::RenderColliderType;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -10,6 +13,69 @@ pub struct Vertex {
     pub weights: [f32; 4],
 }
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
+
+pub fn init(display: &Display) {
+    unsafe {
+        COLLIDER_CUBOID_VERTEX_BUFFER = Some(VertexBuffer::new(display, &CUBE_VERTS_LIST).unwrap());
+        COLLIDER_CUBOID_INDEX_BUFFER = 
+            Some(IndexBuffer::new(display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap());
+        COLLIDER_CUBOID_SHADER = Some(Program::from_source(
+            display,
+            include_str!("../assets/collider_shader.vert"),
+            include_str!("../assets/collider_shader.frag"),
+            None,
+        ).unwrap());
+    }
+}
+
+/// Call only after drawing everything.
+pub fn debug_draw(target: &mut Frame) {
+    let colliders = unsafe { &mut RENDER_COLLIDERS };
+
+
+    colliders.iter().for_each(|collider| {
+        let uniforms = uniform! {
+            mvp: calculate_collider_mvp(collider),
+        };
+
+        unsafe {
+            let draw_params = glium::DrawParameters {
+                depth: glium::Depth {
+                    test: glium::draw_parameters::DepthTest::IfLess,
+                    write: true,
+                    ..Default::default()
+                },
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                ..Default::default()
+            };
+
+            let vert_buffer = COLLIDER_CUBOID_VERTEX_BUFFER.take().unwrap();
+            let index_buffer = COLLIDER_CUBOID_INDEX_BUFFER.take().unwrap();
+            let shader = COLLIDER_CUBOID_SHADER.take().unwrap();
+
+            target // drawing solid semi-transparent cuboid
+                .draw(
+                    &vert_buffer,
+                    &index_buffer,
+                    &shader,
+                    &uniforms,
+                    &draw_params,
+                )
+                .unwrap();
+
+            COLLIDER_CUBOID_SHADER = Some(shader);
+            COLLIDER_CUBOID_VERTEX_BUFFER = Some(vert_buffer);
+            COLLIDER_CUBOID_INDEX_BUFFER = Some(index_buffer);
+            RENDER_COLLIDERS.clear();
+        }
+    });
+}
+
+pub fn add_collider_to_draw(col: RenderColliderType) {
+    unsafe {
+        RENDER_COLLIDERS.push(col);
+    }
+}
 
 pub fn draw(target: &mut Frame) {
     target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
@@ -125,3 +191,91 @@ pub struct CameraLocation {
     right: Vec3,
     up: Vec3,
 }
+
+const CUBE_VERTS_LIST: [Vertex; 8] = 
+    [Vertex { position: [1.0, 1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [1.0, -1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [1.0, 1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [1.0, -1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [-1.0, 1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [-1.0, -1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [-1.0, 1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
+    Vertex { position: [-1.0, -1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] }]; 
+const CUBE_INDICES_LIST: [u32; 36] = [1, 2, 0, 3, 6, 2, 7, 5, 6, 5, 0, 4, 6, 0, 2, 3, 5, 7, 1, 3, 2, 3, 7, 6, 7, 5, 4, 5, 1, 0, 6, 4, 0, 3, 1, 5];
+static mut COLLIDER_CUBOID_VERTEX_BUFFER: Option<VertexBuffer<Vertex>> = None;
+static mut COLLIDER_CUBOID_INDEX_BUFFER: Option<IndexBuffer<u32>> = None;
+static mut RENDER_COLLIDERS: Vec<RenderColliderType> = vec![];
+static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
+
+pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
+    let view = get_view_matrix();
+    let proj = get_projection_matrix();
+
+    let rot_quat;
+    let position_vector;
+
+    match collider {
+        RenderColliderType::Ball(pos, rot, radius) => {
+            match rot {
+                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
+            }
+            match pos {
+                Some(pos) => position_vector = pos,
+                None => position_vector = &Vec3::ZERO,
+            }
+
+            let scale = Vec3::new(*radius * 2.0, *radius * 2.0, *radius * 2.0);
+            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+
+            return (proj * view * transform).to_cols_array_2d();
+        },
+        RenderColliderType::Cuboid(pos, rot, half_x, half_y, half_z) => {
+            match rot {
+                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
+            }
+            match pos {
+                Some(pos) => position_vector = pos,
+                None => position_vector = &Vec3::ZERO,
+            }
+
+            let scale = Vec3::new(*half_x * 2.0 + 0.001, *half_y * 2.0 + 0.001, *half_z * 2.0 + 0.001);
+            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+
+            return (proj * view * transform).to_cols_array_2d();
+        }
+        RenderColliderType::Capsule(pos, rot, radius, height) => {
+            match rot {
+                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
+            }
+            match pos {
+                Some(pos) => position_vector = pos,
+                None => position_vector = &Vec3::ZERO,
+            }
+
+            let scale = Vec3::new(*radius * 2.0, *height * 2.0, *radius * 2.0);
+            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+
+            return (proj * view * transform).to_cols_array_2d();
+        }
+        RenderColliderType::Cylinder(pos, rot, radius, height) => {
+            match rot {
+                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
+            }
+            match pos {
+                Some(pos) => position_vector = pos,
+                None => position_vector = &Vec3::ZERO,
+            }
+
+            let scale = Vec3::new(*radius * 2.0, *height * 2.0, *radius * 2.0);
+            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+
+            return (proj * view * transform).to_cols_array_2d();
+        },
+    }
+}
+
+//indices = IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0, 1, 3, 0, 3, 2, 0, 4, 6, 0, 6, 2, 6, 4, 5, 5, 7, 6, 5, 1, 3, 5, 7, 3]);

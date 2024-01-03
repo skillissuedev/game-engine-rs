@@ -1,13 +1,21 @@
 use glium::{Frame, Display};
 use glam::Vec3;
 use serde::{Serialize, Deserialize};
-
-use crate::managers::physics::{ObjectBodyParameters, BodyType, self};
+use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render}, framework};
 
 pub mod empty_object;
 pub mod camera_position;
 pub mod model_object;
 pub mod sound_emitter;
+
+static mut LAST_OBJECT_ID: u128 = 0;
+
+pub fn gen_object_id() -> u128 {
+    unsafe { 
+        LAST_OBJECT_ID += 1;
+        LAST_OBJECT_ID
+    }
+}
 
 pub trait Object: std::fmt::Debug {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -31,7 +39,8 @@ pub trait Object: std::fmt::Debug {
     fn get_parent_transform(&self) -> Option<Transform>;
     fn set_parent_transform(&mut self, transform: Transform);
     fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>);
-    fn get_body_parameters(&mut self) -> Option<ObjectBodyParameters>;
+    fn get_body_parameters(&self) -> Option<ObjectBodyParameters>;
+    fn get_object_id(&self) -> &u128;
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<&str> { 
         println!("call function is not implemented in this object.");
@@ -46,8 +55,6 @@ pub trait Object: std::fmt::Debug {
             Some(transform) => additional_transformations = transform,
             None => additional_transformations = Transform::default(),
         }
-        //dbg!(self.get_local_transform());
-        //dbg!(base_transformations.position + additional_transformations.position);
 
         Transform {
             position: base_transformations.position + additional_transformations.position,
@@ -89,8 +96,11 @@ pub trait Object: std::fmt::Debug {
     
     fn update_transform(&mut self) {
         if let Some(parameters) = self.get_body_parameters() {
+            if let None = parameters.rigid_body_handle {
+                return;
+            }
+
             let position_and_rotation_option = physics::get_body_transformations(parameters);
-            //dbg!(position_and_rotation_option);
 
             if let Some((pos, rot)) = position_and_rotation_option {
                 self.set_position(pos, false);
@@ -102,7 +112,7 @@ pub trait Object: std::fmt::Debug {
     fn update_children(&mut self) {
         let global_transform = self.get_global_transform();
 
-        self.get_children_list_mut().into_iter().for_each(|child| {
+        self.get_children_list_mut().iter_mut().for_each(|child| {
             child.set_parent_transform(global_transform);
             child.update(); 
             child.update_children(); 
@@ -110,7 +120,25 @@ pub trait Object: std::fmt::Debug {
     }
 
     fn render_children(&mut self, display: &mut Display, target: &mut Frame) {
-        self.get_children_list_mut().into_iter().for_each(|child| child.render(display, target));
+        self.get_children_list_mut().iter_mut().for_each(|child| child.render(display, target));
+    }
+
+    fn debug_render(&self) {
+        // Adding collider to render manager's render colliders list if debug mode != None
+        match framework::get_debug_mode() {
+            framework::DebugMode::Full => {
+                if let Some(body) = self.get_body_parameters() {
+                    if let Some(mut render_collider) = body.render_collider_type {
+                        let transform = self.get_global_transform();
+                        render_collider.set_transform(transform.position, transform.rotation);
+                        render::add_collider_to_draw(render_collider);
+                    }
+                }
+
+                self.get_children_list().iter().for_each(|child| child.debug_render());
+            },
+            _ => ()
+        }
     }
 
     fn set_position(&mut self, position: Vec3, set_rigid_body_position: bool) {
@@ -148,18 +176,26 @@ pub trait Object: std::fmt::Debug {
         self.get_children_list_mut().push(object);
     }
 
-    fn build_object_rigid_body(&mut self, body_type: Option<BodyType>, mass: f32) {
+    fn build_object_rigid_body(&mut self, body_type: Option<BodyType>,
+        custom_render_collider: Option<RenderColliderType>, mass: f32, membership_groups: Option<CollisionGroups>, filter_groups: Option<CollisionGroups>) {
+
         match body_type {
             Some(body_type) => {
-                dbg!(self.get_global_transform());
-                self.set_body_parameters(Some(physics::new_rigid_body(body_type, Some(self.get_global_transform()), mass)))
+                let mut body_parameters = 
+                    physics::new_rigid_body(body_type, Some(self.get_global_transform()), mass, *self.get_object_id(), membership_groups, filter_groups);
+                if let Some(render_collider) = custom_render_collider {
+                    body_parameters.set_render_collider(Some(render_collider));
+                }
+                self.set_body_parameters(Some(body_parameters));
             },
             None => {
-                match self.get_body_parameters() {
-                    Some(body) => {
-                        physics::remove_rigid_body(body);
-                    },
-                    None => (),
+                if let Some(mut body) = self.get_body_parameters() {
+                    physics::remove_rigid_body(&mut body);
+                }
+                if let Some(render_collider) = custom_render_collider {
+                    let mut params = ObjectBodyParameters::empty();
+                    params.set_render_collider(Some(render_collider));
+                    self.set_body_parameters(Some(params));
                 }
             },
         }
@@ -178,11 +214,4 @@ impl Default for Transform {
         Transform { position: Vec3::ZERO, rotation: Vec3::ZERO, scale: Vec3::ONE }
     }
 }
-
-/*pub enum ObjectType {
-    EmptyObject,
-    ModelObject,
-    SoundEmitterObject,
-    CameraPositionObject
-}*/
 

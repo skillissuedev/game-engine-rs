@@ -51,7 +51,7 @@ pub fn reg_event(event: &WindowEvent) {
                                         ElementState::Released => {
                                             if UP_EVENTS.contains(&input_ev_type) == false {
                                                 UP_EVENTS.push(input_ev_type);
-                                                for i in 0..DOWN_EVENTS.len() {
+                                                for i in 0..DOWN_EVENTS.len() - 1 {
                                                     let val = DOWN_EVENTS[i];
                                                     if val == input_ev_type {
                                                         DOWN_EVENTS.remove(i);

@@ -18,13 +18,12 @@ fn main() {
     dbg!(&args);
     println!("---\n");
 
-    if let Some(arg1) = args.get(1) {
-        if arg1 == "server" {
-            println!("runnning game as server");
-            managers::networking::new_server(9999, 10).unwrap();
-            framework::start_game_without_render();
-        }
+    if args.contains(&"server".into()) {
+        println!("runnning game as server");
+        managers::networking::new_server(9999, 10).unwrap();
+        framework::start_game_without_render();
     }
+
     match get_current_networking_mode() {
         managers::networking::NetworkingMode::Server(_) => (),
         managers::networking::NetworkingMode::Client(_) => (),
@@ -34,6 +33,10 @@ fn main() {
         },
     }
 
-    #[cfg(debug_assertions)]
-    framework::start_game_with_render(DebugMode::ShowFps);
+    if args.contains(&"debug".into()) {
+        println!("debug");
+        framework::start_game_with_render(DebugMode::Full);
+    } else {
+        framework::start_game_with_render(DebugMode::None);
+    }
 }

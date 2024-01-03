@@ -64,6 +64,7 @@ pub trait System {
     fn render_objects(&mut self, display: &mut Display, target: &mut Frame) {
         self.get_objects_list_mut().into_iter().for_each(|object| object.render(display, target));
         self.get_objects_list_mut().into_iter().for_each(|object| object.render_children(display, target));
+        self.get_objects_list_mut().into_iter().for_each(|object| object.debug_render());
     }
 
     fn destroy_system(&mut self) {

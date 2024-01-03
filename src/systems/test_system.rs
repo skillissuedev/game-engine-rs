@@ -1,5 +1,5 @@
 use glam::Vec3;
-use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
+use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
 use super::System;
 
 pub struct TestSystem {
@@ -24,16 +24,25 @@ impl System for TestSystem {
     fn start(&mut self) {
         //let asset = ModelAsset::from_file("models/test_model.gltf");
         let asset = ModelAsset::from_file("models/knife_test.gltf");
-        let mut model_object = 
+        let mut knife_model = 
             Box::new(ModelObject::new("knife_model", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         //println!("start");
-        model_object.set_position(Vec3::new(0.0, 0.0, 6.0), true);
+        knife_model.set_position(Vec3::new(0.0, 10.0, 6.0), true);
+
+        let mut ground_collider = Box::new(EmptyObject::new("ground_collider"));
+        ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
 
         if networking::is_server() {
-            model_object.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(1.0, 1.0, 1.0)))), 1.0);
+            knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, None, None);
+            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 0.5, 10.0))))
+                , None, 1.0, None, Some(CollisionGroups::Group2 | CollisionGroups::Group1));
+        } else {
+            knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2)), 1.0, None, None);
+            ground_collider.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 10.0, 0.5, 10.0)), 1.0, None, None);
         }
 
-        self.add_object(model_object);
+        self.add_object(knife_model);
+        self.add_object(ground_collider);
 
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
         input::new_bind("left", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)]);
@@ -44,10 +53,9 @@ impl System for TestSystem {
     fn update(&mut self) {
         let obj = self.find_object_mut("knife_model").unwrap();
         let obj_position = obj.get_local_transform();
-        //dbg!(obj_position);
 
         if networking::is_server() {
-            let send_result = self.send_message(MessageReliability::Reliable, Message {
+            let _ = self.send_message(MessageReliability::Reliable, Message {
                 receiver: networking::MessageReceiver::Everybody,
                 system_id: self.system_id().into(),
                 message_id: "sync_knife".into(),
@@ -56,24 +64,7 @@ impl System for TestSystem {
                     transform: obj_position,
                 }),
             });
-            //dbg!(send_result);
         }
-
-        //obj.set_rotation(Vec3::new(0.0, obj_rotation.y + 0.01, 0.0));
-        //println!("{:?}", get_camera_rotation());
-        /*if input::is_bind_pressed("forward") {
-            obj_position.position.z += 1.0;
-        }
-        if input::is_bind_pressed("backwards") {
-            obj_position.position.z -= 1.0;
-        }
-        if input::is_bind_pressed("left") {
-            obj_position.position.x -= 1.0;
-        }
-        if input::is_bind_pressed("right") {
-            obj_position.position.x += 1.0;
-        }
-        obj.set_local_transform(obj_position);*/
     }
 
     fn render(&mut self) { }
@@ -107,11 +98,9 @@ impl System for TestSystem {
     }
 
     fn reg_message(&mut self, message: Message) {
-        //dbg!(&message);
         match message.message {
             networking::MessageContents::SyncObject(sync_msg) => {
                 if &sync_msg.object_name == "knife_model" {
-                    //println!("object");
                     let object = self.find_object_mut("knife_model");
                     object.unwrap().set_local_transform(sync_msg.transform);
                 }

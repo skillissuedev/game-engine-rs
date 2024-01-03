@@ -1,5 +1,5 @@
 use crate::{
-    game::game_main::{self, update},
+    game::game_main,
     managers::{
         render,
         sound::{self, set_listener_transform}, systems, input, networking::{self, NetworkingMode}, physics,
@@ -8,7 +8,11 @@ use crate::{
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
 use std::{time::{Instant, Duration}, num::NonZeroU32};
 
+static mut DEBUG_MODE: DebugMode = DebugMode::None;
+
 pub fn start_game_with_render(debug_mode: DebugMode) {
+    unsafe { DEBUG_MODE = debug_mode } 
+
     let event_loop = EventLoop::new();
     let mut display: Option<Display>;
     match networking::get_current_networking_mode() {
@@ -16,8 +20,8 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
             display = None;
         },
         _ => {
-            let wb = WindowBuilder::new().with_title("projectbaldej");
-            let cb = ContextBuilder::new().with_srgb(false);
+            let wb = WindowBuilder::new().with_title("projectbaldej").with_transparent(false);
+            let cb = ContextBuilder::new().with_srgb(false).with_vsync(true);
             display = Some(Display::new(wb, cb, &event_loop).expect("failed to create glium display"));
         },
     }
@@ -28,7 +32,10 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
     match networking::get_current_networking_mode() {
         networking::NetworkingMode::Server(_) => (),
-        _ => sound::init().unwrap(),
+        _ => {
+            sound::init().unwrap();
+            render::init(display.as_ref().unwrap());
+        },
     };
 
     game_main::start();
@@ -71,6 +78,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         render::draw(&mut target);
                         game_main::render();
                         systems::render(&mut display.as_mut().expect("display is none(should be only in server mode)"), &mut target);
+                        render::debug_draw(&mut target);
 
                         target.finish().unwrap();
                         last_frame = Instant::now();
@@ -157,6 +165,10 @@ fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
         return Some(frames.clone());
     }
     None
+}
+
+pub fn get_debug_mode() -> DebugMode {
+    unsafe { DEBUG_MODE }
 }
 
 #[derive(Clone, Copy)]
