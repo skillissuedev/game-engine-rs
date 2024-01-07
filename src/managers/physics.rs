@@ -4,9 +4,9 @@ use nalgebra::Vector3;
 use once_cell::sync::Lazy;
 use rapier3d::{
     dynamics::{RigidBodySet, IntegrationParameters, IslandManager, ImpulseJointSet, MultibodyJointSet, CCDSolver, RigidBody, RigidBodyBuilder, RigidBodyHandle},
-    geometry::{ColliderSet, BroadPhase, NarrowPhase, ColliderBuilder, ColliderHandle, InteractionGroups}, 
+    geometry::{ColliderSet, BroadPhase, NarrowPhase, ColliderBuilder, ColliderHandle, InteractionGroups, Ray}, 
     na::vector,
-    pipeline::{PhysicsPipeline, QueryPipeline},
+    pipeline::{PhysicsPipeline, QueryPipeline, QueryFilter},
     math::{Point, Real}
 };
 use crate::{objects::Transform, math_utils::{rad_vec_to_deg, deg_to_rad}};
@@ -329,6 +329,12 @@ impl RenderColliderType {
     }
 }
 
+#[derive(Debug)]
+pub struct RenderRay {
+    pub origin: Vec3,
+    pub direction: Vec3
+}
+
 pub fn get_body_transformations(body_parameters: ObjectBodyParameters) -> Option<(Vec3, Vec3)> {
     unsafe {
         if let Some(body) = body_parameters.rigid_body_handle {
@@ -437,6 +443,18 @@ pub fn get_body_rotation(body_parameters: ObjectBodyParameters) -> Option<Vec3> 
     } else {
         debugger::error(&format!("get_body_rotation error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
         None
+    }
+}
+
+
+
+pub fn is_ray_intersecting(ray: Ray, toi: f32, query_filter: QueryFilter) -> bool {
+    unsafe {
+        if let Some(_) = QUERY_PIPELINE.cast_ray(&RIGID_BODY_SET, &COLLIDER_SET, &ray, toi, true, query_filter) {
+            true
+        } else {
+            false
+        }
     }
 }
 

@@ -6,8 +6,9 @@ in vec2 tex_coords;
 in vec4 joints;
 in vec4 weights;
 
-uniform mat4 mvp;
+uniform mat4 view;
+uniform mat4 proj;
 
 void main() {
-    gl_Position = mvp * vec4(position, 1.0);
+    gl_Position = proj * view * vec4(position, 1.0);
 }

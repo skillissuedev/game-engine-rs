@@ -2,7 +2,7 @@ use glium::{implement_vertex, Frame, Surface, VertexBuffer, IndexBuffer, index::
 use glam::{Mat4, Vec3, Quat};
 use crate::math_utils::deg_to_rad;
 
-use super::physics::RenderColliderType;
+use super::{physics::{RenderColliderType, RenderRay}, networking::disconnect};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -25,14 +25,93 @@ pub fn init(display: &Display) {
             include_str!("../assets/collider_shader.frag"),
             None,
         ).unwrap());
+        RAY_SHADER = Some(Program::from_source(
+            display,
+            include_str!("../assets/ray_shader.vert"),
+            include_str!("../assets/ray_shader.frag"),
+            None,
+        ).unwrap());
     }
 }
 
 /// Call only after drawing everything.
-pub fn debug_draw(target: &mut Frame) {
+pub fn debug_draw(display: &Display, target: &mut Frame) {
+    let proj = get_projection_matrix().to_cols_array_2d();
+    let view = get_view_matrix().to_cols_array_2d();
+
+    unsafe {
+        RENDER_RAYS.iter().for_each(|ray| {
+            let uniforms = uniform! {
+                proj: proj,
+                view: view,
+            };
+
+            let draw_params = glium::DrawParameters {
+                depth: glium::Depth {
+                    test: glium::draw_parameters::DepthTest::IfLess,
+                    write: true,
+                    ..Default::default()
+                },
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                ..Default::default()
+            };
+
+            let origin = ray.origin;
+            let dir = origin + ray.direction;
+
+            let verts_list: [Vertex; 9] = [
+                Vertex { position: [origin.x - 0.15, origin.y + 0.15, origin.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex { position: [origin.x + 0.15, origin.y + 0.15, origin.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex { position: [origin.x - 0.15, origin.y - 0.15, origin.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex { position: [origin.x + 0.15, origin.y - 0.15, origin.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+
+                Vertex { position: [dir.x - 0.15, dir.y + 0.15, dir.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex { position: [dir.x + 0.15, dir.y + 0.15, dir.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex { position: [dir.x - 0.15, dir.y - 0.15, dir.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex { position: [dir.x + 0.15, dir.y - 0.15, dir.z], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                
+                Vertex { position: [dir.x, dir.y, dir.z + 0.15], 
+                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+            ];
+
+            let indices: [u32; 48] = [0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0, 1, 5, 2, 3, 6, 2, 3, 7,
+                4, 5, 8, 4, 6, 8, 5, 7, 8, 6, 7, 8];
+
+            //dbg!(ray);
+            //dbg!(origin);
+            //dbg!(dir);
+
+            let vert_buffer = VertexBuffer::new(display, &verts_list).expect("failed to create vertex buffer while debug rendering rays");
+            let index_buffer = IndexBuffer::new(display, PrimitiveType::TriangleFan, &indices)
+                .expect("failed to create index buffer while debug rendering rays");
+            
+            let shader = RAY_SHADER.take().unwrap();
+
+            target // drawing solid semi-transparent cuboid
+                .draw(
+                    &vert_buffer,
+                    &index_buffer,
+                    &shader,
+                    &uniforms,
+                    &draw_params,
+                )
+                .unwrap();
+
+            RAY_SHADER = Some(shader);
+        });
+        RENDER_RAYS.clear();
+    }
+
+
     let colliders = unsafe { &mut RENDER_COLLIDERS };
-
-
     colliders.iter().for_each(|collider| {
         let uniforms = uniform! {
             mvp: calculate_collider_mvp(collider),
@@ -66,14 +145,21 @@ pub fn debug_draw(target: &mut Frame) {
             COLLIDER_CUBOID_SHADER = Some(shader);
             COLLIDER_CUBOID_VERTEX_BUFFER = Some(vert_buffer);
             COLLIDER_CUBOID_INDEX_BUFFER = Some(index_buffer);
-            RENDER_COLLIDERS.clear();
         }
     });
+
+    unsafe { RENDER_COLLIDERS.clear() }
 }
 
 pub fn add_collider_to_draw(col: RenderColliderType) {
     unsafe {
         RENDER_COLLIDERS.push(col);
+    }
+}
+
+pub fn add_ray_to_draw(ray: RenderRay) {
+    unsafe {
+        RENDER_RAYS.push(ray);
     }
 }
 
@@ -205,6 +291,8 @@ const CUBE_INDICES_LIST: [u32; 36] = [1, 2, 0, 3, 6, 2, 7, 5, 6, 5, 0, 4, 6, 0, 
 static mut COLLIDER_CUBOID_VERTEX_BUFFER: Option<VertexBuffer<Vertex>> = None;
 static mut COLLIDER_CUBOID_INDEX_BUFFER: Option<IndexBuffer<u32>> = None;
 static mut RENDER_COLLIDERS: Vec<RenderColliderType> = vec![];
+static mut RENDER_RAYS: Vec<RenderRay> = vec![];
+static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
 
 pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
@@ -277,5 +365,3 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
         },
     }
 }
-
-//indices = IndexBuffer::new(display, PrimitiveType::TrianglesList, &[0, 1, 3, 0, 3, 2, 0, 4, 6, 0, 6, 2, 6, 4, 5, 5, 7, 6, 5, 1, 3, 5, 7, 3]);

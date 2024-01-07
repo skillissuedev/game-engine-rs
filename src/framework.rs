@@ -78,7 +78,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         render::draw(&mut target);
                         game_main::render();
                         systems::render(&mut display.as_mut().expect("display is none(should be only in server mode)"), &mut target);
-                        render::debug_draw(&mut target);
+                        render::debug_draw(display.as_ref().expect("display is none(should be only in server mode)"), &mut target);
 
                         target.finish().unwrap();
                         last_frame = Instant::now();

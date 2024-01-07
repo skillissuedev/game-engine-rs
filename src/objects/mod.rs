@@ -7,6 +7,7 @@ pub mod empty_object;
 pub mod camera_position;
 pub mod model_object;
 pub mod sound_emitter;
+pub mod ray;
 
 static mut LAST_OBJECT_ID: u128 = 0;
 

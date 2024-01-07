@@ -1,5 +1,5 @@
 use glam::Vec3;
-use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
+use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, ray::Ray}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
 use super::System;
 
 pub struct TestSystem {
@@ -32,10 +32,14 @@ impl System for TestSystem {
         let mut ground_collider = Box::new(EmptyObject::new("ground_collider"));
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
 
+        let mut ray = Box::new(Ray::new("ray", Vec3::new(0.0, 0.0, 40.0), Some(CollisionGroups::Group3)));
+        ray.set_position(Vec3::new(-2.0, -1.5, 0.0), false);
+        ray.set_rotation(Vec3::new(0.0, 0.0, 0.0), false);
+
         if networking::is_server() {
-            knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, None, None);
-            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 0.5, 10.0))))
-                , None, 1.0, None, Some(CollisionGroups::Group2 | CollisionGroups::Group1));
+            knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, Some(CollisionGroups::Group3), None);
+            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 0.5, 10.0)))),
+                None, 1.0, None, Some(CollisionGroups::Group2 | CollisionGroups::Group1 | CollisionGroups::Group3));
         } else {
             knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2)), 1.0, None, None);
             ground_collider.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 10.0, 0.5, 10.0)), 1.0, None, None);
@@ -43,6 +47,7 @@ impl System for TestSystem {
 
         self.add_object(knife_model);
         self.add_object(ground_collider);
+        self.add_object(ray);
 
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
         input::new_bind("left", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)]);
@@ -51,20 +56,26 @@ impl System for TestSystem {
     }
 
     fn update(&mut self) {
-        let obj = self.find_object_mut("knife_model").unwrap();
-        let obj_position = obj.get_local_transform();
+        {
+            let obj = self.find_object_mut("knife_model").unwrap();
+            let obj_position = obj.get_local_transform();
 
-        if networking::is_server() {
-            let _ = self.send_message(MessageReliability::Reliable, Message {
-                receiver: networking::MessageReceiver::Everybody,
-                system_id: self.system_id().into(),
-                message_id: "sync_knife".into(),
-                message: MessageContents::SyncObject(SyncObjectMessage {
-                    object_name: "knife_model".into(),
-                    transform: obj_position,
-                }),
-            });
+            if networking::is_server() {
+                let _ = self.send_message(MessageReliability::Reliable, Message {
+                    receiver: networking::MessageReceiver::Everybody,
+                    system_id: self.system_id().into(),
+                    message_id: "sync_knife".into(),
+                    message: MessageContents::SyncObject(SyncObjectMessage {
+                        object_name: "knife_model".into(),
+                        transform: obj_position,
+                    }),
+                });
+
+            }
         }
+
+        //let ray = self.find_object_mut("ray").unwrap();
+        //dbg!(ray.call("is_intersecting", vec![]));
     }
 
     fn render(&mut self) { }
