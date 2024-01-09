@@ -458,6 +458,17 @@ pub fn is_ray_intersecting(ray: Ray, toi: f32, query_filter: QueryFilter) -> boo
     }
 }
 
+pub fn get_ray_intersaction_position(ray: Ray, toi: f32, query_filter: QueryFilter) -> Option<Vec3> {
+    unsafe {
+        if let Some((_, toi)) = QUERY_PIPELINE.cast_ray(&RIGID_BODY_SET, &COLLIDER_SET, &ray, toi, true, query_filter) {
+            let hit_point = ray.point_at(toi);
+            return Some(Vec3::new(hit_point.x, hit_point.y, hit_point.z));
+        } else {
+            return None
+        }
+    }
+}
+
 /// To use several CollisionGroups at once, use "|" between them.
 /// 
 /// Example: `CollisionGroups::Group1 | CollisionGroups::Group3` <- using groups 1 and 3 here

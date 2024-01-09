@@ -27,13 +27,13 @@ impl System for TestSystem {
         let mut knife_model = 
             Box::new(ModelObject::new("knife_model", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         //println!("start");
-        knife_model.set_position(Vec3::new(0.0, 10.0, 6.0), true);
+        knife_model.set_position(Vec3::new(5.0, 6.0, 6.0), true);
 
         let mut ground_collider = Box::new(EmptyObject::new("ground_collider"));
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
 
         let mut ray = Box::new(Ray::new("ray", Vec3::new(0.0, 0.0, 40.0), Some(CollisionGroups::Group3)));
-        ray.set_position(Vec3::new(-2.0, -1.5, 0.0), false);
+        ray.set_position(Vec3::new(4.0, -1.5, 0.0), false);
         ray.set_rotation(Vec3::new(0.0, 0.0, 0.0), false);
 
         if networking::is_server() {
@@ -74,8 +74,8 @@ impl System for TestSystem {
             }
         }
 
-        //let ray = self.find_object_mut("ray").unwrap();
-        //dbg!(ray.call("is_intersecting", vec![]));
+        let ray = self.find_object_mut("ray").unwrap();
+        dbg!(ray.call("get_intersection_position", vec![]));
     }
 
     fn render(&mut self) { }

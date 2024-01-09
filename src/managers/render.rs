@@ -2,7 +2,7 @@ use glium::{implement_vertex, Frame, Surface, VertexBuffer, IndexBuffer, index::
 use glam::{Mat4, Vec3, Quat};
 use crate::math_utils::deg_to_rad;
 
-use super::{physics::{RenderColliderType, RenderRay}, networking::disconnect};
+use super::physics::{RenderColliderType, RenderRay};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -228,7 +228,6 @@ pub fn get_view_matrix() -> Mat4 {
 
 pub fn get_projection_matrix() -> Mat4 {
     unsafe {
-        //ultraviolet::projection::perspective_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 560.0)
         Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 560.0)
     }
 }
@@ -313,7 +312,7 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
                 None => position_vector = &Vec3::ZERO,
             }
 
-            let scale = Vec3::new(*radius * 2.0, *radius * 2.0, *radius * 2.0);
+            let scale = Vec3::new(*radius, *radius, *radius);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return (proj * view * transform).to_cols_array_2d();
@@ -328,7 +327,7 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
                 None => position_vector = &Vec3::ZERO,
             }
 
-            let scale = Vec3::new(*half_x * 2.0 + 0.001, *half_y * 2.0 + 0.001, *half_z * 2.0 + 0.001);
+            let scale = Vec3::new(*half_x + 0.001, *half_y + 0.001, *half_z + 0.001);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return (proj * view * transform).to_cols_array_2d();
@@ -343,7 +342,7 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
                 None => position_vector = &Vec3::ZERO,
             }
 
-            let scale = Vec3::new(*radius * 2.0, *height * 2.0, *radius * 2.0);
+            let scale = Vec3::new(*radius, *height, *radius);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return (proj * view * transform).to_cols_array_2d();
@@ -358,7 +357,7 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
                 None => position_vector = &Vec3::ZERO,
             }
 
-            let scale = Vec3::new(*radius * 2.0, *height * 2.0, *radius * 2.0);
+            let scale = Vec3::new(*radius, *height, *radius);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return (proj * view * transform).to_cols_array_2d();

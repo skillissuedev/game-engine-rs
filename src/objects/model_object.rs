@@ -222,7 +222,7 @@ impl Object for ModelObject {
     }
 
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
         if name == "play_animation" && !args.is_empty() {
             let _ = self.play_animation(args[0]);
             return None;
@@ -391,7 +391,7 @@ impl ModelObject {
         let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
         let model_object_scale: [f32; 3] = self.transform.scale.into();
         let model_object_rotation_vec = 
-            [deg_to_rad(model_object_rotation_vec[0]), deg_to_rad(model_object_rotation_vec[1] + 90.0), deg_to_rad(model_object_rotation_vec[2])];
+            [deg_to_rad(model_object_rotation_vec[0]), deg_to_rad(model_object_rotation_vec[1]), deg_to_rad(model_object_rotation_vec[2])];
 
         let full_translation = 
             Vec3::new(

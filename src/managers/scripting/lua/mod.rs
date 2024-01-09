@@ -16,7 +16,7 @@ pub struct LuaSystem {
 }
 
 impl LuaSystem {
-    fn call_in_object(&mut self, args: Vec<String>) -> Option<&str> { 
+    fn call_in_object(&mut self, args: Vec<String>) -> Option<String> { 
         let system_id = self.system_id().to_owned();
 
         match args.len() >= 2 {
@@ -184,7 +184,7 @@ impl System for LuaSystem {
         self.call(call_id);
     }
 
-    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<&str> {
+    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<String> {
         let system_id = self.id.clone();
 
         match call_id {

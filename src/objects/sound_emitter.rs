@@ -133,7 +133,7 @@ impl Object for SoundEmitter {
         &self.id
     }
 
-    fn call(&mut self, name: &str, _args: Vec<&str>) -> Option<&str> {
+    fn call(&mut self, name: &str, _args: Vec<&str>) -> Option<String> {
         if name == "play" {
             self.play_sound();
         }

@@ -79,7 +79,7 @@ impl Object for CameraPosition {
         &self.id
     }
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
         None
     }
 }

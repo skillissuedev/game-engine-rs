@@ -76,7 +76,7 @@ pub trait System {
         self.get_objects_list_mut().last_mut().expect("the last object does not exist(why?..)").start();
     }
 
-    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<&str> {
+    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<String> {
         None
     }
 }

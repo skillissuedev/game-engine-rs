@@ -43,7 +43,7 @@ pub trait Object: std::fmt::Debug {
     fn get_body_parameters(&self) -> Option<ObjectBodyParameters>;
     fn get_object_id(&self) -> &u128;
 
-    fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<&str> { 
+    fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> { 
         println!("call function is not implemented in this object.");
         return None; 
     } 

@@ -77,7 +77,7 @@ impl Object for EmptyObject {
         &self.id
     }
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
         if name == "test" {
             println!("test message {}", args[0])
         }
