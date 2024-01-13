@@ -1,5 +1,5 @@
 use glam::Vec3;
-use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, ray::Ray}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
+use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, ray::Ray, trigger::Trigger}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
 use super::System;
 
 pub struct TestSystem {
@@ -36,18 +36,21 @@ impl System for TestSystem {
         ray.set_position(Vec3::new(4.0, -1.5, 0.0), false);
         ray.set_rotation(Vec3::new(0.0, 0.0, 0.0), false);
 
+        let trigger = Box::new(Trigger::new("trigger", None, Some(CollisionGroups::Group1 | CollisionGroups::Group3), BodyColliderType::Cuboid(10.0, 0.5, 10.0)));
+
         if networking::is_server() {
             knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, Some(CollisionGroups::Group3), None);
             ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 0.5, 10.0)))),
                 None, 1.0, None, Some(CollisionGroups::Group2 | CollisionGroups::Group1 | CollisionGroups::Group3));
         } else {
-            knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2)), 1.0, None, None);
-            ground_collider.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 10.0, 0.5, 10.0)), 1.0, None, None);
+            knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2, false)), 1.0, None, None);
+            ground_collider.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 10.0, 0.5, 10.0, false)), 1.0, None, None);
         }
 
         self.add_object(knife_model);
         self.add_object(ground_collider);
         self.add_object(ray);
+        self.add_object(trigger);
 
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
         input::new_bind("left", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)]);
@@ -74,8 +77,13 @@ impl System for TestSystem {
             }
         }
 
-        let ray = self.find_object_mut("ray").unwrap();
-        dbg!(ray.call("get_intersection_position", vec![]));
+        {
+            let ray = self.find_object_mut("ray").unwrap();
+            dbg!(ray.call("get_intersection_position", vec![]));
+        }
+
+        let trigger = self.find_object_mut("trigger").unwrap();
+        dbg!(trigger.call("is_colliding", vec![]));
     }
 
     fn render(&mut self) { }

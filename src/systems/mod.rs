@@ -1,7 +1,7 @@
 pub mod test_system;
 
 use glium::{Frame, Display};
-use crate::{objects::Object, managers::{systems::CallList, networking::{Message, MessageReliability, self, NetworkError}}};
+use crate::{objects::Object, managers::{systems::{CallList, register_object_id_system}, networking::{Message, MessageReliability, self, NetworkError}}};
 
 
 pub trait System {
@@ -72,6 +72,7 @@ pub trait System {
     }
 
     fn add_object(&mut self, object: Box<dyn Object>) {
+        register_object_id_system(*object.get_object_id(), self.system_id());
         self.get_objects_list_mut().push(object);
         self.get_objects_list_mut().last_mut().expect("the last object does not exist(why?..)").start();
     }

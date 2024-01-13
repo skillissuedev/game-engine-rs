@@ -1,7 +1,12 @@
+use std::collections::HashMap;
+
 use glium::{Frame, Display};
+use once_cell::sync::Lazy;
 use crate::systems::System;
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
+static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
+static mut OBJECTS_ID_SYSTEMS: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
 
 pub fn get_system_with_id(id: &str) -> Option<&Box<dyn System>> {
     unsafe {
@@ -49,6 +54,19 @@ pub fn add_system(system: Box<dyn System>) {
         SYSTEMS.last_mut().expect("Failed to add system").start();
     }
 }
+
+pub fn register_object_id_name(id: u128, name: &str) {
+    unsafe {
+        OBJECTS_ID_NAMES.entry(id).or_insert(name.into());
+    }
+}
+
+pub fn register_object_id_system(id: u128, system: &str) {
+    unsafe {
+        OBJECTS_ID_SYSTEMS.entry(id).or_insert(system.into());
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct CallList {

@@ -14,13 +14,13 @@ use super::debugger;
 
 
 const GRAVITY: Vector3<f32> = vector![0.0, -9.81, 0.0];
-static mut RIGID_BODY_SET: Lazy<RigidBodySet> = Lazy::new(|| RigidBodySet::new());
-static mut COLLIDER_SET: Lazy<ColliderSet> = Lazy::new(|| ColliderSet::new());
+pub static mut RIGID_BODY_SET: Lazy<RigidBodySet> = Lazy::new(|| RigidBodySet::new());
+pub static mut COLLIDER_SET: Lazy<ColliderSet> = Lazy::new(|| ColliderSet::new());
 static INTEGRATION_PARAMETERS: Lazy<IntegrationParameters> = Lazy::new(|| IntegrationParameters::default());
 static mut PHYSICS_PIPELINE: Lazy<PhysicsPipeline> = Lazy::new(|| PhysicsPipeline::new());
 static mut ISLAND_MANAGER: Lazy<IslandManager> = Lazy::new(|| IslandManager::new());
 static mut BROAD_PHASE: Lazy<BroadPhase> = Lazy::new(|| BroadPhase::new());
-static mut NARROW_PHASE: Lazy<NarrowPhase> = Lazy::new(|| NarrowPhase::new());
+pub static mut NARROW_PHASE: Lazy<NarrowPhase> = Lazy::new(|| NarrowPhase::new());
 static mut IMPULSE_JOINT_SET: Lazy<ImpulseJointSet> = Lazy::new(|| ImpulseJointSet::new());
 static mut MULTIBODY_JOINT_SET: Lazy<MultibodyJointSet> = Lazy::new(|| MultibodyJointSet::new());
 static mut CCD_SOLVER: Lazy<CCDSolver> = Lazy::new(|| CCDSolver::new());
@@ -253,7 +253,7 @@ fn get_body(handle: &RigidBodyHandle) -> Option<&mut RigidBody> {
     }
 }
 
-fn collider_type_to_collider_builder(collider: BodyColliderType, membership_groups: CollisionGroups, filter_groups: CollisionGroups) -> ColliderBuilder {
+pub fn collider_type_to_collider_builder(collider: BodyColliderType, membership_groups: CollisionGroups, filter_groups: CollisionGroups) -> ColliderBuilder {
     let mut collider_builder: ColliderBuilder;
 
     match collider {
@@ -296,32 +296,32 @@ pub enum BodyColliderType {
 
 #[derive(Clone, Copy, Debug)]
 pub enum RenderColliderType {
-    /// position, rotation, f32 is radius
-    Ball(Option<Vec3>, Option<Vec3>, f32),
-    /// position, rotation, f32s are half-x, half-y and half-z size of collider
-    Cuboid(Option<Vec3>, Option<Vec3>, f32, f32, f32),
-    /// position, rotation, first is radius, second is height
-    Capsule(Option<Vec3>, Option<Vec3>, f32, f32),
-    /// position, rotation, first is radius, second is height
-    Cylinder(Option<Vec3>, Option<Vec3>, f32, f32),
+    /// position, rotation, f32 is radius, bool is sensor
+    Ball(Option<Vec3>, Option<Vec3>, f32, bool),
+    /// position, rotation, f32s are half-x, half-y and half-z size of collider, bool is sensor
+    Cuboid(Option<Vec3>, Option<Vec3>, f32, f32, f32, bool),
+    /// position, rotation, first is radius, second is height, bool is sensor
+    Capsule(Option<Vec3>, Option<Vec3>, f32, f32, bool),
+    /// position, rotation, first is radius, second is height, bool is sensor
+    Cylinder(Option<Vec3>, Option<Vec3>, f32, f32, bool),
 }
 
 impl RenderColliderType {
     pub fn set_transform(&mut self, position: Vec3, rotation: Vec3) {
         match self {
-            RenderColliderType::Ball(col_pos, col_rot, _) => {
+            RenderColliderType::Ball(col_pos, col_rot, _, _) => {
                 *col_pos = Some(position);
                 *col_rot = Some(rotation);
             },
-            RenderColliderType::Cuboid(col_pos, col_rot, _, _, _) => {
+            RenderColliderType::Cuboid(col_pos, col_rot, _, _, _, _) => {
                 *col_pos = Some(position);
                 *col_rot = Some(rotation);
             },
-            RenderColliderType::Capsule(col_pos, col_rot, _, _) => {
+            RenderColliderType::Capsule(col_pos, col_rot, _, _, _) => {
                 *col_pos = Some(position);
                 *col_rot = Some(rotation);
             },
-            RenderColliderType::Cylinder(col_pos, col_rot, _, _) => {
+            RenderColliderType::Cylinder(col_pos, col_rot, _, _, _) => {
                 *col_pos = Some(position);
                 *col_rot = Some(rotation);
             },
@@ -478,4 +478,15 @@ pub enum CollisionGroups {
     Group11, Group12, Group13, Group14, Group15, Group16, Group17, Group18, Group19,
     Group20, Group21, Group22, Group23, Group24, Group25, Group26, Group27, Group28,
     Group29, Group30, Group31, Group32,
+}
+
+
+pub fn collider_type_to_render_collider(collider: &BodyColliderType, is_sensor: bool) -> Option<RenderColliderType> {
+    return match collider {
+        BodyColliderType::Ball(radius) => Some(RenderColliderType::Ball(None, None, *radius, is_sensor)),
+        BodyColliderType::Cuboid(x, y, z) => Some(RenderColliderType::Cuboid(None, None, *x, *y, *z, is_sensor)),
+        BodyColliderType::Capsule(radius, height) => Some(RenderColliderType::Capsule(None, None, *radius, *height, is_sensor)),
+        BodyColliderType::Cylinder(radius, height) => Some(RenderColliderType::Cylinder(None, None, *radius, *height, is_sensor)),
+        BodyColliderType::TriangleMesh(_, _) => None,
+    }
 }

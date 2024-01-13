@@ -1,13 +1,14 @@
 use glium::{Frame, Display};
 use glam::Vec3;
 use serde::{Serialize, Deserialize};
-use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render}, framework};
+use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render, systems::register_object_id_system}, framework};
 
 pub mod empty_object;
 pub mod camera_position;
 pub mod model_object;
 pub mod sound_emitter;
 pub mod ray;
+pub mod trigger;
 
 static mut LAST_OBJECT_ID: u128 = 0;
 

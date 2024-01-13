@@ -111,10 +111,13 @@ pub fn debug_draw(display: &Display, target: &mut Frame) {
     }
 
 
+
     let colliders = unsafe { &mut RENDER_COLLIDERS };
     colliders.iter().for_each(|collider| {
+        let mvp_and_sensor = calculate_collider_mvp_and_sensor(collider);
         let uniforms = uniform! {
-            mvp: calculate_collider_mvp(collider),
+            mvp: mvp_and_sensor.0,
+            sensor: mvp_and_sensor.1
         };
 
         unsafe {
@@ -294,7 +297,7 @@ static mut RENDER_RAYS: Vec<RenderRay> = vec![];
 static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
 
-pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
+pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f32; 4]; 4], bool) {
     let view = get_view_matrix();
     let proj = get_projection_matrix();
 
@@ -302,7 +305,7 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
     let position_vector;
 
     match collider {
-        RenderColliderType::Ball(pos, rot, radius) => {
+        RenderColliderType::Ball(pos, rot, radius, sensor) => {
             match rot {
                 Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
@@ -315,9 +318,9 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
             let scale = Vec3::new(*radius, *radius, *radius);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return (proj * view * transform).to_cols_array_2d();
+            return ((proj * view * transform).to_cols_array_2d(), *sensor);
         },
-        RenderColliderType::Cuboid(pos, rot, half_x, half_y, half_z) => {
+        RenderColliderType::Cuboid(pos, rot, half_x, half_y, half_z, sensor) => {
             match rot {
                 Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
@@ -330,9 +333,9 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
             let scale = Vec3::new(*half_x + 0.001, *half_y + 0.001, *half_z + 0.001);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return (proj * view * transform).to_cols_array_2d();
+            return ((proj * view * transform).to_cols_array_2d(), *sensor);
         }
-        RenderColliderType::Capsule(pos, rot, radius, height) => {
+        RenderColliderType::Capsule(pos, rot, radius, height, sensor) => {
             match rot {
                 Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
@@ -345,9 +348,9 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
             let scale = Vec3::new(*radius, *height, *radius);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return (proj * view * transform).to_cols_array_2d();
+            return ((proj * view * transform).to_cols_array_2d(), *sensor);
         }
-        RenderColliderType::Cylinder(pos, rot, radius, height) => {
+        RenderColliderType::Cylinder(pos, rot, radius, height, sensor) => {
             match rot {
                 Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
@@ -360,7 +363,7 @@ pub fn calculate_collider_mvp(collider: &RenderColliderType) -> [[f32; 4]; 4] {
             let scale = Vec3::new(*radius, *height, *radius);
             let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return (proj * view * transform).to_cols_array_2d();
+            return ((proj * view * transform).to_cols_array_2d(), *sensor);
         },
     }
 }
