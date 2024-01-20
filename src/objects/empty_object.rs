@@ -27,19 +27,19 @@ impl Object for EmptyObject {
 
     fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }
 
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
 
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
 
-    fn get_object_type(&self) -> &str {
+    fn object_type(&self) -> &str {
         "EmptyObject"
     }
 
@@ -47,7 +47,7 @@ impl Object for EmptyObject {
         self.name = name.to_string();
     }
 
-    fn get_local_transform(&self) -> Transform {
+    fn local_transform(&self) -> Transform {
         self.transform
     }
 
@@ -57,7 +57,7 @@ impl Object for EmptyObject {
         self.transform = transform
     }
 
-    fn get_parent_transform(&self) -> Option<Transform> {
+    fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
 
@@ -69,12 +69,16 @@ impl Object for EmptyObject {
         self.body = rigid_body
     }
 
-    fn get_body_parameters(&self) -> Option<ObjectBodyParameters> {
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
         self.body
     }
 
-    fn get_object_id(&self) -> &u128 {
+    fn object_id(&self) -> &u128 {
         &self.id
+    }
+
+    fn groups_list(&self) -> Vec<super::ObjectGroup> {
+        todo!()
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {

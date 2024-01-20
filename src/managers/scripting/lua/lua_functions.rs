@@ -207,7 +207,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
                         Some(object) => return 
-                            Ok(vec![object.get_global_transform().position.x, object.get_global_transform().position.y, object.get_global_transform().position.z]),
+                            Ok(vec![object.global_transform().position.x, object.global_transform().position.y, object.global_transform().position.z]),
                         None => debugger::error("failed to call get_object_position, object not found"),
                     }
                 },
@@ -233,7 +233,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
                         Some(object) => return 
-                            Ok(vec![object.get_global_transform().rotation.x, object.get_global_transform().rotation.y, object.get_global_transform().rotation.z]),
+                            Ok(vec![object.global_transform().rotation.x, object.global_transform().rotation.y, object.global_transform().rotation.z]),
                         None => debugger::error("failed to call get_object_rotation, object not found"),
                     }
                 },
@@ -259,7 +259,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
                         Some(object) => return 
-                            Ok(vec![object.get_global_transform().scale.x, object.get_global_transform().scale.y, object.get_global_transform().scale.z]),
+                            Ok(vec![object.global_transform().scale.x, object.global_transform().scale.y, object.global_transform().scale.z]),
                         None => debugger::error("failed to call get_object_scale, object not found"),
                     }
                 },

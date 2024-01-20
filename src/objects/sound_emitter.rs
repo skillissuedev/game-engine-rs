@@ -81,23 +81,23 @@ impl Object for SoundEmitter {
     fn start(&mut self) { }
 
     fn update(&mut self) {
-        self.update_sound_transforms(self.get_global_transform().position);
+        self.update_sound_transforms(self.global_transform().position);
     }
 
     fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
 
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }
 
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
 
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         self.name.as_str()
     }
-    fn get_object_type(&self) -> &str {
+    fn object_type(&self) -> &str {
         "SoundEmitter"
     }
 
@@ -105,7 +105,7 @@ impl Object for SoundEmitter {
         self.name = name.to_string();
     }
 
-    fn get_local_transform(&self) -> Transform {
+    fn local_transform(&self) -> Transform {
         self.transform
     }
 
@@ -113,7 +113,7 @@ impl Object for SoundEmitter {
         self.transform = transform;
     }
 
-    fn get_parent_transform(&self) -> Option<Transform> {
+    fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
 
@@ -125,12 +125,16 @@ impl Object for SoundEmitter {
         self.body = rigid_body
     }
 
-    fn get_body_parameters(&self) -> Option<ObjectBodyParameters> {
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
         self.body
     }
 
-    fn get_object_id(&self) -> &u128 {
+    fn object_id(&self) -> &u128 {
         &self.id
+    }
+
+    fn groups_list(&self) -> Vec<super::ObjectGroup> {
+        todo!()
     }
 
     fn call(&mut self, name: &str, _args: Vec<&str>) -> Option<String> {
@@ -146,7 +150,7 @@ impl Debug for SoundEmitter {
         formatter
             .debug_struct("SoundEmitter")
             .field("name", &self.name)
-            .field("object_type", &self.get_object_type())
+            .field("object_type", &self.object_type())
             .field("transform", &self.transform)
             .field("parent_transform", &self.parent_transform)
             .field("children", &self.children)

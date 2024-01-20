@@ -71,7 +71,7 @@ impl System for TestSystem {
         if networking::is_server() {
             {
                 let obj = self.find_object_mut("knife_model").unwrap();
-                let obj_position = obj.get_local_transform();
+                let obj_position = obj.local_transform();
 
                 let _ = self.send_message(MessageReliability::Reliable, Message {
                     receiver: networking::MessageReceiver::Everybody,
@@ -88,7 +88,7 @@ impl System for TestSystem {
             {
                 let controller = self.find_object_mut("controller").unwrap().downcast_mut::<CharacterController>().unwrap();
                 controller.move_controller(Vec3::new(0.0, -1.0, 0.0));
-                transform = controller.get_local_transform();
+                transform = controller.local_transform();
             }
 
             let _ = self.send_message(MessageReliability::Unreliable, Message {
@@ -103,7 +103,7 @@ impl System for TestSystem {
 
 
         //let ray = self.find_object_mut("ray").unwrap();
-        //dbg!(ray.call("get_intersection_position", vec![]));
+        //dbg!(ray.call("intersection_position", vec![]));
 
 
         //let trigger = self.find_object_mut("trigger").unwrap();
@@ -163,17 +163,17 @@ impl System for TestSystem {
         self.is_destroyed = is_destroyed;
     }
 
-    fn get_call_list(&self) -> CallList {
+    fn call_list(&self) -> CallList {
         CallList {
             immut_call: vec![],
             mut_call: vec![]
         }
     }
 
-    fn get_objects_list(&self) -> &Vec<Box<dyn Object>> {
+    fn objects_list(&self) -> &Vec<Box<dyn Object>> {
         &self.objects
     }
-    fn get_objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+    fn objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.objects
     }
 
@@ -211,7 +211,7 @@ impl TestSystem {
         {
             let controller = self.find_object_mut("controller").unwrap().downcast_mut::<CharacterController>().unwrap();
             controller.move_controller(direction);
-            transform = controller.get_local_transform();
+            transform = controller.local_transform();
         }
 
 

@@ -1,6 +1,6 @@
 use glam::Vec3;
 use glium::Display;
-use rapier3d::{control::{KinematicCharacterController, CharacterLength}, geometry::{ColliderShape, Collider}, pipeline::QueryFilter};
+use rapier3d::{control::{KinematicCharacterController, CharacterLength}, geometry::Collider, pipeline::QueryFilter};
 use crate::{managers::{physics::{ObjectBodyParameters, BodyColliderType, self, CollisionGroups}, debugger}, math_utils::deg_to_rad, framework};
 
 use super::{Object, Transform, gen_object_id};
@@ -54,19 +54,19 @@ impl Object for CharacterController {
 
     fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }
 
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
 
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
 
-    fn get_object_type(&self) -> &str {
+    fn object_type(&self) -> &str {
         "CharacterController"
     }
 
@@ -74,7 +74,7 @@ impl Object for CharacterController {
         self.name = name.to_string();
     }
 
-    fn get_local_transform(&self) -> Transform {
+    fn local_transform(&self) -> Transform {
         self.transform
     }
 
@@ -83,7 +83,7 @@ impl Object for CharacterController {
         self.transform = transform
     }
 
-    fn get_parent_transform(&self) -> Option<Transform> {
+    fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
 
@@ -95,12 +95,16 @@ impl Object for CharacterController {
         debugger::error("character controller error!\ncan't set body parameters in CharacterController objects.");
     }
 
-    fn get_body_parameters(&self) -> Option<ObjectBodyParameters> {
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
         None
     }
 
-    fn get_object_id(&self) -> &u128 {
+    fn object_id(&self) -> &u128 {
         &self.id
+    }
+
+    fn groups_list(&self) -> Vec<super::ObjectGroup> {
+        todo!()
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
@@ -121,14 +125,14 @@ impl CharacterController {
                 &physics::COLLIDER_SET,      // The ColliderSet.
                 &physics::QUERY_PIPELINE,        // The QueryPipeline.
                 self.collider.shape(), // The character’s shape.
-                &self.get_global_transform().position.into(),   // The character’s initial position.
+                &self.global_transform().position.into(),   // The character’s initial position.
                 direction.into(),
                 QueryFilter::default(),
                 |_| { }
             );
 
             let translation = movement.translation;
-            let new_position: Vec3 = self.get_local_transform().position + Vec3::new(translation.x, translation.y, translation.z);
+            let new_position: Vec3 = self.local_transform().position + Vec3::new(translation.x, translation.y, translation.z);
             self.set_position(new_position, false);
         }
     }
@@ -137,9 +141,9 @@ impl CharacterController {
 impl std::fmt::Debug for CharacterController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CharacterController")
-            .field("name", &self.get_name())
-            .field("object_type", &self.get_object_type())
-            .field("children", &self.get_children_list())
+            .field("name", &self.name())
+            .field("object_type", &self.object_type())
+            .field("children", &self.children_list())
             .finish()
     }
 }

@@ -62,19 +62,19 @@ impl Object for Trigger {
 
     fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }
 
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
 
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
 
-    fn get_object_type(&self) -> &str {
+    fn object_type(&self) -> &str {
         "Ray"
     }
 
@@ -82,7 +82,7 @@ impl Object for Trigger {
         self.name = name.to_string();
     }
 
-    fn get_local_transform(&self) -> Transform {
+    fn local_transform(&self) -> Transform {
         self.transform
     }
 
@@ -92,7 +92,7 @@ impl Object for Trigger {
         self.transform = transform
     }
 
-    fn get_parent_transform(&self) -> Option<Transform> {
+    fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
 
@@ -104,12 +104,16 @@ impl Object for Trigger {
         debugger::error("failed to call set_body_parameters!\nTrigger objects can't have bodies");
     }
 
-    fn get_body_parameters(&self) -> Option<ObjectBodyParameters> {
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
         None
     }
 
-    fn get_object_id(&self) -> &u128 {
+    fn object_id(&self) -> &u128 {
         &self.id
+    }
+
+    fn groups_list(&self) -> Vec<super::ObjectGroup> {
+        todo!()
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<std::string::String> {
@@ -123,24 +127,9 @@ impl Object for Trigger {
         None
     }
 
-    fn get_global_transform(&self) -> Transform {
-        let base_transformations = self.get_local_transform();
-        let additional_transformations: Transform;
-        match self.get_parent_transform() {
-            Some(transform) => additional_transformations = transform,
-            None => additional_transformations = Transform::default(),
-        }
-
-        Transform {
-            position: base_transformations.position + additional_transformations.position,
-            rotation: base_transformations.rotation + additional_transformations.rotation,
-            scale: base_transformations.scale + additional_transformations.scale,
-        }
-    }
-
     fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {
-        for object in self.get_children_list() {
-            if object.get_name() == object_name {
+        for object in self.children_list() {
+            if object.name() == object_name {
                 return Some(object);
             }
 
@@ -154,8 +143,8 @@ impl Object for Trigger {
     }
 
     fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
-        for object in self.get_children_list_mut() {
-            if object.get_name() == object_name {
+        for object in self.children_list_mut() {
+            if object.name() == object_name {
                 return Some(object);
             }
 
@@ -169,7 +158,7 @@ impl Object for Trigger {
     }
 
     fn update_transform(&mut self) {
-        if let Some(parameters) = self.get_body_parameters() {
+        if let Some(parameters) = self.body_parameters() {
             if let None = parameters.rigid_body_handle {
                 return;
             }
@@ -184,9 +173,9 @@ impl Object for Trigger {
     }
 
     fn update_children(&mut self) {
-        let global_transform = self.get_global_transform();
+        let global_transform = self.global_transform();
 
-        self.get_children_list_mut().iter_mut().for_each(|child| {
+        self.children_list_mut().iter_mut().for_each(|child| {
             child.set_parent_transform(global_transform);
             child.update(); 
             child.update_children(); 
@@ -194,7 +183,7 @@ impl Object for Trigger {
     }
 
     fn render_children(&mut self, display: &mut Display, target: &mut glium::Frame) {
-        self.get_children_list_mut().iter_mut().for_each(|child| child.render(display, target));
+        self.children_list_mut().iter_mut().for_each(|child| child.render(display, target));
     }
 
     fn debug_render(&self) {
@@ -205,14 +194,14 @@ impl Object for Trigger {
                     render::add_collider_to_draw(render_collider);
                 }
 
-                self.get_children_list().iter().for_each(|child| child.debug_render());
+                self.children_list().iter().for_each(|child| child.debug_render());
             },
             _ => ()
         }
     }
 
     fn set_position(&mut self, position: Vec3, set_rigid_body_position: bool) {
-        let mut transform = self.get_local_transform();
+        let mut transform = self.local_transform();
         transform.position = position;
         self.set_local_transform(transform);
 
@@ -220,11 +209,11 @@ impl Object for Trigger {
     }
 
     fn set_rotation(&mut self, rotation: Vec3, set_rigid_body_rotation: bool) {
-        let mut transform = self.get_local_transform();
+        let mut transform = self.local_transform();
         transform.rotation = rotation;
         self.set_local_transform(transform);
 
-        if let Some(parameters) = self.get_body_parameters() {
+        if let Some(parameters) = self.body_parameters() {
             if set_rigid_body_rotation == true {
                 physics::set_body_rotation(parameters, rotation);
             }
@@ -232,48 +221,18 @@ impl Object for Trigger {
     }
 
     fn set_scale(&mut self, scale: Vec3) {
-        let mut transform = self.get_local_transform();
+        let mut transform = self.local_transform();
         transform.scale = scale;
         self.set_local_transform(transform);
-    }
-
-    fn add_child(&mut self, mut object: Box<dyn Object>) {
-        object.set_parent_transform(self.get_global_transform());
-        self.get_children_list_mut().push(object);
-    }
-
-    fn build_object_rigid_body(&mut self, body_type: Option<physics::BodyType>,
-        custom_render_collider: Option<physics::RenderColliderType>, mass: f32, membership_groups: Option<CollisionGroups>, filter_groups: Option<CollisionGroups>) {
-
-        match body_type {
-            Some(body_type) => {
-                let mut body_parameters = 
-                    physics::new_rigid_body(body_type, Some(self.get_global_transform()), mass, *self.get_object_id(), membership_groups, filter_groups);
-                if let Some(render_collider) = custom_render_collider {
-                    body_parameters.set_render_collider(Some(render_collider));
-                }
-                self.set_body_parameters(Some(body_parameters));
-            },
-            None => {
-                if let Some(mut body) = self.get_body_parameters() {
-                    physics::remove_rigid_body(&mut body);
-                }
-                if let Some(render_collider) = custom_render_collider {
-                    let mut params = ObjectBodyParameters::empty();
-                    params.set_render_collider(Some(render_collider));
-                    self.set_body_parameters(Some(params));
-                }
-            },
-        }
     }
 }
 
 impl std::fmt::Debug for Trigger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Trigger")
-            .field("name", &self.get_name())
-            .field("object_type", &self.get_object_type())
-            .field("children", &self.get_children_list())
+            .field("name", &self.name())
+            .field("object_type", &self.object_type())
+            .field("children", &self.children_list())
             .finish()
     }
 }
@@ -299,7 +258,7 @@ impl Trigger {
         }
     }
     
-    pub fn get_mask(&self) -> &CollisionGroups {
+    pub fn mask(&self) -> &CollisionGroups {
         &self.mask
     }
 
@@ -307,7 +266,7 @@ impl Trigger {
         self.mask = mask
     }
 
-    pub fn get_group(&self) -> &CollisionGroups {
+    pub fn group(&self) -> &CollisionGroups {
         &self.membership_group
     }
 
