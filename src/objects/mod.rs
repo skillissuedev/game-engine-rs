@@ -1,7 +1,10 @@
+use std::str::Bytes;
+
+use downcast_rs::{impl_downcast, Downcast};
 use glium::{Frame, Display};
 use glam::Vec3;
 use serde::{Serialize, Deserialize};
-use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render, systems::register_object_id_system}, framework};
+use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render}, framework};
 
 pub mod empty_object;
 pub mod camera_position;
@@ -9,6 +12,7 @@ pub mod model_object;
 pub mod sound_emitter;
 pub mod ray;
 pub mod trigger;
+pub mod character_controller;
 
 static mut LAST_OBJECT_ID: u128 = 0;
 
@@ -19,7 +23,7 @@ pub fn gen_object_id() -> u128 {
     }
 }
 
-pub trait Object: std::fmt::Debug {
+pub trait Object: std::fmt::Debug + Downcast {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Object")
             .field("name", &self.get_name())
@@ -203,6 +207,8 @@ pub trait Object: std::fmt::Debug {
         }
     }
 }
+
+impl_downcast!(Object);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Transform {

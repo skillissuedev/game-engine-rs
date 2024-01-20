@@ -2103,6 +2103,7 @@ dependencies = [
  "chron",
  "colored",
  "data-url",
+ "downcast-rs",
  "ez_al",
  "glam",
  "glium",

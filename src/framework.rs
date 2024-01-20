@@ -9,6 +9,7 @@ use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, windo
 use std::{time::{Instant, Duration}, num::NonZeroU32};
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
+static mut DELTA_TIME: Duration = Duration::new(0, 0);
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode } 
@@ -151,6 +152,7 @@ pub fn start_game_without_render() {
 }
 
 fn update_game(delta_time: Duration) {
+    set_delta_time(delta_time);
     physics::update();
     input::update();
     networking::update(delta_time);
@@ -184,4 +186,14 @@ fn set_audio_listener_transformations() {
 
     sound::set_listener_position(camera_pos);
     sound::set_listener_orientation(camera_rot);
+}
+
+fn set_delta_time(dt: Duration) {
+    unsafe {
+        DELTA_TIME = dt;
+    }
+}
+
+pub fn get_delta_time() -> Duration {
+    unsafe { DELTA_TIME }
 }

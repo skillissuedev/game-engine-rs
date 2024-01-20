@@ -216,11 +216,7 @@ impl Object for Trigger {
         transform.position = position;
         self.set_local_transform(transform);
 
-        if let Some(parameters) = self.get_body_parameters() {
-            if set_rigid_body_position == true {
-                physics::set_body_position(parameters, position);
-            }
-        }
+        physics::set_rigidbody_position(self.body_handle, position);
     }
 
     fn set_rotation(&mut self, rotation: Vec3, set_rigid_body_rotation: bool) {

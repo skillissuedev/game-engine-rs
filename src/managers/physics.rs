@@ -4,7 +4,7 @@ use nalgebra::Vector3;
 use once_cell::sync::Lazy;
 use rapier3d::{
     dynamics::{RigidBodySet, IntegrationParameters, IslandManager, ImpulseJointSet, MultibodyJointSet, CCDSolver, RigidBody, RigidBodyBuilder, RigidBodyHandle},
-    geometry::{ColliderSet, BroadPhase, NarrowPhase, ColliderBuilder, ColliderHandle, InteractionGroups, Ray}, 
+    geometry::{ColliderSet, BroadPhase, NarrowPhase, ColliderBuilder, ColliderHandle, InteractionGroups, Ray, ColliderShape}, 
     na::vector,
     pipeline::{PhysicsPipeline, QueryPipeline, QueryFilter},
     math::{Point, Real}
@@ -16,15 +16,15 @@ use super::debugger;
 const GRAVITY: Vector3<f32> = vector![0.0, -9.81, 0.0];
 pub static mut RIGID_BODY_SET: Lazy<RigidBodySet> = Lazy::new(|| RigidBodySet::new());
 pub static mut COLLIDER_SET: Lazy<ColliderSet> = Lazy::new(|| ColliderSet::new());
-static INTEGRATION_PARAMETERS: Lazy<IntegrationParameters> = Lazy::new(|| IntegrationParameters::default());
-static mut PHYSICS_PIPELINE: Lazy<PhysicsPipeline> = Lazy::new(|| PhysicsPipeline::new());
-static mut ISLAND_MANAGER: Lazy<IslandManager> = Lazy::new(|| IslandManager::new());
-static mut BROAD_PHASE: Lazy<BroadPhase> = Lazy::new(|| BroadPhase::new());
+pub static INTEGRATION_PARAMETERS: Lazy<IntegrationParameters> = Lazy::new(|| IntegrationParameters::default());
+pub static mut PHYSICS_PIPELINE: Lazy<PhysicsPipeline> = Lazy::new(|| PhysicsPipeline::new());
+pub static mut ISLAND_MANAGER: Lazy<IslandManager> = Lazy::new(|| IslandManager::new());
+pub static mut BROAD_PHASE: Lazy<BroadPhase> = Lazy::new(|| BroadPhase::new());
 pub static mut NARROW_PHASE: Lazy<NarrowPhase> = Lazy::new(|| NarrowPhase::new());
-static mut IMPULSE_JOINT_SET: Lazy<ImpulseJointSet> = Lazy::new(|| ImpulseJointSet::new());
-static mut MULTIBODY_JOINT_SET: Lazy<MultibodyJointSet> = Lazy::new(|| MultibodyJointSet::new());
-static mut CCD_SOLVER: Lazy<CCDSolver> = Lazy::new(|| CCDSolver::new());
-static mut QUERY_PIPELINE: Lazy<QueryPipeline> = Lazy::new(|| QueryPipeline::new());
+pub static mut IMPULSE_JOINT_SET: Lazy<ImpulseJointSet> = Lazy::new(|| ImpulseJointSet::new());
+pub static mut MULTIBODY_JOINT_SET: Lazy<MultibodyJointSet> = Lazy::new(|| MultibodyJointSet::new());
+pub static mut CCD_SOLVER: Lazy<CCDSolver> = Lazy::new(|| CCDSolver::new());
+pub static mut QUERY_PIPELINE: Lazy<QueryPipeline> = Lazy::new(|| QueryPipeline::new());
 
 
 pub fn update() {
@@ -388,13 +388,35 @@ pub fn set_body_position(body_parameters: ObjectBodyParameters, position: Vec3) 
     }
 }
 
+pub fn set_rigidbody_rotation(body: RigidBodyHandle, rotation_deg: Vec3) {
+    unsafe {
+        match RIGID_BODY_SET.get_mut(body) {
+            Some(body) => {
+                let quat = Quat::from_euler(glam::EulerRot::XYZ,
+                    deg_to_rad(rotation_deg.x), deg_to_rad(rotation_deg.y), deg_to_rad(rotation_deg.z));
+                body.set_rotation(quat.into(), true);
+            }
+            None => debugger::error(&format!("set_rigidbody_rotation error\nfailed to get rigid body with handle {:?}", body)),
+        }
+    }
+}
+
+pub fn set_rigidbody_position(body: RigidBodyHandle, position: Vec3) {
+    unsafe {
+        match RIGID_BODY_SET.get_mut(body) {
+            Some(body) => body.set_translation(position.into(), true),
+            None => debugger::error(&format!("set_rigidbody_position error\nfailed to get rigid body with handle {:?}", body)),
+        }
+    }
+}
+
 pub fn get_body_position(body_parameters: ObjectBodyParameters) -> Option<Vec3> {
     if let Some(body) = body_parameters.rigid_body_handle {
         unsafe {
             match RIGID_BODY_SET.get(body) {
                 Some(body) => Some((*body.translation()).into()),
                 None => {
-                    debugger::error(&format!("get_body_position error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
+                    debugger::error(&format!("get_rigidbody_position error\nfailed to get rigid body with handle {:?}", body_parameters.rigid_body_handle));
                     None
                 }
             }
@@ -487,6 +509,16 @@ pub fn collider_type_to_render_collider(collider: &BodyColliderType, is_sensor: 
         BodyColliderType::Cuboid(x, y, z) => Some(RenderColliderType::Cuboid(None, None, *x, *y, *z, is_sensor)),
         BodyColliderType::Capsule(radius, height) => Some(RenderColliderType::Capsule(None, None, *radius, *height, is_sensor)),
         BodyColliderType::Cylinder(radius, height) => Some(RenderColliderType::Cylinder(None, None, *radius, *height, is_sensor)),
+        BodyColliderType::TriangleMesh(_, _) => None,
+    }
+}
+
+pub fn collider_type_to_rapier_shape(collider: &BodyColliderType) -> Option<ColliderShape> {
+    return match collider {
+        BodyColliderType::Ball(radius) => Some(ColliderShape::ball(*radius)),
+        BodyColliderType::Cuboid(x, y, z) => Some(ColliderShape::cuboid(*x, *y, *z)),
+        BodyColliderType::Capsule(radius, height) => Some(ColliderShape::capsule_y(*height, *radius)),
+        BodyColliderType::Cylinder(radius, height) => Some(ColliderShape::cylinder(*height, *radius)),
         BodyColliderType::TriangleMesh(_, _) => None,
     }
 }

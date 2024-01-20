@@ -1,5 +1,5 @@
 use glam::Vec3;
-use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, ray::Ray, trigger::Trigger}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
+use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents, MessageReceiver}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, ray::Ray, trigger::Trigger, character_controller::CharacterController}, assets::{model_asset::{ModelAsset, ModelAssetError}, shader_asset::ShaderAsset}};
 use super::System;
 
 pub struct TestSystem {
@@ -38,13 +38,22 @@ impl System for TestSystem {
 
         let trigger = Box::new(Trigger::new("trigger", None, Some(CollisionGroups::Group1 | CollisionGroups::Group3), BodyColliderType::Cuboid(10.0, 0.5, 10.0)));
 
+
         if networking::is_server() {
             knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, Some(CollisionGroups::Group3), None);
             ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 0.5, 10.0)))),
                 None, 1.0, None, Some(CollisionGroups::Group2 | CollisionGroups::Group1 | CollisionGroups::Group3));
+            let mut controller = Box::new(CharacterController::new("controller", BodyColliderType::Capsule(1.0, 2.0),
+                None, Some(CollisionGroups::Group1 | CollisionGroups::Group3)).unwrap());
+            controller.set_position(Vec3::new(0.0, 2.0, 0.0), false);
+            self.add_object(controller);
         } else {
             knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2, false)), 1.0, None, None);
             ground_collider.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 10.0, 0.5, 10.0, false)), 1.0, None, None);
+            let capsule_model_asset = ModelAsset::from_file("models/capsule.gltf").unwrap();
+            let mut controller = Box::new(ModelObject::new("controller", capsule_model_asset, None, ShaderAsset::load_default_shader().unwrap()));
+            controller.set_position(Vec3::new(0.0, 2.0, 0.0), false);
+            self.add_object(controller);
         }
 
         self.add_object(knife_model);
@@ -59,11 +68,11 @@ impl System for TestSystem {
     }
 
     fn update(&mut self) {
-        {
-            let obj = self.find_object_mut("knife_model").unwrap();
-            let obj_position = obj.get_local_transform();
+        if networking::is_server() {
+            {
+                let obj = self.find_object_mut("knife_model").unwrap();
+                let obj_position = obj.get_local_transform();
 
-            if networking::is_server() {
                 let _ = self.send_message(MessageReliability::Reliable, Message {
                     receiver: networking::MessageReceiver::Everybody,
                     system_id: self.system_id().into(),
@@ -73,17 +82,69 @@ impl System for TestSystem {
                         transform: obj_position,
                     }),
                 });
-
             }
+
+            let transform;
+            {
+                let controller = self.find_object_mut("controller").unwrap().downcast_mut::<CharacterController>().unwrap();
+                controller.move_controller(Vec3::new(0.0, -1.0, 0.0));
+                transform = controller.get_local_transform();
+            }
+
+            let _ = self.send_message(MessageReliability::Unreliable, Message {
+                receiver: MessageReceiver::Everybody,
+                system_id: "TestSystem".into(),
+                message_id: "sync_controller".into(),
+                message: MessageContents::SyncObject(SyncObjectMessage {
+                    object_name: "controller".into(), transform
+                }),
+            });
         }
 
-        {
-            let ray = self.find_object_mut("ray").unwrap();
-            dbg!(ray.call("get_intersection_position", vec![]));
+
+        //let ray = self.find_object_mut("ray").unwrap();
+        //dbg!(ray.call("get_intersection_position", vec![]));
+
+
+        //let trigger = self.find_object_mut("trigger").unwrap();
+        //dbg!(trigger.call("is_colliding", vec![]));
+
+        if input::is_bind_down("forward") {
+            println!("forward");
+            let _ = self.send_message(MessageReliability::Reliable, Message {
+                receiver: networking::MessageReceiver::Everybody,
+                system_id: self.system_id().into(),
+                message_id: "move_controller".into(),
+                message: MessageContents::Custom("forward".into()),
+            });
         }
 
-        let trigger = self.find_object_mut("trigger").unwrap();
-        dbg!(trigger.call("is_colliding", vec![]));
+        if input::is_bind_down("backwards") {
+            let _ = self.send_message(MessageReliability::Reliable, Message {
+                receiver: networking::MessageReceiver::Everybody,
+                system_id: self.system_id().into(),
+                message_id: "move_controller".into(),
+                message: MessageContents::Custom("backwards".into()),
+            });
+        }
+
+        if input::is_bind_down("left") {
+            let _ = self.send_message(MessageReliability::Reliable, Message {
+                receiver: networking::MessageReceiver::Everybody,
+                system_id: self.system_id().into(),
+                message_id: "move_controller".into(),
+                message: MessageContents::Custom("left".into()),
+            });
+        }
+
+        if input::is_bind_down("right") {
+            let _ = self.send_message(MessageReliability::Reliable, Message {
+                receiver: networking::MessageReceiver::Everybody,
+                system_id: self.system_id().into(),
+                message_id: "move_controller".into(),
+                message: MessageContents::Custom("right".into()),
+            });
+        }
     }
 
     fn render(&mut self) { }
@@ -123,8 +184,37 @@ impl System for TestSystem {
                     let object = self.find_object_mut("knife_model");
                     object.unwrap().set_local_transform(sync_msg.transform);
                 }
+                if &sync_msg.object_name == "controller" {
+                    let object = self.find_object_mut("controller");
+                    object.unwrap().set_local_transform(sync_msg.transform);
+                }
             },
-            networking::MessageContents::Custom(_) => (),
+            networking::MessageContents::Custom(contents) => {
+                if message.message_id == "move_controller" {
+                    match contents.as_str() {
+                        "forward" => self.move_controller(Vec3 { x: 0.0, y: 0.0, z: 0.01 } ),
+                        "backwards" => self.move_controller(Vec3 { x: 0.0, y: 0.0, z: -0.01 } ),
+                        "right" => self.move_controller(Vec3 { x: 0.01, y: 0.0, z: 0.0 } ),
+                        "left" => self.move_controller(Vec3 { x: -0.01, y: 0.0, z: 0.0 } ),
+                        _ => ()
+                   }
+                }
+            },
         }
+    }
+}
+
+impl TestSystem {
+    fn move_controller(&mut self, direction: Vec3) {
+        let transform;
+        
+        {
+            let controller = self.find_object_mut("controller").unwrap().downcast_mut::<CharacterController>().unwrap();
+            controller.move_controller(direction);
+            transform = controller.get_local_transform();
+        }
+
+
+        println!("move");
     }
 }
