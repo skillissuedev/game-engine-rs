@@ -1,16 +1,18 @@
 use std::fmt::Debug;
-use ez_al::{sound_source::{SoundSource, SoundSourceType}, SoundError};
+use ez_al::{SoundSource, SoundSourceType, SoundError};
 use glam::Vec3;
-use crate::{assets::sound_asset::SoundAsset, managers::debugger::warn};
-use super::{Transform, Object};
+use crate::{assets::sound_asset::SoundAsset, managers::{debugger::warn, physics::ObjectBodyParameters}};
+use super::{Transform, Object, gen_object_id};
 
 pub struct SoundEmitter {
-    pub name: String,
-    pub transform: Transform,
-    pub parent_transform: Option<Transform>,
-    pub children: Vec<Box<dyn Object>>,
+    name: String,
+    transform: Transform,
+    parent_transform: Option<Transform>,
+    children: Vec<Box<dyn Object>>,
     pub source_type: SoundSourceType,
-    pub source: SoundSource
+    pub source: SoundSource,
+    body: Option<ObjectBodyParameters>,
+    id: u128
 }
 
 impl SoundEmitter {
@@ -25,6 +27,8 @@ impl SoundEmitter {
                     children: vec![],
                     source_type: emitter_type,
                     source,
+                    body: None,
+                    id: gen_object_id()
                 });
             },
             Err(err) => {
@@ -49,7 +53,7 @@ impl SoundEmitter {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to set max distance when emitter type is simple");
-                return Err(SoundError::WrongEmitterType);
+                return Err(SoundError::WrongSoundSourceType);
             }
             SoundSourceType::Positional => {
                 let _ = self.source.set_max_distance(distance);
@@ -62,7 +66,7 @@ impl SoundEmitter {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to get max distance when emitter type is simple");
-                return Err(SoundError::WrongEmitterType);
+                return Err(SoundError::WrongSoundSourceType);
             }
             SoundSourceType::Positional => return Ok(self.source.get_max_distance().unwrap()),
         }
@@ -77,35 +81,39 @@ impl Object for SoundEmitter {
     fn start(&mut self) { }
 
     fn update(&mut self) {
-        self.update_sound_transforms(self.get_global_transform().position);
+        self.update_sound_transforms(self.global_transform().position);
     }
 
     fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
 
-    fn get_name(&self) -> &str {
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
+        &self.children
+    }
+
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+        &mut self.children
+    }
+
+    fn name(&self) -> &str {
         self.name.as_str()
     }
+    fn object_type(&self) -> &str {
+        "SoundEmitter"
+    }
+
     fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
     }
 
-    fn get_object_type(&self) -> &str {
-        "SoundEmitter"
-    }
-
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
-        &self.children
-    }
-
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
-        &mut self.children
-    }
-
-    fn get_local_transform(&self) -> Transform {
+    fn local_transform(&self) -> Transform {
         self.transform
     }
 
-    fn get_parent_transform(&self) -> Option<Transform> {
+    fn set_local_transform(&mut self, transform: Transform) {
+        self.transform = transform;
+    }
+
+    fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
 
@@ -113,11 +121,23 @@ impl Object for SoundEmitter {
         self.parent_transform = Some(transform);
     }
 
-    fn set_local_transform(&mut self, transform: Transform) {
-        self.transform = transform;
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
     }
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
+        self.body
+    }
+
+    fn object_id(&self) -> &u128 {
+        &self.id
+    }
+
+    fn groups_list(&self) -> Vec<super::ObjectGroup> {
+        todo!()
+    }
+
+    fn call(&mut self, name: &str, _args: Vec<&str>) -> Option<String> {
         if name == "play" {
             self.play_sound();
         }
@@ -130,7 +150,7 @@ impl Debug for SoundEmitter {
         formatter
             .debug_struct("SoundEmitter")
             .field("name", &self.name)
-            .field("object_type", &self.get_object_type())
+            .field("object_type", &self.object_type())
             .field("transform", &self.transform)
             .field("parent_transform", &self.parent_transform)
             .field("children", &self.children)

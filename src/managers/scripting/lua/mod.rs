@@ -1,7 +1,7 @@
 pub mod lua_functions;
 
 use std::{fs, collections::HashMap};
-use ez_al::sound_source::SoundSourceType;
+use ez_al::SoundSourceType;
 use mlua::{Lua, Function, StdLib, LuaOptions};
 use once_cell::sync::Lazy;
 use crate::{objects::{Object, empty_object::EmptyObject, model_object::ModelObject, sound_emitter::SoundEmitter, camera_position::CameraPosition}, managers::{debugger, assets, systems::CallList, scripting::lua::lua_functions::add_lua_vm_to_list}, systems::System, assets::{model_asset::ModelAsset, texture_asset::TextureAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset}};
@@ -16,7 +16,7 @@ pub struct LuaSystem {
 }
 
 impl LuaSystem {
-    fn call_in_object(&mut self, args: Vec<String>) -> Option<&str> { 
+    fn call_in_object(&mut self, args: Vec<String>) -> Option<String> { 
         let system_id = self.system_id().to_owned();
 
         match args.len() >= 2 {
@@ -148,7 +148,7 @@ impl LuaSystem {
 
 impl System for LuaSystem {
     fn update(&mut self) {
-        let lua_option = get_lua_vm_ref(self.system_id().into());
+        let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "update");
@@ -158,7 +158,7 @@ impl System for LuaSystem {
     }
 
     fn start(&mut self) {
-        let lua_option = get_lua_vm_ref(self.system_id().into());
+        let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "start");
@@ -169,7 +169,7 @@ impl System for LuaSystem {
 
 
     fn call(&self, call_id: &str) {
-        let lua_option = get_lua_vm_ref(self.system_id().into());
+        let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, call_id);
@@ -184,7 +184,7 @@ impl System for LuaSystem {
         self.call(call_id);
     }
 
-    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<&str> {
+    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<String> {
         let system_id = self.id.clone();
 
         match call_id {
@@ -262,21 +262,21 @@ impl System for LuaSystem {
             },
 
             _ => {
-                debugger::error(&format!("can't call {} in system {}, check all things that are avaliable to call using get_call_list().", call_id, system_id));
+                debugger::error(&format!("can't call {} in system {}, check all things that are avaliable to call using call_list().", call_id, system_id));
                 None
             }
         }
     }
 
-    fn get_objects_list(&self) -> &Vec<Box<dyn Object>> {
+    fn objects_list(&self) -> &Vec<Box<dyn Object>> {
         &self.objects
     }
 
-    fn get_objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+    fn objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.objects
     }
 
-    fn get_call_list(&self) -> crate::managers::systems::CallList {
+    fn call_list(&self) -> crate::managers::systems::CallList {
         // TODO
         CallList {
             immut_call: vec![],
@@ -301,13 +301,13 @@ impl System for LuaSystem {
     }
 }
 
-fn get_lua_vm_ref<'a>(system_id: String) -> Option<&'a Lua> {
+fn lua_vm_ref<'a>(system_id: String) -> Option<&'a Lua> {
     unsafe {
         SYSTEMS_LUA_VMS.get(&system_id)
     }
 }
 
-fn get_lua_vm_ref_mut<'a>(system_id: String) -> Option<&'a mut Lua> {
+fn lua_vm_ref_mut<'a>(system_id: String) -> Option<&'a mut Lua> {
     unsafe {
         SYSTEMS_LUA_VMS.get_mut(&system_id)
     }

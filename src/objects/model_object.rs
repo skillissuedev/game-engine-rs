@@ -1,15 +1,15 @@
 use std::time::Instant;
 use glam::{Mat4, Quat, Vec3};
 use glium::{VertexBuffer, Program, IndexBuffer, uniform, Surface, uniforms::UniformBuffer, Display};
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}}, math_utils::deg_to_rad};
-use super::{Object, Transform};
+use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}, physics::ObjectBodyParameters}, math_utils::deg_to_rad};
+use super::{Object, Transform, gen_object_id};
 
 #[derive(Debug)]
 pub struct ModelObject {
-    pub name: String,
-    pub transform: Transform,
-    pub parent_transform: Option<Transform>,
-    pub children: Vec<Box<dyn Object>>,
+    name: String,
+    transform: Transform,
+    parent_transform: Option<Transform>,
+    children: Vec<Box<dyn Object>>,
     pub asset: ModelAsset,
     pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
@@ -20,6 +20,8 @@ pub struct ModelObject {
     program: Vec<Program>,
     started: bool,
     error: bool,
+    body: Option<ObjectBodyParameters>,
+    id: u128
 }
 
 impl ModelObject {
@@ -47,35 +49,24 @@ impl ModelObject {
             nodes_transforms,
             children: vec![],
             name: name.to_string(),
-            parent_transform: None, asset,
+            parent_transform: None, 
+            asset,
             texture_asset,
             shader_asset,
             texture: None,
-            vertex_buffer: vec![], program: vec![],
+            vertex_buffer: vec![], 
+            program: vec![],
             started: false, error: false,
-            animation_settings: CurrentAnimationSettings { animation: None, looping: false, timer: None }
+            animation_settings: CurrentAnimationSettings { animation: None, looping: false, timer: None },
+            body: None,
+            id: gen_object_id()
         }
     }
 }
 
 
 impl Object for ModelObject {
-    fn get_object_type(&self) -> &str {
-        "ModelObject"
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-    }
-
-
-    fn start(&mut self) {
-
-    }
+    fn start(&mut self) { }
 
     fn update(&mut self) {
         self.update_animation();
@@ -161,6 +152,7 @@ impl Object for ModelObject {
                     write: true,
                     ..Default::default()
                 },
+                blend: glium::draw_parameters::Blend::alpha_blending(),
                 backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
                 polygon_mode: glium::draw_parameters::PolygonMode::Fill,
                 ..Default::default()
@@ -178,9 +170,28 @@ impl Object for ModelObject {
         } 
     }
 
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
+        &self.children
+    }
+
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+        &mut self.children
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn object_type(&self) -> &str {
+        "ModelObject"
+    }
+
+    fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
 
 
-    fn get_local_transform(&self) -> Transform {
+    fn local_transform(&self) -> Transform {
         self.transform
     }
 
@@ -188,25 +199,34 @@ impl Object for ModelObject {
         self.transform = transform
     }
 
-    fn get_parent_transform(&self) -> Option<Transform> {
+    fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
+
+
 
     fn set_parent_transform(&mut self, transform: Transform) {
         self.parent_transform = Some(transform);
     }
 
-
-    fn get_children_list(&self) -> &Vec<Box<dyn Object>> {
-        &self.children
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
     }
 
-    fn get_children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
-        &mut self.children
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
+        self.body
+    }
+
+    fn object_id(&self) -> &u128 {
+        &self.id
     }
 
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<&str> {
+    fn groups_list(&self) -> Vec<super::ObjectGroup> {
+        todo!()
+    }
+
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
         if name == "play_animation" && !args.is_empty() {
             let _ = self.play_animation(args[0]);
             return None;
@@ -238,7 +258,7 @@ impl Object for ModelObject {
                     },
                 };
 
-                let _ = self.set_position(Vec3::new(x, y, z));
+                let _ = self.set_position(Vec3::new(x, y, z), true);
 
                 return None;
             } else {

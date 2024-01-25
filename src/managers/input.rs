@@ -51,13 +51,12 @@ pub fn reg_event(event: &WindowEvent) {
                                         ElementState::Released => {
                                             if UP_EVENTS.contains(&input_ev_type) == false {
                                                 UP_EVENTS.push(input_ev_type);
-                                                for i in 0..DOWN_EVENTS.len() {
-                                                    let val = DOWN_EVENTS[i];
-                                                    if val == input_ev_type {
-                                                        DOWN_EVENTS.remove(i);
-                                                    }
-                                                }
                                             }
+                                            DOWN_EVENTS.iter().enumerate().for_each(|(idx, value)| {
+                                                if value == &input_ev_type {
+                                                    DOWN_EVENTS.remove(idx);
+                                                }
+                                            });
                                         },
                                     };
                                 }
@@ -77,15 +76,15 @@ pub fn reg_event(event: &WindowEvent) {
                         }
                     },
                     ElementState::Released => {
+                        println!("released");
                         if UP_EVENTS.contains(&input_ev_type) == false {
                             UP_EVENTS.push(input_ev_type);
-                            for i in 0..DOWN_EVENTS.len() {
-                                let val = DOWN_EVENTS[i];
-                                if val == input_ev_type {
-                                    DOWN_EVENTS.remove(i);
-                                }
-                            }
                         }
+                        DOWN_EVENTS.iter().enumerate().for_each(|(idx, value)| {
+                            if value == &input_ev_type {
+                                DOWN_EVENTS.remove(idx);
+                            }
+                        });
                     }
                 }
             }
@@ -170,7 +169,7 @@ pub fn is_bind_up(requested_bind_name: &str) -> bool {
     return false;
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum InputEventType {
     Key(VirtualKeyCode),
     Mouse(MouseButton)
