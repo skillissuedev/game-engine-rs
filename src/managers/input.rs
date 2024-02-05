@@ -66,6 +66,7 @@ pub fn reg_event(event: &WindowEvent) {
                     }
                 });
             },
+            #[allow(deprecated)]
             WindowEvent::MouseInput { device_id: _, state, button, modifiers: _ } => {
                 let input_ev_type = InputEventType::Mouse(*button);
                 match state {

@@ -2,17 +2,18 @@ use std::fmt::Debug;
 use ez_al::{SoundSource, SoundSourceType, SoundError};
 use glam::Vec3;
 use crate::{assets::sound_asset::SoundAsset, managers::{debugger::warn, physics::ObjectBodyParameters}};
-use super::{Transform, Object, gen_object_id};
+use super::{Transform, Object, gen_object_id, ObjectGroup};
 
 pub struct SoundEmitter {
     name: String,
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
+    body: Option<ObjectBodyParameters>,
+    id: u128,
+    groups: Vec<ObjectGroup>,
     pub source_type: SoundSourceType,
     pub source: SoundSource,
-    body: Option<ObjectBodyParameters>,
-    id: u128
 }
 
 impl SoundEmitter {
@@ -25,10 +26,11 @@ impl SoundEmitter {
                     transform: Transform::default(),
                     parent_transform: None,
                     children: vec![],
+                    body: None,
+                    id: gen_object_id(),
+                    groups: vec![],
                     source_type: emitter_type,
                     source,
-                    body: None,
-                    id: gen_object_id()
                 });
             },
             Err(err) => {
@@ -133,8 +135,8 @@ impl Object for SoundEmitter {
         &self.id
     }
 
-    fn groups_list(&self) -> Vec<super::ObjectGroup> {
-        todo!()
+    fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
+        &mut self.groups
     }
 
     fn call(&mut self, name: &str, _args: Vec<&str>) -> Option<String> {

@@ -4,9 +4,9 @@ use nalgebra::Vector3;
 use once_cell::sync::Lazy;
 use rapier3d::{
     dynamics::{RigidBodySet, IntegrationParameters, IslandManager, ImpulseJointSet, MultibodyJointSet, CCDSolver, RigidBody, RigidBodyBuilder, RigidBodyHandle},
-    geometry::{ColliderSet, BroadPhase, NarrowPhase, ColliderBuilder, ColliderHandle, InteractionGroups, Ray, ColliderShape}, 
+    geometry::{ColliderSet, BroadPhase, NarrowPhase, ColliderBuilder, ColliderHandle, InteractionGroups, Ray, ColliderShape, ActiveCollisionTypes}, 
     na::vector,
-    pipeline::{PhysicsPipeline, QueryPipeline, QueryFilter},
+    pipeline::{PhysicsPipeline, QueryPipeline, QueryFilter, ActiveEvents},
     math::{Point, Real}
 };
 use crate::{objects::Transform, math_utils::{rad_vec_to_deg, deg_to_rad}};
@@ -57,7 +57,7 @@ pub fn remove_rigid_body(body_parameters: &mut ObjectBodyParameters) {
 
 pub fn new_rigid_body(body_type: BodyType, transform: Option<Transform>, mass: f32, id: u128,
     membership_groups: Option<CollisionGroups>, filter_groups: Option<CollisionGroups>) -> ObjectBodyParameters {
-    let mut collider_option: Option<BodyColliderType> = None;
+    let collider_option: Option<BodyColliderType>;
     let rigid_body_builder = match body_type {
         BodyType::Fixed(collider) => {
             collider_option = collider;
@@ -126,7 +126,17 @@ pub fn new_rigid_body(body_type: BodyType, transform: Option<Transform>, mass: f
         },
     }
 
-    let collider = collider_builder.build();
+    let mut collider = collider_builder
+        .active_events(ActiveEvents::COLLISION_EVENTS)
+        .active_collision_types(ActiveCollisionTypes::default() 
+            | ActiveCollisionTypes::FIXED_FIXED 
+            | ActiveCollisionTypes::DYNAMIC_FIXED
+            | ActiveCollisionTypes::DYNAMIC_DYNAMIC
+            | ActiveCollisionTypes::DYNAMIC_KINEMATIC
+            | ActiveCollisionTypes::DYNAMIC_FIXED
+            | ActiveCollisionTypes::KINEMATIC_FIXED)
+        .build();
+    collider.user_data = id;
 
     unsafe {
         let rigid_body_handle = RIGID_BODY_SET.insert(rigid_body);
@@ -268,7 +278,7 @@ pub fn collider_type_to_collider_builder(collider: BodyColliderType, membership_
         },
     }
 
-    collider_builder = collider_builder.collision_groups(InteractionGroups::new(membership_groups.bits.into(), filter_groups.bits.into()));
+    collider_builder = collider_builder.solver_groups(InteractionGroups::new(membership_groups.bits.into(), filter_groups.bits.into()));
 
     collider_builder
 }

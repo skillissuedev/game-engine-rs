@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use glium::{Frame, Display};
 use once_cell::sync::Lazy;
-use crate::systems::System;
+use crate::{systems::System, objects::ObjectGroup};
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
 static mut OBJECTS_ID_SYSTEMS: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
+static mut OBJECTS_ID_GROUPS: Lazy<HashMap<u128, Vec<ObjectGroup>>> = Lazy::new(|| HashMap::new());
 
 pub fn get_system_with_id(id: &str) -> Option<&Box<dyn System>> {
     unsafe {
@@ -57,13 +58,55 @@ pub fn add_system(system: Box<dyn System>) {
 
 pub fn register_object_id_name(id: u128, name: &str) {
     unsafe {
-        OBJECTS_ID_NAMES.entry(id).or_insert(name.into());
+        dbg!(id);
+        dbg!(name);
+        match OBJECTS_ID_NAMES.get_mut(&id) {
+            Some(name_in_map) => {
+                *name_in_map = name.into();
+            },
+            None => {
+                OBJECTS_ID_NAMES.insert(id, name.into());
+            },
+        };
     }
+
 }
 
 pub fn register_object_id_system(id: u128, system: &str) {
     unsafe {
-        OBJECTS_ID_SYSTEMS.entry(id).or_insert(system.into());
+        match OBJECTS_ID_SYSTEMS.get_mut(&id) {
+            Some(system_in_map) => {
+                *system_in_map = system.into();
+            },
+            None => {
+                OBJECTS_ID_SYSTEMS.insert(id, system.into());
+            },
+        };
+    }
+}
+
+pub fn register_object_id_groups(id: u128, groups: &Vec<ObjectGroup>) {
+    unsafe {
+        match OBJECTS_ID_GROUPS.get_mut(&id) {
+            Some(group_in_map) => {
+                *group_in_map = groups.to_vec();
+            },
+            None => {
+                OBJECTS_ID_GROUPS.insert(id, groups.to_vec());
+            },
+        };
+    }
+}
+
+pub fn get_object_groups_with_id(id: u128) -> Option<Vec<ObjectGroup>> {
+    unsafe {
+        OBJECTS_ID_GROUPS.get(&id).cloned()
+    }
+}
+
+pub fn get_object_name_with_id(id: u128) -> Option<String> {
+    unsafe {
+        OBJECTS_ID_NAMES.get(&id).cloned()
     }
 }
 

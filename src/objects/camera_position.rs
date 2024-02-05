@@ -1,5 +1,5 @@
 use crate::managers::{render, physics::ObjectBodyParameters};
-use super::{Object, Transform, gen_object_id};
+use super::{Object, Transform, gen_object_id, ObjectGroup};
 
 #[derive(Debug)]
 pub struct CameraPosition {
@@ -8,12 +8,21 @@ pub struct CameraPosition {
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
     body: Option<ObjectBodyParameters>, 
-    id: u128
+    id: u128,
+    groups: Vec<ObjectGroup>
 }
 
 impl CameraPosition {
     pub fn new(name: &str) -> Self {
-        CameraPosition { transform: Transform::default(), children: vec![], name: name.to_string(), parent_transform: None, body: None, id: gen_object_id() }
+        CameraPosition {
+            transform: Transform::default(),
+            children: vec![],
+            name: name.to_string(),
+            parent_transform: None,
+            body: None,
+            id: gen_object_id(),
+            groups: vec![]
+        }
     }
 }
 
@@ -83,7 +92,7 @@ impl Object for CameraPosition {
         None
     }
 
-    fn groups_list(&self) -> Vec<super::ObjectGroup> {
-        todo!()
+    fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
+        &mut self.groups
     }
 }

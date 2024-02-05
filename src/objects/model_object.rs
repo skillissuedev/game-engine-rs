@@ -2,7 +2,7 @@ use std::time::Instant;
 use glam::{Mat4, Quat, Vec3};
 use glium::{VertexBuffer, Program, IndexBuffer, uniform, Surface, uniforms::UniformBuffer, Display};
 use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}, physics::ObjectBodyParameters}, math_utils::deg_to_rad};
-use super::{Object, Transform, gen_object_id};
+use super::{Object, Transform, gen_object_id, ObjectGroup};
 
 #[derive(Debug)]
 pub struct ModelObject {
@@ -10,6 +10,9 @@ pub struct ModelObject {
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
+    body: Option<ObjectBodyParameters>,
+    id: u128,
+    groups: Vec<ObjectGroup>,
     pub asset: ModelAsset,
     pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
@@ -20,8 +23,6 @@ pub struct ModelObject {
     program: Vec<Program>,
     started: bool,
     error: bool,
-    body: Option<ObjectBodyParameters>,
-    id: u128
 }
 
 impl ModelObject {
@@ -51,6 +52,7 @@ impl ModelObject {
             name: name.to_string(),
             parent_transform: None, 
             asset,
+            groups: vec![],
             texture_asset,
             shader_asset,
             texture: None,
@@ -222,8 +224,8 @@ impl Object for ModelObject {
     }
 
 
-    fn groups_list(&self) -> Vec<super::ObjectGroup> {
-        todo!()
+    fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
+        &mut self.groups
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {

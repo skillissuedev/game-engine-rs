@@ -3,7 +3,7 @@ use glium::Display;
 use rapier3d::{pipeline::QueryFilter, geometry::InteractionGroups};
 use crate::{managers::{physics::{ObjectBodyParameters, CollisionGroups, is_ray_intersecting, RenderRay, get_ray_intersaction_position}, debugger, render}, math_utils::deg_vec_to_rad, framework::{self, DebugMode}};
 
-use super::{Object, Transform, gen_object_id};
+use super::{Object, Transform, gen_object_id, ObjectGroup};
 
 #[derive(Debug)]
 pub struct Ray {
@@ -12,6 +12,7 @@ pub struct Ray {
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
     id: u128,
+    groups: Vec<ObjectGroup>,
     direction: Vec3,
     mask: CollisionGroups
     // TODO: direction, point(using object's position), mask(CollisionGroups)
@@ -24,7 +25,16 @@ impl Ray {
             None => CollisionGroups::full(), // maybe use all if this won't work?
         };
 
-        Ray { transform: Transform::default(), children: vec![], name: name.to_string(), parent_transform: None, id: gen_object_id(), direction, mask }
+        Ray {
+            transform: Transform::default(),
+            children: vec![],
+            name: name.to_string(),
+            parent_transform: None,
+            id: gen_object_id(),
+            groups: vec![],
+            direction,
+            mask
+        }
     }
 }
 
@@ -86,8 +96,8 @@ impl Object for Ray {
         &self.id
     }
 
-    fn groups_list(&self) -> Vec<super::ObjectGroup> {
-        todo!()
+    fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
+        &mut self.groups
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<std::string::String> {
