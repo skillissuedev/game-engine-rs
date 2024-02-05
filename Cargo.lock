@@ -2115,7 +2115,6 @@ dependencies = [
  "navmesh",
  "once_cell",
  "rapier3d",
- "rayon",
  "renet",
  "serde",
  "serde_bare",

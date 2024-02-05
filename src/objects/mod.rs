@@ -2,7 +2,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use glium::{Frame, Display};
 use glam::Vec3;
 use serde::{Serialize, Deserialize};
-use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render}, framework};
+use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render, self}, framework};
 
 pub mod empty_object;
 pub mod camera_position;
@@ -21,7 +21,6 @@ pub fn gen_object_id() -> u128 {
     }
 }
 
-pub struct ObjectGroup(pub String);
 
 pub trait Object: std::fmt::Debug + Downcast {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -48,7 +47,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn body_parameters(&self) -> Option<ObjectBodyParameters>;
     fn object_id(&self) -> &u128;
 
-    fn groups_list(&self) -> Vec<ObjectGroup>;
+    fn groups_list(&mut self) -> &mut Vec<ObjectGroup>;
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> { 
         println!("call function is not implemented in this object.");
@@ -58,17 +57,18 @@ pub trait Object: std::fmt::Debug + Downcast {
     // premade fns:
     fn global_transform(&self) -> Transform {
         let base_transformations = self.local_transform();
-        let additional_transformations: Transform;
+        /*let additional_transformations: Transform;
         match self.parent_transform() {
             Some(transform) => additional_transformations = transform,
             None => additional_transformations = Transform::default(),
-        }
+        }*/
 
-        Transform {
-            position: base_transformations.position + additional_transformations.position,
-            rotation: base_transformations.rotation + additional_transformations.rotation,
-            scale: base_transformations.scale + additional_transformations.scale,
-        }
+        /*Transform {
+            position: base_transformations.position,// + additional_transformations.position,
+            rotation: base_transformations.rotation,// + additional_transformations.rotation,
+            scale: base_transformations.scale,// + additional_transformations.scale,
+        }*/
+        Transform { position: base_transformations.position, rotation: base_transformations.rotation, scale: base_transformations.scale }
     }
 
     fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {
@@ -209,6 +209,16 @@ pub trait Object: std::fmt::Debug + Downcast {
             },
         }
     }
+
+    fn add_to_group(&mut self, group_name: &str) {
+        self.groups_list().push(ObjectGroup(group_name.into()));
+        managers::systems::register_object_id_groups(*self.object_id(), self.groups_list());
+    }
+
+    fn remove_from_group(&mut self, group_name: &str) {
+        self.groups_list().retain(|group| group_name != group.0);
+        managers::systems::register_object_id_groups(*self.object_id(), self.groups_list());
+    }
 }
 
 impl_downcast!(Object);
@@ -226,3 +236,12 @@ impl Default for Transform {
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectGroup(pub String);
+
+impl ObjectGroup {
+    pub fn as_raw(&self) -> &String {
+        &self.0
+    }
+}

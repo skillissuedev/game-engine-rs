@@ -67,6 +67,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                     networking::NetworkingMode::Server(_) => (),
                     _ => {
                         set_listener_transform(render::get_camera_position(), render::get_camera_front());
+
                         win_w = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().width;
                         win_h = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().height;
 
@@ -106,7 +107,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                     networking::NetworkingMode::Server(_) => {
                         let fps = get_fps(&now, &frames_count);
                         if fps.is_some() {
-                            let fps = fps.unwrap();
+                            let _ = fps.unwrap();
                             //println!("fps: {}", fps);
                             frames_count = 0;
                             now = Instant::now();
