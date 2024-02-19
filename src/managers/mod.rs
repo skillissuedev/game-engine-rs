@@ -1,6 +1,6 @@
 pub mod assets;
 pub mod debugger;
-pub mod pathfinding;
+pub mod navigation;
 pub mod physics;
 pub mod render;
 pub mod sound;

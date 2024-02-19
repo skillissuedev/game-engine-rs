@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 colored = "2.0.0"
-navmesh = "0.12.1"
+#navmesh = "0.12.1"
 #ultraviolet = "0.9.1"
 #rcrefcell = "1.0.7"
 image = "0.24.6"
@@ -27,6 +27,13 @@ nalgebra = { version = "0.32.3", features = ["convert-glam024"] }
 chron = "0.1.3"
 bitmask-enum = "2.2.3"
 downcast-rs = "1.2.0"
+recastnavigation-sys = "1.0.3"
+navmesh = "0.12.1"
+#landmass = "0.3.3"
+#landmass = { git = "https://github.com/andriyDev/landmass" }
+#recast-detour-rs = "0.2.0"
+recast-rs = "0.1.0"
+grid = "0.13.0"
 
 [profile.dev.package.rapier3d]
 opt-level = 3

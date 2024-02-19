@@ -72,7 +72,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         win_h = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().height;
 
                         unsafe {
-                            render::ASPECT_RATIO = (win_w / win_h) as f32 ;
+                            render::ASPECT_RATIO = win_w as f32 / win_h as f32;
                         }
 
                         let mut target = display.as_ref().expect("display is none(should be only in server mode)").draw();

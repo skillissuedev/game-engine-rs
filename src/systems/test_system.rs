@@ -1,5 +1,5 @@
-use glam::Vec3;
-use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents, MessageReceiver}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, character_controller::CharacterController, trigger::Trigger, ObjectGroup}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
+use glam::{Vec3, Vec2};
+use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents, MessageReceiver}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}, navigation}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, character_controller::CharacterController, trigger::Trigger, ObjectGroup, navmesh::NavMesh}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
 use super::System;
 
 pub struct TestSystem {
@@ -23,20 +23,28 @@ impl System for TestSystem {
 
     fn start(&mut self) {
         let asset = ModelAsset::from_file("models/knife_test.gltf");
+        let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
+        let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = 
             Box::new(ModelObject::new("knife_model", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         knife_model.set_position(Vec3::new(5.0, 6.0, 6.0), true);
 
-        let mut ground_collider = Box::new(EmptyObject::new("ground_collider"));
+        let mut ground_collider = Box::new(
+            ModelObject::new("ground_collider", ground_asset.clone(), None, ShaderAsset::load_default_shader().unwrap()));
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
 
 
         if networking::is_server() {
             knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, None, None);
-            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 0.5, 10.0)))),
+            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 1.0, 10.0)))),
                 None, 1.0, None, None);
-            dbg!(ground_collider.object_id());
-            let mut controller = Box::new(CharacterController::new("controller", BodyColliderType::Capsule(1.0, 2.0),
+
+            let navmesh = NavMesh::new("ground_navmesh", Vec2::new(10.0, 10.0));
+            ground_collider.add_child(Box::new(navmesh));
+            //dbg!(unsafe { navigation::MAP.clone() });
+
+            //dbg!(ground_collider.object_id());
+            let mut controller = Box::new(CharacterController::new("controller", BodyColliderType::Capsule(1.0, 4.0),
                 None, None).unwrap());
             controller.set_position(Vec3::new(4.0, 10.0, 6.0), false);
             controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
@@ -88,7 +96,7 @@ impl System for TestSystem {
             {
                 let trigger: &Trigger = self.find_object("trigger").unwrap().downcast_ref().unwrap();
                 let group = ObjectGroup("player".into());
-                dbg!(trigger.is_intersecting_with_group(group));
+                //dbg!(trigger.is_intersecting_with_group(group));
             }
 
             let transform;

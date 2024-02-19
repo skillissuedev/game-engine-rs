@@ -11,6 +11,7 @@ pub mod sound_emitter;
 pub mod ray;
 pub mod trigger;
 pub mod character_controller;
+pub mod navmesh;
 
 static mut LAST_OBJECT_ID: u128 = 0;
 
@@ -183,6 +184,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn add_child(&mut self, mut object: Box<dyn Object>) {
         object.set_parent_transform(self.global_transform());
         self.children_list_mut().push(object);
+        self.children_list_mut().last_mut().unwrap().start();
     }
 
     fn build_object_rigid_body(&mut self, body_type: Option<BodyType>,

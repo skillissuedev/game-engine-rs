@@ -285,12 +285,10 @@ impl Trigger {
         for (collider1, collider2, intersecting) in intersections_iter {
             if intersecting {
                 if collider1 == self.collider_handle {
-                    println!("collider2!");
                     if is_collider_in_group(collider_set, collider2, &group) == true {
                         return true;
                     }
                 } else {
-                    println!("collider1!");
                     if is_collider_in_group(collider_set, collider1, &group) == true {
                         return true;
                     }
@@ -322,7 +320,6 @@ fn is_collider_in_group(collider_set: &ColliderSet, collider_handle: ColliderHan
     let collider = collider_set.get(collider_handle);
 
     if let Some(collider) = collider {
-        dbg!(collider.user_data);
         //dbg!(systems::get_object_name_with_id(collider.user_data));
         if let Some(groups_list) = systems::get_object_groups_with_id(collider.user_data) {
             //dbg!(&groups_list);

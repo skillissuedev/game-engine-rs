@@ -141,16 +141,16 @@ impl CharacterController {
         unsafe {
             let collider = physics::COLLIDER_SET.get_mut(self.collider);
             if let Some(collider) = collider {
-                let timer = Instant::now();
+                //let timer = Instant::now();
                 let global_position = self.global_transform().position;
 
                 let movement = self.controller.move_shape(
-                    framework::get_delta_time().as_secs_f32(),              // The timestep length (can be set to SimulationSettings::dt).
-                    &physics::RIGID_BODY_SET,        // The RigidBodySet.
-                    &physics::COLLIDER_SET,      // The ColliderSet.
-                    &physics::QUERY_PIPELINE,        // The QueryPipeline.
-                    collider.shape(), // The character’s shape.
-                    &global_position.into(),   // The character’s initial position.
+                    framework::get_delta_time().as_secs_f32(), 
+                    &physics::RIGID_BODY_SET,
+                    &physics::COLLIDER_SET,
+                    &physics::QUERY_PIPELINE,
+                    collider.shape(),
+                    &global_position.into(),
                     direction.into(),
                     QueryFilter::new().exclude_sensors(),
                     |_| { }
@@ -161,8 +161,8 @@ impl CharacterController {
                 self.set_position(new_position, false);
                 collider.set_position(new_position.into());
 
-                let total_elapsed = timer.elapsed();
-                dbg!(total_elapsed);
+                //let total_elapsed = timer.elapsed();
+                //dbg!(total_elapsed);
             }
             else {
                 debugger::error("CharacterController's move_controller error!\nfailed to get collider");
