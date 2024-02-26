@@ -1,8 +1,7 @@
 use crate::{
     game::game_main,
     managers::{
-        render,
-        sound::{self, set_listener_transform}, systems, input, networking::{self, NetworkingMode}, physics,
+        input, navigation, networking::{self, NetworkingMode}, physics, render, sound::{self, set_listener_transform}, systems
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
@@ -157,8 +156,10 @@ fn update_game(delta_time: Duration) {
     physics::update();
     input::update();
     networking::update(delta_time);
+    navigation::update();
     game_main::update();
     systems::update();
+    navigation::create_grids();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {

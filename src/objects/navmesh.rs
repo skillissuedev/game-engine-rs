@@ -1,22 +1,27 @@
-use glam::{Mat4, Vec3, Vec2};
+use das_grid::Grid;
+use glam::Vec2;
 use glium::Display;
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
-use crate::{managers::{physics::ObjectBodyParameters, debugger, navigation}, assets::model_asset::ModelAsset};
+use crate::managers::{debugger, navigation::{self, NavMeshDimensions}, physics::ObjectBodyParameters};
 use super::{Object, Transform, ObjectGroup, gen_object_id};
 
-#[derive(Debug)]
-pub struct NavMesh {
+//#[derive(Debug)]
+pub struct NavigationGround {
     name: String,
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    area_size: Vec2,
+    dimensions: NavMeshDimensions,
+    grid: Grid<Option<()>>
 }
 
-impl NavMesh {
+impl NavigationGround {
     pub fn new(name: &str, area_size: Vec2) -> Self {
+        let x_cells_count = ((area_size.x.round() / 2.0) as i32).abs_diff(0) as i32;
+        let z_cells_count = ((area_size.y.round() / 2.0) as i32).abs_diff(0) as i32;
+
         Self { 
             name: name.into(),
             transform: Transform::default(),
@@ -24,36 +29,27 @@ impl NavMesh {
             children: vec![],
             id: gen_object_id(),
             groups: vec![],
-            area_size
+            dimensions: NavMeshDimensions {
+                area_size_world: area_size,
+                x_cells_count,
+                z_cells_count,
+                position: Vec2::new(0.0, 0.0),
+            },
+            grid: Grid::new(x_cells_count, z_cells_count, Some(())),
         }
     }
 }
 
 
-impl Object for NavMesh {
-    fn start(&mut self) {
-        let global_pos = self.global_transform().position;
-        let x1 = global_pos.x - self.area_size.x / 2.0;
-        let x2 = global_pos.x + self.area_size.x / 2.0;
-        let z1 = global_pos.z - self.area_size.y / 2.0;
-        let z2 = global_pos.z + self.area_size.y / 2.0;
-        dbg!(x1, x2, z1, z2);
+impl Object for NavigationGround {
+    fn start(&mut self) { }
 
-        for x in x1.round() as i32..x2.round() as i32 {
-            let map_x = navigation::world_x_to_map_x(x as f32);
-            println!("{}", x);
-            for z in z1.round() as i32..z2.round() as i32 {
-                let map_z = navigation::world_z_to_map_z(z as f32);
-                navigation::set_map_val_by_map_coords(Vec2::new(map_x as f32, map_z as f32), true);
-            }
-        }
+    fn update(&mut self) { 
+        let pos = self.global_transform().position;
+        self.dimensions.position = Vec2::new(pos.x, pos.z);
 
-        dbg!(unsafe {
-            &navigation::MAP
-        });
+        navigation::add_navmesh(*self.object_id(), self.dimensions.clone());
     }
-
-    fn update(&mut self) { }
 
     fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
@@ -116,6 +112,16 @@ impl Object for NavMesh {
             println!("test message {}", args[0])
         }
         None
+    }
+}
+
+impl std::fmt::Debug for NavigationGround {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NavigationGround")
+            .field("name", &self.name())
+            .field("object_type", &self.object_type())
+            .field("children", &self.children_list())
+            .finish()
     }
 }
 

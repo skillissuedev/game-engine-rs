@@ -1,5 +1,5 @@
 use glam::{Vec3, Vec2};
-use crate::{managers::{systems::CallList, networking::{Message, self, MessageReliability, SyncObjectMessage, MessageContents, MessageReceiver}, physics::{BodyType, BodyColliderType, RenderColliderType, CollisionGroups}, input::{self, InputEventType}, navigation}, objects::{Object, model_object::ModelObject, empty_object::EmptyObject, character_controller::CharacterController, trigger::Trigger, ObjectGroup, navmesh::NavMesh}, assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}};
+use crate::{assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, managers::{input::{self, InputEventType}, navigation::{self, NavMeshObstacleTransform}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, systems::CallList}, objects::{character_controller::CharacterController, model_object::ModelObject, navmesh::NavigationGround, trigger::Trigger, Object, ObjectGroup}};
 use super::System;
 
 pub struct TestSystem {
@@ -24,7 +24,7 @@ impl System for TestSystem {
     fn start(&mut self) {
         let asset = ModelAsset::from_file("models/knife_test.gltf");
         let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
-        let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
+        //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = 
             Box::new(ModelObject::new("knife_model", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         knife_model.set_position(Vec3::new(5.0, 6.0, 6.0), true);
@@ -39,7 +39,8 @@ impl System for TestSystem {
             ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 1.0, 10.0)))),
                 None, 1.0, None, None);
 
-            let navmesh = NavMesh::new("ground_navmesh", Vec2::new(10.0, 10.0));
+            let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(50.0, 50.0));
+            navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
             ground_collider.add_child(Box::new(navmesh));
             //dbg!(unsafe { navigation::MAP.clone() });
 
@@ -69,6 +70,7 @@ impl System for TestSystem {
         trigger.set_position(Vec3::new(0.0, -2.0, 5.0), true);
         self.add_object(trigger);
 
+
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
         input::new_bind("left", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)]);
         input::new_bind("backwards", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::S)]);
@@ -77,6 +79,13 @@ impl System for TestSystem {
 
     fn update(&mut self) {
         if networking::is_server() {
+            navigation::add_obstacle(NavMeshObstacleTransform::new(Vec2::new(10.0, 10.0), Vec2::new(4.0, 4.0)));
+            let mut last_start = Vec2::new(-20.0, -20.0);
+            while let Some(next) = navigation::find_path_map(last_start, Vec2::new(20.0, 20.0)) {
+                last_start = next;
+                dbg!(last_start);
+            }
+            dbg!("that's it");
             {
                 let obj = self.find_object_mut("knife_model").unwrap();
                 let obj_position = obj.local_transform();

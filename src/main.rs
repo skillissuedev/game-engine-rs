@@ -20,7 +20,7 @@ fn main() {
 
     if args.contains(&"server".into()) {
         println!("runnning game as server");
-        managers::networking::new_server(9999, 10).unwrap();
+        managers::networking::new_server(7777, 10).unwrap();
         framework::start_game_without_render();
     }
 
@@ -29,7 +29,7 @@ fn main() {
         managers::networking::NetworkingMode::Client(_) => (),
         managers::networking::NetworkingMode::Disconnected(_) => {
             println!("creating a client");
-            managers::networking::new_client(std::net::IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999).unwrap();
+            managers::networking::new_client(std::net::IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7777).unwrap();
         },
     }
 

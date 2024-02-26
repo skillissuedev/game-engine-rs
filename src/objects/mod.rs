@@ -183,6 +183,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn add_child(&mut self, mut object: Box<dyn Object>) {
         object.set_parent_transform(self.global_transform());
+        dbg!(object.object_id());
         self.children_list_mut().push(object);
         self.children_list_mut().last_mut().unwrap().start();
     }
