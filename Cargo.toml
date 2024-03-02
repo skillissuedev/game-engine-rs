@@ -28,7 +28,8 @@ chron = "0.1.3"
 bitmask-enum = "2.2.3"
 downcast-rs = "1.2.0"
 das-grid = "0.1.5"
-seastar = "0.2.0"
+pathfinding = "4.9.1"
+basic-pathfinding = "0.2.8"
 #das-grid = "0.1.5"
 
 [profile.dev.package.rapier3d]

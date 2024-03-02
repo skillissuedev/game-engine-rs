@@ -12,6 +12,7 @@ pub mod ray;
 pub mod trigger;
 pub mod character_controller;
 pub mod navmesh;
+pub mod nav_obstacle;
 
 static mut LAST_OBJECT_ID: u128 = 0;
 

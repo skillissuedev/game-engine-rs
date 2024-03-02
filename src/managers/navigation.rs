@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use basic_pathfinding::{coord::Coord, pathfinding::{find_path, SearchOpts}};
 use das_grid::Grid;
 use glam::Vec2;
 use once_cell::sync::Lazy;
@@ -191,11 +192,11 @@ pub fn find_path_map(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
             //dbg!(obstacle_pos_x, obstacle_pos_z);
             if *start_x >= x1 && *start_x <= x2 && *start_z >= z1 && *start_z <= z2
                 && *finish_x >= x1 && *finish_x <= x2 && *finish_z >= z1 && *finish_z <= z2 {
-                    let mut relative_start_x_pos = (round_start_x.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
-                    let mut relative_start_z_pos = (round_start_z.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
+                    let relative_start_x_pos = (round_start_x.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
+                    let relative_start_z_pos = (round_start_z.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
 
-                    let mut relative_finish_x_pos = (round_finish_x.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
-                    let mut relative_finish_z_pos = (round_finish_z.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
+                    let relative_finish_x_pos = (round_finish_x.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
+                    let relative_finish_z_pos = (round_finish_z.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
                     //dbg!(&relative_start_x_pos);
                     //dbg!(&relative_start_z_pos);
                     //dbg!(&relative_finish_x_pos);
@@ -204,32 +205,39 @@ pub fn find_path_map(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
                     let navmesh_grid = NAVMESH_GRIDS.get(navmesh_id);
                     match navmesh_grid {
                         Some(grid) => {
-                            let mut astar_grid: Vec<Vec<Option<()>>> = Vec::new();
+                            let mut astar_grid: basic_pathfinding::grid::Grid = basic_pathfinding::grid::Grid {
+                                tiles: vec![],
+                                walkable_tiles: vec![1],
+                                grid_type: basic_pathfinding::grid::GridType::Intercardinal,
+                                ..Default::default()
+                            };
+
                             for (x, y) in grid.enumerate() {
                                 let val = grid.get((x, y)).unwrap();
-                                if x >= astar_grid.len() as i32 {
-                                    astar_grid.push(vec![]);
+                                if x >= astar_grid.tiles.len() as i32 {
+                                    astar_grid.tiles.push(vec![]);
                                 }
 
-                                let astar_grid_x = &mut astar_grid[x as usize];
+                                let astar_grid_x = &mut astar_grid.tiles[x as usize];
                                 if y >= astar_grid_x.len() as i32 {
-                                    astar_grid_x.push(None);
+                                    astar_grid_x.push(1);
                                 }
                                 match val  {
-                                    true => astar_grid_x[y as usize] = None,
-                                    false => astar_grid_x[y as usize] = Some(()) 
+                                    true => astar_grid_x[y as usize] = 1,
+                                    false => astar_grid_x[y as usize] = 0,
                                 }
                             }
-                            //dbg!(&astar_grid);
+                            //dbg!(&astar_grid.tiles);
                             //dbg!(&grid);
-                            let start_point = seastar::Point::new(relative_start_x_pos as isize, relative_start_z_pos as isize);
-                            let finish_point = seastar::Point::new(relative_finish_x_pos as isize, relative_finish_z_pos as isize);
-                            let next_point = seastar::astar(&astar_grid, start_point, finish_point);
+                            let start_point = Coord::new(relative_start_x_pos, relative_start_z_pos);
+
+                            let finish_point = Coord::new(relative_finish_x_pos, relative_finish_z_pos);
+                            let next_point = find_path(&astar_grid, start_point, finish_point, SearchOpts::default());
+                            println!("next_point:");
                             return match next_point {
                                 Some(next) => {
                                     //dbg!(&grid);
-                                    if let Some(next) = next.get(2) {
-                                        dbg!(&next);
+                                    if let Some(next) = next.get(1) {
                                         let next_x = x1 + next.x as f32 * 2.0;
                                         let next_z = z1 + next.y as f32 * 2.0;
 
@@ -250,3 +258,4 @@ pub fn find_path_map(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
     }
     None
 }
+
