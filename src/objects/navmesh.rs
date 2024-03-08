@@ -1,4 +1,3 @@
-use das_grid::Grid;
 use glam::Vec2;
 use glium::Display;
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
@@ -14,7 +13,7 @@ pub struct NavigationGround {
     id: u128,
     groups: Vec<ObjectGroup>,
     dimensions: NavMeshDimensions,
-    grid: Grid<Option<()>>
+    //grid: Grid<Option<()>>
 }
 
 impl NavigationGround {
@@ -35,7 +34,7 @@ impl NavigationGround {
                 z_cells_count,
                 position: Vec2::new(0.0, 0.0),
             },
-            grid: Grid::new(x_cells_count, z_cells_count, Some(())),
+            //grid: Grid::new(x_cells_count, z_cells_count, Some(())),
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use basic_pathfinding::{coord::Coord, pathfinding::{find_path, SearchOpts}};
-use das_grid::Grid;
+use grid_util::Grid;
 use glam::Vec2;
+use grid_pathfinding::PathingGrid;
 use once_cell::sync::Lazy;
 
 use crate::managers::debugger;
@@ -11,7 +11,7 @@ static mut NAVMESH_DIMENSIONS: Lazy<HashMap<u128, NavMeshDimensions>> = Lazy::ne
 /// u128 is object's id
 static mut NAVMESH_OBSTACLES: Lazy<HashMap<u128, Vec<NavMeshObstacleTransform>>> = Lazy::new(|| HashMap::new());
 //static mut NAVMESH_GRIDS: Lazy<HashMap<u128, Grid<Option<()>>>> = Lazy::new(|| HashMap::new());
-static mut NAVMESH_GRIDS: Lazy<HashMap<u128, Grid<bool>>> = Lazy::new(|| HashMap::new());
+static mut NAVMESH_GRIDS: Lazy<HashMap<u128, PathingGrid>> = Lazy::new(|| HashMap::new());
 
 #[derive(Debug, Clone)]
 pub struct NavMeshDimensions {
@@ -45,6 +45,7 @@ pub fn add_navmesh(id: u128, dimensions: NavMeshDimensions) {
     unsafe {
         NAVMESH_DIMENSIONS.insert(id, dimensions);
     }
+    create_grids();
 }
 
 pub fn add_obstacle(transform: NavMeshObstacleTransform) {
@@ -89,6 +90,7 @@ pub fn create_grids() {
     unsafe {
         NAVMESH_GRIDS.clear();
         for (id, navmesh) in NAVMESH_DIMENSIONS.iter() {
+            //dbg!(&navmesh);
             let round_pos_x = navmesh.position.x.round() as i32;
             let round_pos_z = navmesh.position.y.round() as i32;
             let round_area_size_x = navmesh.area_size_world.x.round() as i32;
@@ -97,7 +99,10 @@ pub fn create_grids() {
             let x1 = round_pos_x - round_area_size_x / 2;
             let z1 = round_pos_z - round_area_size_z / 2;
 
-            NAVMESH_GRIDS.insert(*id, Grid::new(navmesh.x_cells_count, navmesh.z_cells_count, true));
+            NAVMESH_GRIDS.insert(*id, PathingGrid::new(navmesh.x_cells_count as usize, navmesh.z_cells_count as usize, false));
+            let grid = NAVMESH_GRIDS.get_mut(id).unwrap();
+            grid.generate_components();
+            //println!("{}", &NAVMESH_GRIDS[id]);
             match NAVMESH_OBSTACLES.get(id) {
                 Some(obstacles) => {
                     for obstacle in obstacles {
@@ -133,10 +138,9 @@ pub fn create_grids() {
                         for x in relative_x2_pos..=relative_x_pos {
                             for z in relative_z2_pos..=relative_z_pos {
                                 let grid = NAVMESH_GRIDS.get_mut(id).unwrap();
-                                match grid.set((x, z), &false) {
-                                    Ok(_) => (),
-                                    Err(err) => debugger::error(&format!("Navigation error!\nfailed to set obstacle position on grid!\nerr: {}", err)),
-                                };
+                                grid.set(x as usize, z as usize, true);
+                                grid.generate_components();
+                                //dbg!(grid);
                             }
                         }
                     }
@@ -152,22 +156,17 @@ pub fn create_grids() {
 }
 
 
-pub fn find_path_map(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
+pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
     //println!("path");
     unsafe {
         for (navmesh_id, dim) in NAVMESH_DIMENSIONS.iter() {
+            dbg!(dim);
             //println!("{}", navmesh_id);
             let pos_x = dim.position.x;
             let pos_z = dim.position.y;
 
-            let round_pos_x = dim.position.x.round() as i32;
-            let round_pos_z = dim.position.y.round() as i32;
-
             let area_size_x = dim.area_size_world.x;
             let area_size_z = dim.area_size_world.y;
-
-            let round_area_size_x = dim.area_size_world.x.round() as i32;
-            let round_area_size_z = dim.area_size_world.y.round() as i32;
 
             let start_x = &start_world.x;
             let start_z = &start_world.y;
@@ -185,63 +184,38 @@ pub fn find_path_map(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
             let round_x1 = (pos_x - area_size_x / 2.0) as i32;
             let x2 = pos_x + area_size_x / 2.0;
             let z1 = pos_z - area_size_z / 2.0;
-            let round_z1 = (pos_z - area_size_z / 2.0) as i32;
+            //let round_z1 = (pos_z - area_size_z / 2.0) as i32;
             let z2 = pos_z + area_size_z / 2.0;
   
             //dbg!(x1, x2, z1, z2);
             //dbg!(obstacle_pos_x, obstacle_pos_z);
             if *start_x >= x1 && *start_x <= x2 && *start_z >= z1 && *start_z <= z2
                 && *finish_x >= x1 && *finish_x <= x2 && *finish_z >= z1 && *finish_z <= z2 {
-                    let relative_start_x_pos = (round_start_x.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
-                    let relative_start_z_pos = (round_start_z.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
+                    let relative_start_x_pos = (round_start_x.abs_diff(round_x1) as f32 / 2.0).round() as i32;
+                    let relative_start_z_pos = (round_start_z.abs_diff(round_x1) as f32 / 2.0).round() as i32;
 
-                    let relative_finish_x_pos = (round_finish_x.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
-                    let relative_finish_z_pos = (round_finish_z.abs_diff(round_x1) as f32 / 2.0).round() as i32 - 1;
-                    //dbg!(&relative_start_x_pos);
-                    //dbg!(&relative_start_z_pos);
+                    let relative_finish_x_pos = (round_finish_x.abs_diff(round_x1) as f32 / 2.0).round() as i32;
+                    let relative_finish_z_pos = (round_finish_z.abs_diff(round_x1) as f32 / 2.0).round() as i32;
+                    dbg!(&relative_start_x_pos);
+                    dbg!(&relative_start_z_pos);
                     //dbg!(&relative_finish_x_pos);
                     //dbg!(&relative_finish_z_pos);
 
                     let navmesh_grid = NAVMESH_GRIDS.get(navmesh_id);
                     match navmesh_grid {
                         Some(grid) => {
-                            let mut astar_grid: basic_pathfinding::grid::Grid = basic_pathfinding::grid::Grid {
-                                tiles: vec![],
-                                walkable_tiles: vec![1],
-                                grid_type: basic_pathfinding::grid::GridType::Intercardinal,
-                                ..Default::default()
-                            };
-
-                            for (x, y) in grid.enumerate() {
-                                let val = grid.get((x, y)).unwrap();
-                                if x >= astar_grid.tiles.len() as i32 {
-                                    astar_grid.tiles.push(vec![]);
-                                }
-
-                                let astar_grid_x = &mut astar_grid.tiles[x as usize];
-                                if y >= astar_grid_x.len() as i32 {
-                                    astar_grid_x.push(1);
-                                }
-                                match val  {
-                                    true => astar_grid_x[y as usize] = 1,
-                                    false => astar_grid_x[y as usize] = 0,
-                                }
-                            }
-                            //dbg!(&astar_grid.tiles);
-                            //dbg!(&grid);
-                            let start_point = Coord::new(relative_start_x_pos, relative_start_z_pos);
-
-                            let finish_point = Coord::new(relative_finish_x_pos, relative_finish_z_pos);
-                            let next_point = find_path(&astar_grid, start_point, finish_point, SearchOpts::default());
-                            println!("next_point:");
+                            let start_point = grid_util::Point::new(relative_start_x_pos, relative_start_z_pos);
+                            let finish_point = grid_util::Point::new(relative_finish_x_pos, relative_finish_z_pos);
+                            let next_point = grid.get_path_single_goal(start_point, finish_point, false);
+                            dbg!(&next_point);
                             return match next_point {
                                 Some(next) => {
                                     //dbg!(&grid);
-                                    if let Some(next) = next.get(1) {
-                                        let next_x = x1 + next.x as f32 * 2.0;
-                                        let next_z = z1 + next.y as f32 * 2.0;
+                                    if let Some(next_pos) = next.get(1) {
+                                        let next_x = x1 + next_pos.x as f32 * 2.0;
+                                        let next_z = z1 + next_pos.y as f32 * 2.0;
 
-                                        Some(Vec2::new(next_x, next_z))
+                                        return Some(Vec2::new(next_x, next_z));
                                     } else {
                                         None
                                     }
@@ -256,6 +230,7 @@ pub fn find_path_map(start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
             }
         }
     }
+    println!("failed to get a grid for a*");
     None
 }
 

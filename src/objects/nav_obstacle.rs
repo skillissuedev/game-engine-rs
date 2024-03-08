@@ -1,38 +1,50 @@
+use glam::{Vec2, Vec3};
 use glium::Display;
-use crate::managers::physics::ObjectBodyParameters;
+use crate::managers::{navigation::{self, NavMeshObstacleTransform}, physics::ObjectBodyParameters};
 
 use super::{Object, Transform, gen_object_id, ObjectGroup};
 
 #[derive(Debug)]
-pub struct EmptyObject {
+pub struct NavObstacle {
     name: String,
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
     body: Option<ObjectBodyParameters>,
     id: u128,
-    groups: Vec<ObjectGroup>
+    groups: Vec<ObjectGroup>,
+    size: Vec3
 }
 
-impl EmptyObject {
-    pub fn new(name: &str) -> Self {
-        EmptyObject { 
+impl NavObstacle {
+    pub fn new(name: &str, size: Vec3) -> Self {
+        NavObstacle { 
             transform: Transform::default(),
             children: vec![],
             name: name.to_string(),
             parent_transform: None,
             body: None,
             id: gen_object_id(),
-            groups: vec![]
+            groups: vec![],
+            size
         }
+    }
+
+    pub fn set_size(&mut self, size: Vec3) {
+        self.size = size
     }
 }
 
 
-impl Object for EmptyObject {
+impl Object for NavObstacle {
     fn start(&mut self) { }
 
-    fn update(&mut self) { }
+    fn update(&mut self) {
+        let position = self.global_transform().position;
+        let position_xz = Vec2::new(position.x, position.z);
+        let size_xz = Vec2::new(self.size.x, self.size.z);
+        navigation::add_obstacle(NavMeshObstacleTransform::new(position_xz, size_xz));
+    }
 
     fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
@@ -49,7 +61,7 @@ impl Object for EmptyObject {
     }
 
     fn object_type(&self) -> &str {
-        "EmptyObject"
+        "NavObstacle"
     }
 
     fn set_name(&mut self, name: &str) {
@@ -91,9 +103,6 @@ impl Object for EmptyObject {
     }
 
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        if name == "test" {
-            println!("test message {}", args[0])
-        }
         None
     }
 }

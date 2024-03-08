@@ -1,5 +1,4 @@
 use std::f32::consts::PI;
-
 use glam::Vec3;
 
 pub fn rad_to_deg(rad: f32) -> f32 {

@@ -1,8 +1,7 @@
-use std::time::Instant;
-use glam::Vec3;
+use glam::{EulerRot, Mat4, Quat, Vec2, Vec3};
 use glium::Display;
 use rapier3d::{control::{KinematicCharacterController, CharacterLength}, geometry::{ColliderHandle, ActiveCollisionTypes}, pipeline::{QueryFilter, ActiveEvents}};
-use crate::{managers::{physics::{ObjectBodyParameters, BodyColliderType, self, CollisionGroups}, debugger}, math_utils::deg_to_rad, framework};
+use crate::{framework, managers::{debugger, navigation, physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters}}, math_utils::{deg_to_rad, rad_vec_to_deg}};
 use super::{Object, Transform, gen_object_id, ObjectGroup};
 
 pub struct CharacterController {
@@ -14,6 +13,14 @@ pub struct CharacterController {
     groups: Vec<ObjectGroup>,
     controller: KinematicCharacterController,
     collider: ColliderHandle,
+    movement: Option<CharacterControllerMovement>,
+    last_path_point: Option<Vec3>
+}
+
+#[derive(Debug)]
+pub struct CharacterControllerMovement {
+    pub target: Vec3,
+    pub speed: f32
 }
 
 impl CharacterController {
@@ -62,6 +69,8 @@ impl CharacterController {
             controller,
             collider: collider_handle,
             id,
+            movement: None,
+            last_path_point: None
         })
     }
 }
@@ -70,7 +79,37 @@ impl CharacterController {
 impl Object for CharacterController {
     fn start(&mut self) { }
 
-    fn update(&mut self) { }
+    fn update(&mut self) {
+        if let Some(movement) = &self.movement {
+            dbg!(self.local_transform());
+            let speed = movement.speed;
+            if let Some(next_pos) = self.last_path_point {
+                self.look_at(next_pos);
+                self.move_controller(Vec3::new(0.0, 0.0, speed));
+                self.last_path_point = None;
+            }
+            else {
+                let target = movement.target;
+                let pos = self.global_transform().position;
+                let next_pos = navigation::find_next_path_point(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z));
+                dbg!(self.local_transform());
+                dbg!(next_pos);
+                match next_pos {
+                    Some(next_pos) => {
+                        let full_pos = Vec3::new(next_pos.x, 0.0, next_pos.y);
+                        self.look_at(full_pos);
+                        self.move_controller(Vec3::new(0.0, 0.0, speed));
+                        self.last_path_point = Some(full_pos);
+                    },
+                    None => {
+                        println!("done walking");
+                        self.last_path_point = None;
+                        self.movement = None;
+                    },
+                }
+            }
+        }
+    }
 
     fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
@@ -127,22 +166,41 @@ impl Object for CharacterController {
         &mut self.groups
     }
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        if name == "move_controller" {
-            
-        }
-
+    fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> {
         None
     }
 }
 
 impl CharacterController {
+    fn look_at(&mut self, point: Vec3) {
+        let pos = self.global_transform().position;
+
+        let pos = Vec3::new(pos.x, 0.0, pos.z);
+        let look_at_mat = Mat4::look_at_lh(pos, point, Vec3::Y);
+        let (_, look_at_rot, _)
+            = look_at_mat.to_scale_rotation_translation();
+        let rotation_euler_vec = look_at_rot.to_euler(EulerRot::XYZ);
+        let rotation_degrees_vec = -rad_vec_to_deg(rotation_euler_vec.into());
+
+
+        let local_tr = self.local_transform();
+        self.set_local_transform(Transform {
+            position: local_tr.position,
+            rotation: rotation_degrees_vec,
+            scale: local_tr.scale,
+        });
+
+    }
     pub fn move_controller(&mut self, direction: Vec3) {
         unsafe {
             let collider = physics::COLLIDER_SET.get_mut(self.collider);
             if let Some(collider) = collider {
                 //let timer = Instant::now();
-                let global_position = self.global_transform().position;
+                let global_transform = self.global_transform();
+                let global_position = global_transform.position;
+                let rotation = global_transform.rotation;
+                let rotation_quat = Quat::from_euler(EulerRot::XYZ, rotation.x, rotation.y, rotation.z).normalize();
+                let direction = rotation_quat.mul_vec3(direction);
 
                 let movement = self.controller.move_shape(
                     framework::get_delta_time().as_secs_f32(), 
@@ -168,6 +226,15 @@ impl CharacterController {
                 debugger::error("CharacterController's move_controller error!\nfailed to get collider");
             }
         }
+    }
+
+    pub fn walk_to(&mut self, target: Vec3, speed: f32) {
+        let movement = CharacterControllerMovement {
+            target,
+            speed
+        };
+        dbg!(&movement);
+        self.movement = Some(movement);
     }
 }
 

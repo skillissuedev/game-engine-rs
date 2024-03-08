@@ -38,6 +38,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         },
     };
 
+    navigation::update();
     game_main::start();
 
     let mut win_w = 0;

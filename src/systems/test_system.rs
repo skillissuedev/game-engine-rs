@@ -1,5 +1,5 @@
 use glam::{Vec3, Vec2};
-use crate::{assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, managers::{input::{self, InputEventType}, navigation::{self, NavMeshObstacleTransform}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, systems::CallList}, objects::{character_controller::CharacterController, model_object::ModelObject, navmesh::NavigationGround, trigger::Trigger, Object, ObjectGroup}};
+use crate::{assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, managers::{input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, systems::CallList}, objects::{character_controller::CharacterController, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, trigger::Trigger, Object, ObjectGroup}};
 use super::System;
 
 pub struct TestSystem {
@@ -32,22 +32,26 @@ impl System for TestSystem {
         let mut ground_collider = Box::new(
             ModelObject::new("ground_collider", ground_asset.clone(), None, ShaderAsset::load_default_shader().unwrap()));
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
+        ground_collider.set_scale(Vec3::new(5.0, 1.0, 5.0));
 
 
         if networking::is_server() {
             knife_model.build_object_rigid_body(Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(0.2, 2.0, 0.2)))), None, 1.0, None, None);
-            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(10.0, 1.0, 10.0)))),
+            ground_collider.build_object_rigid_body(Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(100.0, 1.0, 100.0)))),
                 None, 1.0, None, None);
 
-            let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(50.0, 50.0));
+            let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(100.0, 100.0));
             navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
             ground_collider.add_child(Box::new(navmesh));
+            let mut obstacle = NavObstacle::new("obstacle", Vec3::new(4.0, 4.0, 4.0));
+            obstacle.set_position(Vec3::new(10.0, 0.0, 15.0), false);
+            //ground_collider.add_child(Box::new(obstacle));
             //dbg!(unsafe { navigation::MAP.clone() });
 
             //dbg!(ground_collider.object_id());
             let mut controller = Box::new(CharacterController::new("controller", BodyColliderType::Capsule(1.0, 4.0),
                 None, None).unwrap());
-            controller.set_position(Vec3::new(4.0, 10.0, 6.0), false);
+            controller.set_position(Vec3::new(0.0, 10.0, 6.0), false);
             controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
             controller.add_to_group("player");
 
@@ -79,13 +83,6 @@ impl System for TestSystem {
 
     fn update(&mut self) {
         if networking::is_server() {
-            navigation::add_obstacle(NavMeshObstacleTransform::new(Vec2::new(10.0, 10.0), Vec2::new(4.0, 4.0)));
-            let mut last_start = Vec2::new(-20.0, -20.0);
-            while let Some(next) = navigation::find_path_map(last_start, Vec2::new(20.0, 20.0)) {
-                last_start = next;
-                dbg!(last_start);
-            }
-            dbg!("that's it");
             {
                 let obj = self.find_object_mut("knife_model").unwrap();
                 let obj_position = obj.local_transform();
@@ -100,6 +97,9 @@ impl System for TestSystem {
                     }),
                 });
             }
+            let controller = self.find_object_mut("controller");
+            let controller: &mut CharacterController = controller.unwrap().downcast_mut().unwrap();
+            controller.walk_to(Vec3::new(20.0, 0.0, 20.0), 0.1);
 
             //println!("tick");
             {
