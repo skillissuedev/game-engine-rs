@@ -59,18 +59,16 @@ pub trait Object: std::fmt::Debug + Downcast {
     // premade fns:
     fn global_transform(&self) -> Transform {
         let base_transformations = self.local_transform();
-        /*let additional_transformations: Transform;
         match self.parent_transform() {
-            Some(transform) => additional_transformations = transform,
-            None => additional_transformations = Transform::default(),
-        }*/
-
-        /*Transform {
-            position: base_transformations.position,// + additional_transformations.position,
-            rotation: base_transformations.rotation,// + additional_transformations.rotation,
-            scale: base_transformations.scale,// + additional_transformations.scale,
-        }*/
-        Transform { position: base_transformations.position, rotation: base_transformations.rotation, scale: base_transformations.scale }
+            Some(transform) => {
+                Transform {
+                    position: base_transformations.position + transform.position,
+                    rotation: base_transformations.rotation + transform.rotation,
+                    scale: base_transformations.scale + transform.scale,
+                }
+            },
+            None => base_transformations,
+        }
     }
 
     fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {

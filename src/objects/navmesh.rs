@@ -18,9 +18,6 @@ pub struct NavigationGround {
 
 impl NavigationGround {
     pub fn new(name: &str, area_size: Vec2) -> Self {
-        let x_cells_count = ((area_size.x.round() / 2.0) as i32).abs_diff(0) as i32;
-        let z_cells_count = ((area_size.y.round() / 2.0) as i32).abs_diff(0) as i32;
-
         Self { 
             name: name.into(),
             transform: Transform::default(),
@@ -28,12 +25,7 @@ impl NavigationGround {
             children: vec![],
             id: gen_object_id(),
             groups: vec![],
-            dimensions: NavMeshDimensions {
-                area_size_world: area_size,
-                x_cells_count,
-                z_cells_count,
-                position: Vec2::new(0.0, 0.0),
-            },
+            dimensions: NavMeshDimensions::new(Vec2::new(0.0, 0.0), area_size),
             //grid: Grid::new(x_cells_count, z_cells_count, Some(())),
         }
     }
@@ -45,7 +37,7 @@ impl Object for NavigationGround {
 
     fn update(&mut self) { 
         let pos = self.global_transform().position;
-        self.dimensions.position = Vec2::new(pos.x, pos.z);
+        self.dimensions.set_position(Vec2::new(pos.x, pos.z));
 
         navigation::add_navmesh(*self.object_id(), self.dimensions.clone());
     }

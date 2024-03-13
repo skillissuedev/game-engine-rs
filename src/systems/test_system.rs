@@ -43,21 +43,21 @@ impl System for TestSystem {
             let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(100.0, 100.0));
             navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
             ground_collider.add_child(Box::new(navmesh));
-            let mut obstacle = NavObstacle::new("obstacle", Vec3::new(4.0, 4.0, 4.0));
-            obstacle.set_position(Vec3::new(10.0, 0.0, 15.0), false);
-            //ground_collider.add_child(Box::new(obstacle));
+            let obstacle = NavObstacle::new("obstacle", Vec3::new(4.0, 4.0, 4.0));
+            //obstacle.set_position(Vec3::new(2.0, 0.0, 4.0), false);
+            knife_model.add_child(Box::new(obstacle));
             //dbg!(unsafe { navigation::MAP.clone() });
 
             //dbg!(ground_collider.object_id());
             let mut controller = Box::new(CharacterController::new("controller", BodyColliderType::Capsule(1.0, 4.0),
                 None, None).unwrap());
-            controller.set_position(Vec3::new(0.0, 10.0, 6.0), false);
+            controller.set_position(Vec3::new(45.0, 10.0, 30.0), false);
             controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
             controller.add_to_group("player");
 
             self.add_object(controller);
         } else {
-            knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2, false)), 1.0, None, None);
+            //knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2, false)), 1.0, None, None);
             ground_collider.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 10.0, 0.5, 10.0, false)), 1.0, None, None);
 
             let capsule_model_asset = ModelAsset::from_file("models/capsule.gltf").unwrap();
@@ -72,7 +72,7 @@ impl System for TestSystem {
         self.add_object(ground_collider);
         let mut trigger = Box::new(Trigger::new("trigger", None, Some(CollisionGroups::Group1), BodyColliderType::Cuboid(1.0, 5.0, 1.0)));
         trigger.set_position(Vec3::new(0.0, -2.0, 5.0), true);
-        self.add_object(trigger);
+        //self.add_object(trigger);
 
 
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
@@ -85,28 +85,36 @@ impl System for TestSystem {
         if networking::is_server() {
             {
                 let obj = self.find_object_mut("knife_model").unwrap();
-                let obj_position = obj.local_transform();
+                let obj_tr = obj.local_transform();
 
+                //dbg!(obj_tr.position);
                 let _ = self.send_message(MessageReliability::Reliable, Message {
                     receiver: networking::MessageReceiver::Everybody,
                     system_id: self.system_id().into(),
                     message_id: "sync_knife".into(),
                     message: MessageContents::SyncObject(SyncObjectMessage {
                         object_name: "knife_model".into(),
-                        transform: obj_position,
+                        transform: obj_tr,
                     }),
                 });
             }
+
+            {
+                let obj = self.find_object("obstacle").unwrap();
+                let obj_tr = obj.global_transform();
+
+                //dbg!(obj_tr.position);
+            }
             let controller = self.find_object_mut("controller");
             let controller: &mut CharacterController = controller.unwrap().downcast_mut().unwrap();
-            controller.walk_to(Vec3::new(20.0, 0.0, 20.0), 0.1);
+            controller.walk_to(Vec3::new(3.0, 0.0, 3.0), 0.1);
 
             //println!("tick");
-            {
+            /*{
                 let trigger: &Trigger = self.find_object("trigger").unwrap().downcast_ref().unwrap();
                 let group = ObjectGroup("player".into());
                 //dbg!(trigger.is_intersecting_with_group(group));
-            }
+            }*/
 
             let transform;
             {
