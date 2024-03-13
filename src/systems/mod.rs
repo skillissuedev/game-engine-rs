@@ -5,9 +5,12 @@ use crate::{objects::Object, managers::{systems::{CallList, register_object_id_s
 
 
 pub trait System {
-    fn start(&mut self) {}
-    fn update(&mut self) {}
-    fn render(&mut self) {}
+    fn client_start(&mut self);
+    fn server_start(&mut self);
+    fn client_update(&mut self);
+    fn server_update(&mut self);
+    fn server_render(&mut self);
+    fn client_render(&mut self);
     fn call(&self, call_id: &str);    
     fn call_mut(&mut self, call_id: &str);    
     fn objects_list(&self) -> &Vec<Box<dyn Object>>;
