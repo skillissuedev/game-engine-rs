@@ -4,6 +4,8 @@ use glium::{Frame, Display};
 use once_cell::sync::Lazy;
 use crate::{systems::System, objects::ObjectGroup};
 
+use super::networking;
+
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
 static mut OBJECTS_ID_SYSTEMS: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
@@ -33,18 +35,32 @@ pub fn get_system_mut_with_id(id: &str) -> Option<&mut Box<dyn System>> {
 
 pub fn update() {
     unsafe {
-        for system in &mut SYSTEMS {
-            system.update();
-            system.update_objects();
+        if networking::is_server() {
+            for system in &mut SYSTEMS {
+                system.server_update();
+                system.update_objects();
+            }
+        } else { 
+            for system in &mut SYSTEMS {
+                system.client_update();
+                system.update_objects();
+            }
         }
     }
 }
 
 pub fn render(display: &mut Display, target: &mut Frame) {
     unsafe {
-        for system in &mut SYSTEMS {
-            system.render();
-            system.render_objects(display, target);
+        if networking::is_server() {
+            for system in &mut SYSTEMS {
+                system.server_render();
+                //system.render_objects();
+            }
+        } else { 
+            for system in &mut SYSTEMS {
+                system.client_render();
+                system.render_objects(display, target);
+            }
         }
     }
 }
@@ -52,7 +68,11 @@ pub fn render(display: &mut Display, target: &mut Frame) {
 pub fn add_system(system: Box<dyn System>) {
     unsafe {
         SYSTEMS.push(system);    
-        SYSTEMS.last_mut().expect("Failed to add system").start();
+        if networking::is_server() {
+            SYSTEMS.last_mut().expect("Failed to add system").server_start();
+        } else {
+            SYSTEMS.last_mut().expect("Failed to add system").client_start();
+        }
     }
 }
 
