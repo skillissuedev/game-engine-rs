@@ -147,7 +147,7 @@ impl LuaSystem {
 }
 
 impl System for LuaSystem {
-    fn update(&mut self) {
+    fn client_update(&mut self) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -157,7 +157,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn start(&mut self) {
+    fn client_start(&mut self) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {

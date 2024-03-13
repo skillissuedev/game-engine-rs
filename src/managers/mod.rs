@@ -7,6 +7,6 @@ pub mod sound;
 pub mod ui;
 pub mod systems;
 pub mod animator;
-pub mod scripting;
+//pub mod scripting;
 pub mod input;
 pub mod networking;
