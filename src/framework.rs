@@ -1,8 +1,7 @@
 use crate::{
     game::game_main,
     managers::{
-        render,
-        sound::{self, set_listener_transform}, systems, input, networking::{self, NetworkingMode}, physics,
+        input, navigation, networking::{self, NetworkingMode}, physics, render, sound::{self, set_listener_transform}, systems
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
@@ -39,6 +38,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         },
     };
 
+    navigation::update();
     game_main::start();
 
     let mut win_w = 0;
@@ -72,7 +72,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         win_h = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().height;
 
                         unsafe {
-                            render::ASPECT_RATIO = (win_w / win_h) as f32 ;
+                            render::ASPECT_RATIO = win_w as f32 / win_h as f32;
                         }
 
                         let mut target = display.as_ref().expect("display is none(should be only in server mode)").draw();
@@ -157,8 +157,10 @@ fn update_game(delta_time: Duration) {
     physics::update();
     input::update();
     networking::update(delta_time);
+    navigation::update();
     game_main::update();
     systems::update();
+    navigation::create_grids();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {

@@ -1,4 +1,3 @@
-use glam::{Vec3, Vec2};
 use crate::{assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, managers::{input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, systems::CallList}, objects::{character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, trigger::Trigger, Object, ObjectGroup}};
 use super::System;
 
@@ -58,12 +57,16 @@ impl System for TestSystem {
 
     fn client_start(&mut self) {
         let asset = ModelAsset::from_file("models/knife_test.gltf");
+        let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
+        //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = 
             Box::new(ModelObject::new("knife_model", asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
         knife_model.set_position(Vec3::new(5.0, 6.0, 6.0), true);
 
-        let mut ground_collider = Box::new(EmptyObject::new("ground_collider"));
+        let mut ground_collider = Box::new(
+            ModelObject::new("ground_collider", ground_asset.clone(), None, ShaderAsset::load_default_shader().unwrap()));
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
+        ground_collider.set_scale(Vec3::new(5.0, 1.0, 5.0));
 
 
         knife_model.build_object_rigid_body(None, Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2, false)), 1.0, None, None);
@@ -78,7 +81,7 @@ impl System for TestSystem {
 
         self.add_object(knife_model);
         self.add_object(ground_collider);
-
+      
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
         input::new_bind("left", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)]);
         input::new_bind("backwards", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::S)]);
@@ -95,6 +98,7 @@ impl System for TestSystem {
                 receiver: networking::MessageReceiver::Everybody,
                 system_id: self.system_id().into(),
                 message_id: "sync_knife".into(),
+              
                 message: MessageContents::SyncObject(SyncObjectMessage {
                     object_name: "knife_model".into(),
                     transform: obj_tr,

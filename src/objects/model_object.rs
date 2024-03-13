@@ -13,7 +13,7 @@ pub struct ModelObject {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    pub asset: ModelAsset,
+    pub model_asset: ModelAsset,
     pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
     pub shader_asset: ShaderAsset,
@@ -51,7 +51,7 @@ impl ModelObject {
             children: vec![],
             name: name.to_string(),
             parent_transform: None, 
-            asset,
+            model_asset: asset,
             groups: vec![],
             texture_asset,
             shader_asset,
@@ -72,8 +72,8 @@ impl Object for ModelObject {
 
     fn update(&mut self) {
         self.update_animation();
-        for node in &self.asset.root_nodes {
-            set_nodes_global_transform(&node, &self.asset.nodes, None, &mut self.nodes_transforms);
+        for node in &self.model_asset.root_nodes {
+            set_nodes_global_transform(&node, &self.model_asset.nodes, None, &mut self.nodes_transforms);
         }
     }
 
@@ -85,8 +85,8 @@ impl Object for ModelObject {
             self.start_mesh(display);
         }
 
-        for i in 0..self.asset.objects.len() {
-            let object = &self.asset.objects[i];
+        for i in 0..self.model_asset.objects.len() {
+            let object = &self.model_asset.objects[i];
 
             let indices = IndexBuffer::new(
                 display,
@@ -96,7 +96,7 @@ impl Object for ModelObject {
 
             let mut transform: Option<&NodeTransform> = None;
             for tr in &self.nodes_transforms {
-                if tr.node_id == self.asset.objects[i].node_index {
+                if tr.node_id == self.model_asset.objects[i].node_index {
                     transform = Some(tr);
                     break;
                 } 
@@ -126,7 +126,7 @@ impl Object for ModelObject {
             let model_cols = model.to_cols_array_2d();
 
             let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
-            let inverse_bind_mats = UniformBuffer::new(display, self.asset.joints_inverse_bind_mats).unwrap();
+            let inverse_bind_mats = UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
 
             let uniforms = uniform! {
                 jointsMats: &joints,
@@ -292,11 +292,11 @@ impl Object for ModelObject {
 
 impl ModelObject {
     pub fn get_asset(&self) -> &ModelAsset {
-        &self.asset
+        &self.model_asset
     }
 
     pub fn play_animation(&mut self, anim_name: &str) -> Result<(), ModelObjectError> {
-        let anim_option = self.asset.find_animation(anim_name);
+        let anim_option = self.model_asset.find_animation(anim_name);
 
         match anim_option {
             Some(animation) => {
@@ -314,7 +314,7 @@ impl ModelObject {
 
     fn get_joints_transforms(&self) -> [[[f32; 4]; 4]; 128] {
         let mut joints_vec: Vec<&NodeTransform> = Vec::new();
-        for joint in &self.asset.joints {
+        for joint in &self.model_asset.joints {
             for node_transform in &self.nodes_transforms {
                 if node_transform.node_id == joint.node_index {
                     joints_vec.push(node_transform);
@@ -428,7 +428,7 @@ impl ModelObject {
     }
 
     fn start_mesh(&mut self, display: &Display) {
-        for i in &self.asset.objects {
+        for i in &self.model_asset.objects {
             let vertex_buffer = VertexBuffer::new(display, &i.vertices);
             match vertex_buffer {
                 Ok(buff) => self.vertex_buffer.push(buff),
@@ -446,7 +446,7 @@ impl ModelObject {
         let vertex_shader_source = &self.shader_asset.vertex_shader_source;
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
 
-        for _ in &self.asset.objects {
+        for _ in &self.model_asset.objects {
             let program = Program::from_source(
                 display,
                 &vertex_shader_source,
