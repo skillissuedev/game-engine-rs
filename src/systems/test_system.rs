@@ -82,7 +82,7 @@ impl System for TestSystem {
 
         self.add_object(knife_model);
         self.add_object(ground_collider);
-
+      
         input::new_bind("forward", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)]);
         input::new_bind("left", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)]);
         input::new_bind("backwards", vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::S)]);
@@ -99,6 +99,7 @@ impl System for TestSystem {
                 receiver: networking::MessageReceiver::Everybody,
                 system_id: self.system_id().into(),
                 message_id: "sync_knife".into(),
+              
                 message: MessageContents::SyncObject(SyncObjectMessage {
                     object_name: "knife_model".into(),
                     transform: obj_tr,
