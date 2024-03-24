@@ -145,7 +145,7 @@ impl Object for ModelObject {
                     model_cols[3],
                 ],
                 tex: texture,
-                lightPos: render::get_light_position().to_array(),
+                lightPos: render::get_light_direction().to_array(),
             };
 
             let draw_params = glium::DrawParameters {

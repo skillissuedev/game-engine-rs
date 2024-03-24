@@ -5,7 +5,7 @@ use crate::{
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
-use std::{time::{Instant, Duration}, num::NonZeroU32};
+use std::{num::NonZeroU32, ops::{RangeBounds, RangeInclusive}, time::{Duration, Instant}};
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
 static mut DELTA_TIME: Duration = Duration::new(0, 0);
@@ -14,29 +14,16 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode } 
 
     let event_loop = EventLoop::new();
-    let mut display: Option<Display>;
-    match networking::get_current_networking_mode() {
-        networking::NetworkingMode::Server(_) => {
-            display = None;
-        },
-        _ => {
-            let wb = WindowBuilder::new().with_title("projectbaldej").with_transparent(false);
-            let cb = ContextBuilder::new().with_srgb(false).with_vsync(true);
-            display = Some(Display::new(wb, cb, &event_loop).expect("failed to create glium display"));
-        },
-    }
+    let wb = WindowBuilder::new().with_title("projectbaldej").with_transparent(false);
+    let cb = ContextBuilder::new().with_srgb(false).with_vsync(true);
+    let mut display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
 
     let mut frames_count: usize = 0;
     let mut now = std::time::Instant::now();
     let mut last_frame = std::time::Instant::now();
 
-    match networking::get_current_networking_mode() {
-        networking::NetworkingMode::Server(_) => (),
-        _ => {
-            sound::init().unwrap();
-            render::init(display.as_ref().unwrap());
-        },
-    };
+    sound::init().unwrap();
+    render::init(&display);
 
     navigation::update();
     game_main::start();
@@ -44,6 +31,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = 0;
     let mut win_h = 0;
 
+    let shadow_texture = glium::texture::DepthTexture2d::empty(&display, 2048, 2048).unwrap();
 
     let frame_time = Duration::from_millis(16);
 
@@ -68,19 +56,19 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                     _ => {
                         set_listener_transform(render::get_camera_position(), render::get_camera_front());
 
-                        win_w = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().width;
-                        win_h = display.as_ref().expect("display is none(should be only in server mode)").gl_window().window().inner_size().height;
+                        win_w = display.gl_window().window().inner_size().width;
+                        win_h = display.gl_window().window().inner_size().height;
 
                         unsafe {
                             render::ASPECT_RATIO = win_w as f32 / win_h as f32;
                         }
 
-                        let mut target = display.as_ref().expect("display is none(should be only in server mode)").draw();
+                        let mut target = display.draw();
 
                         render::draw(&mut target);
                         game_main::render();
-                        systems::render(&mut display.as_mut().expect("display is none(should be only in server mode)"), &mut target);
-                        render::debug_draw(display.as_ref().expect("display is none(should be only in server mode)"), &mut target);
+                        systems::render(&mut display, &mut target);
+                        render::debug_draw(&display, &mut target);
 
                         target.finish().unwrap();
                         last_frame = Instant::now();
@@ -118,8 +106,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         if fps.is_some() {
                             let fps = fps.unwrap();
                             display
-                                .as_ref()
-                                .expect("display is none(should be only in server mode)")
                                 .gl_window()
                                 .window()
                                 .set_title(&format!("projectbaldej: {fps} fps"));
@@ -176,13 +162,6 @@ pub fn get_debug_mode() -> DebugMode {
     unsafe { DEBUG_MODE }
 }
 
-#[derive(Clone, Copy)]
-pub enum DebugMode {
-    None,
-    ShowFps,
-    Full,
-}
-
 fn set_audio_listener_transformations() {
     let camera_pos = render::get_camera_position();
     let camera_rot = render::get_camera_rotation();
@@ -199,4 +178,16 @@ fn set_delta_time(dt: Duration) {
 
 pub fn get_delta_time() -> Duration {
     unsafe { DELTA_TIME }
+}
+
+#[derive(Clone, Copy)]
+pub enum DebugMode {
+    None,
+    ShowFps,
+    Full,
+}
+
+pub struct GameSettings {
+    master_volume: u8,
+    shadowmap_size: u32
 }

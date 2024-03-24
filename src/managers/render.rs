@@ -1,5 +1,5 @@
 use glium::{implement_vertex, Frame, Surface, VertexBuffer, IndexBuffer, index::PrimitiveType, Display, Program, uniform};
-use glam::{Mat4, Vec3, Quat};
+use glam::{Mat4, Quat, Vec3, Vec4};
 use crate::math_utils::deg_to_rad;
 
 use super::physics::{RenderColliderType, RenderRay};
@@ -213,7 +213,7 @@ pub fn set_light_position(pos: Vec3) {
     }
 }
 
-pub fn get_light_position() -> Vec3 {
+pub fn get_light_direction() -> Vec3 {
     unsafe {
         LIGHT_POSITION
     }
@@ -367,3 +367,35 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
         },
     }
 }
+
+fn get_sun_camera_projection_matrix() -> Mat4 {
+    // change all of deez values to a camera bounding box 
+    Mat4::orthographic_rh_gl(-4.0, 4.0, -4.0, 4.0, -10.0, 700.0)
+}
+
+fn get_sun_camera_view_matrix() -> Mat4 {
+    let view_center = Vec3::new(0.0, 0.0, 0.0);
+    let view_up = Vec3::new(0.0, 1.0, 0.0);
+    todo!()
+    //let depth_view_matrix = Mat4::look_at_rh(eye, center, up);
+}
+
+
+// https://learnopengl.com/Guest-Articles/2021/CSM
+fn get_camera_corners(proj: Mat4, view: Mat4) -> Vec<Vec4> {
+    let proj_view = proj * view;
+    let inv = proj_view.inverse();
+    
+    let mut frustum_corners = Vec::new();
+    for x in 0..2 {
+        for y in 0..2 {
+            for z in 0..2 {
+                let pt = inv * Vec4::new(2.0 * x as f32 - 1.0, 2.0 * y as f32 - 1.0, 2.0 * z as f32 - 1.0, 1.0);
+                frustum_corners.push(pt / pt.w);
+            }
+        }
+    }
+    
+    frustum_corners
+}
+

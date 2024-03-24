@@ -1,5 +1,5 @@
 use glam::{Vec3, Vec2};
-use crate::{assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, managers::{input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, systems::CallList}, objects::{character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, trigger::Trigger, Object, ObjectGroup}};
+use crate::{assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, managers::{input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, BodyType, RenderColliderType}, systems::CallList}, objects::{character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object}};
 use super::System;
 
 pub struct TestSystem {
