@@ -56,6 +56,8 @@ pub trait Object: std::fmt::Debug + Downcast {
         return None; 
     } 
 
+    fn shadow_render(&mut self, target: &mut Frame) { }
+
     // premade fns:
     fn global_transform(&self) -> Transform {
         let base_transformations = self.local_transform();

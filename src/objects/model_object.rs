@@ -172,6 +172,10 @@ impl Object for ModelObject {
         } 
     }
 
+    fn shadow_render(&mut self, target: &mut glium::Frame) {
+        todo!()
+    }
+
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }

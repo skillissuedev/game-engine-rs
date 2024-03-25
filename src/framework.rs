@@ -65,7 +65,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
                         let mut target = display.draw();
 
-                        render::draw(&mut target);
+                        render::draw(&display, &mut target, &shadow_texture);
                         game_main::render();
                         systems::render(&mut display, &mut target);
                         render::debug_draw(&display, &mut target);

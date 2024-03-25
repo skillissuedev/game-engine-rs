@@ -1,4 +1,4 @@
-use glium::{implement_vertex, Frame, Surface, VertexBuffer, IndexBuffer, index::PrimitiveType, Display, Program, uniform};
+use glium::{framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer};
 use glam::{Mat4, Quat, Vec3, Vec4};
 use crate::math_utils::deg_to_rad;
 
@@ -13,6 +13,12 @@ pub struct Vertex {
     pub weights: [f32; 4],
 }
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
+
+#[derive(Copy, Clone, Debug)]
+pub struct SimpleVertex {
+    pub position: [f32; 3],
+}
+implement_vertex!(SimpleVertex, position);
 
 pub fn init(display: &Display) {
     unsafe {
@@ -166,7 +172,10 @@ pub fn add_ray_to_draw(ray: RenderRay) {
     }
 }
 
-pub fn draw(target: &mut Frame) {
+pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture2d) {
+    let mut shadow_target = SimpleFrameBuffer::depth_only(display, shadow_texture).unwrap();
+    let corners = CameraCorners::new();
+    let sun_camera = SunCamera::new(&corners);
     target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
     update_camera_vectors();
 }
@@ -368,34 +377,116 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
     }
 }
 
-fn get_sun_camera_projection_matrix() -> Mat4 {
-    // change all of deez values to a camera bounding box 
-    Mat4::orthographic_rh_gl(-4.0, 4.0, -4.0, 4.0, -10.0, 700.0)
+struct SunCamera {
+    proj_mat: Mat4,
+    view_mat: Mat4,
 }
 
-fn get_sun_camera_view_matrix() -> Mat4 {
-    let view_center = Vec3::new(0.0, 0.0, 0.0);
-    let view_up = Vec3::new(0.0, 1.0, 0.0);
-    todo!()
-    //let depth_view_matrix = Mat4::look_at_rh(eye, center, up);
+impl SunCamera {
+    fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
+        Mat4::orthographic_rh_gl(corners.min_x, corners.max_x, corners.min_y, corners.max_y, corners.min_z, corners.max_z)
+    }
+
+    fn get_sun_camera_view_matrix(corners: &CameraCorners) -> Mat4 {
+        let direction = get_light_direction().normalize();
+        let view_center = corners.get_center();
+        let view_up = Vec3::new(0.0, 1.0, 0.0);
+        let view_matrix = Mat4::look_at_rh(Vec3::new(10000.0, 10000.0, 10000.0), view_center, view_up);
+        todo!()
+    }
+
+    pub fn new(corners: &CameraCorners) -> SunCamera {
+        let proj_mat = Self::get_sun_camera_projection_matrix(corners);
+        let view_mat = Self::get_sun_camera_projection_matrix(corners);
+        SunCamera { proj_mat, view_mat }
+    }
 }
 
 
-// https://learnopengl.com/Guest-Articles/2021/CSM
-fn get_camera_corners(proj: Mat4, view: Mat4) -> Vec<Vec4> {
-    let proj_view = proj * view;
-    let inv = proj_view.inverse();
-    
-    let mut frustum_corners = Vec::new();
-    for x in 0..2 {
-        for y in 0..2 {
-            for z in 0..2 {
-                let pt = inv * Vec4::new(2.0 * x as f32 - 1.0, 2.0 * y as f32 - 1.0, 2.0 * z as f32 - 1.0, 1.0);
-                frustum_corners.push(pt / pt.w);
+struct CameraCorners {
+    min_x: f32,
+    max_x: f32,
+    min_y: f32,
+    max_y: f32,
+    min_z: f32,
+    max_z: f32,
+}
+
+impl CameraCorners {
+    // https://learnopengl.com/Guest-Articles/2021/CSM
+    fn get_camera_corners(proj: Mat4, view: Mat4) -> Vec<Vec3> {
+        let proj_view = proj * view;
+        let inv = proj_view.inverse();
+
+        let mut frustum_corners = Vec::new();
+        let mut vec3_frustum_corners = Vec::new();
+        for x in 0..2 {
+            for y in 0..2 {
+                for z in 0..2 {
+                    let pt = inv * Vec4::new(2.0 * x as f32 - 1.0, 2.0 * y as f32 - 1.0, 2.0 * z as f32 - 1.0, 1.0);
+                    frustum_corners.push(pt / pt.w);
+                }
             }
         }
-    }
-    
-    frustum_corners
-}
 
+        for corner in &frustum_corners {
+            vec3_frustum_corners.push(Vec3::new(corner.x, corner.y, corner.z));
+        }
+
+        dbg!(&vec3_frustum_corners);
+        vec3_frustum_corners
+    }
+
+
+    pub fn new() -> CameraCorners {
+        let corners = Self::get_camera_corners(get_projection_matrix(), get_view_matrix());
+
+        let mut min_x = 0.0;
+        let mut min_y = 0.0;
+        let mut min_z = 0.0;
+
+        let mut max_x = 0.0;
+        let mut max_y = 0.0;
+        let mut max_z = 0.0;
+
+        for corner in corners {
+            if corner.x > max_x {
+                max_x = corner.x;
+            }
+            if corner.x < min_x {
+                min_x = corner.x;
+            }
+
+            if corner.y > max_y {
+                max_y = corner.y;
+            }
+            if corner.y < min_y {
+                min_y = corner.y;
+            }
+
+            if corner.z > max_z {
+                max_z = corner.z;
+            }
+            if corner.z < min_z {
+                min_z = corner.z;
+            }
+        }
+
+        CameraCorners {
+            min_x,
+            max_x,
+            min_y,
+            max_y,
+            min_z,
+            max_z,
+        }
+    }
+
+    pub fn get_center(&self) -> Vec3 {
+        let center_x = (self.min_x + self.max_x) / 2.0;
+        let center_y = (self.min_y + self.max_y) / 2.0;
+        let center_z = (self.min_z + self.max_z) / 2.0;
+
+        Vec3::new(center_x, center_y, center_z)
+    }
+}
