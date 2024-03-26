@@ -1,8 +1,9 @@
 use downcast_rs::{impl_downcast, Downcast};
 use glium::{Frame, Display};
 use glam::Vec3;
+use nalgebra::wrap;
 use serde::{Serialize, Deserialize};
-use crate::{managers::{physics::{ObjectBodyParameters, BodyType, self, RenderColliderType, CollisionGroups}, render, self}, framework};
+use crate::{framework, managers::{self, physics::{self, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType}, render::{self, ViewProj}}};
 
 pub mod empty_object;
 pub mod camera_position;
@@ -56,7 +57,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         return None; 
     } 
 
-    fn shadow_render(&mut self, target: &mut Frame) { }
+    fn shadow_render(&mut self, view_proj: &ViewProj, display: &mut Display, target: &mut Frame) { }
 
     // premade fns:
     fn global_transform(&self) -> Transform {
@@ -131,7 +132,17 @@ pub trait Object: std::fmt::Debug + Downcast {
     }
 
     fn render_children(&mut self, display: &mut Display, target: &mut Frame) {
-        self.children_list_mut().iter_mut().for_each(|child| child.render(display, target));
+        self.children_list_mut().iter_mut().for_each(|child| {
+            child.render(display, target);
+            child.render_children(display, target);
+        });
+    }
+
+    fn shadow_render_children(&mut self, view_proj: &ViewProj, display: &mut Display, target: &mut Frame) {
+        self.children_list_mut().iter_mut().for_each(|child| {
+            child.shadow_render(&view_proj, display, target);
+            child.shadow_render_children(&view_proj, display, target);
+        });
     }
 
     fn debug_render(&self) {

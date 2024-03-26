@@ -4,7 +4,7 @@ use glium::{Frame, Display};
 use once_cell::sync::Lazy;
 use crate::{systems::System, objects::ObjectGroup};
 
-use super::networking;
+use super::{networking, render::ViewProj};
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
@@ -60,6 +60,16 @@ pub fn render(display: &mut Display, target: &mut Frame) {
             for system in &mut SYSTEMS {
                 system.client_render();
                 system.render_objects(display, target);
+            }
+        }
+    }
+}
+
+pub fn shadow_render(view_proj: ViewProj, display: &mut Display, target: &mut Frame) {
+    unsafe {
+        if !networking::is_server() {
+            for system in &mut SYSTEMS {
+                system.shadow_render_objects(&view_proj, display, target);
             }
         }
     }

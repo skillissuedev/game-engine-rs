@@ -14,12 +14,6 @@ pub struct Vertex {
 }
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
 
-#[derive(Copy, Clone, Debug)]
-pub struct SimpleVertex {
-    pub position: [f32; 3],
-}
-implement_vertex!(SimpleVertex, position);
-
 pub fn init(display: &Display) {
     unsafe {
         COLLIDER_CUBOID_VERTEX_BUFFER = Some(VertexBuffer::new(display, &CUBE_VERTS_LIST).unwrap());
@@ -174,8 +168,10 @@ pub fn add_ray_to_draw(ray: RenderRay) {
 
 pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture2d) {
     let mut shadow_target = SimpleFrameBuffer::depth_only(display, shadow_texture).unwrap();
-    let corners = CameraCorners::new();
-    let sun_camera = SunCamera::new(&corners);
+    shadow_target.clear_color(1.0, 1.0, 1.0, 1.0);
+    shadow_target.clear_depth(1.0);
+    let view_proj = SunCamera::new().view_proj;
+
     target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
     update_camera_vectors();
 }
@@ -378,8 +374,7 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
 }
 
 struct SunCamera {
-    proj_mat: Mat4,
-    view_mat: Mat4,
+    pub view_proj: ViewProj
 }
 
 impl SunCamera {
@@ -388,17 +383,20 @@ impl SunCamera {
     }
 
     fn get_sun_camera_view_matrix(corners: &CameraCorners) -> Mat4 {
-        let direction = get_light_direction().normalize();
+        //let direction = get_light_direction().normalize();
         let view_center = corners.get_center();
         let view_up = Vec3::new(0.0, 1.0, 0.0);
         let view_matrix = Mat4::look_at_rh(Vec3::new(10000.0, 10000.0, 10000.0), view_center, view_up);
-        todo!()
+
+        view_matrix
     }
 
-    pub fn new(corners: &CameraCorners) -> SunCamera {
-        let proj_mat = Self::get_sun_camera_projection_matrix(corners);
-        let view_mat = Self::get_sun_camera_projection_matrix(corners);
-        SunCamera { proj_mat, view_mat }
+    pub fn new() -> SunCamera {
+        let corners = &CameraCorners::new();
+        let proj = Self::get_sun_camera_projection_matrix(corners);
+        let view = Self::get_sun_camera_projection_matrix(corners);
+        let view_proj = ViewProj { view, proj };
+        SunCamera { view_proj }
     }
 }
 
@@ -489,4 +487,9 @@ impl CameraCorners {
 
         Vec3::new(center_x, center_y, center_z)
     }
+}
+
+pub struct ViewProj {
+    pub view: Mat4, 
+    pub proj: Mat4
 }

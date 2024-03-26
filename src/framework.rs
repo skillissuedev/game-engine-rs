@@ -5,7 +5,7 @@ use crate::{
     },
 };
 use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
-use std::{num::NonZeroU32, ops::{RangeBounds, RangeInclusive}, time::{Duration, Instant}};
+use std::{num::NonZeroU32, time::{Duration, Instant}};
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
 static mut DELTA_TIME: Duration = Duration::new(0, 0);

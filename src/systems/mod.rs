@@ -1,7 +1,7 @@
 pub mod test_system;
 
 use glium::{Frame, Display};
-use crate::{objects::Object, managers::{systems::{CallList, register_object_id_system, register_object_id_name}, networking::{Message, MessageReliability, self, NetworkError}}};
+use crate::{managers::{networking::{self, Message, MessageReliability, NetworkError}, render::ViewProj, systems::{register_object_id_name, register_object_id_system, CallList}}, objects::Object};
 
 
 pub trait System {
@@ -66,6 +66,12 @@ pub trait System {
 
     fn render_objects(&mut self, display: &mut Display, target: &mut Frame) {
         self.objects_list_mut().into_iter().for_each(|object| object.render(display, target));
+        self.objects_list_mut().into_iter().for_each(|object| object.render_children(display, target));
+        self.objects_list_mut().into_iter().for_each(|object| object.debug_render());
+    }
+
+    fn shadow_render_objects(&mut self, view_proj: &ViewProj, display: &mut Display, target: &mut Frame) {
+        self.objects_list_mut().into_iter().for_each(|object| object.shadow_render(view_proj, display, target));
         self.objects_list_mut().into_iter().for_each(|object| object.render_children(display, target));
         self.objects_list_mut().into_iter().for_each(|object| object.debug_render());
     }

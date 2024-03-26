@@ -1,8 +1,8 @@
 use std::time::Instant;
 use glam::{Mat4, Quat, Vec3};
 use glium::{VertexBuffer, Program, IndexBuffer, uniform, Surface, uniforms::UniformBuffer, Display};
-use crate::{assets::{model_asset::{ModelAsset, Animation, AnimationChannelType, AnimationChannel, self}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{render::{Vertex, self}, debugger::{error, warn, self}, physics::ObjectBodyParameters}, math_utils::deg_to_rad};
-use super::{Object, Transform, gen_object_id, ObjectGroup};
+use crate::{assets::{model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{debugger::{self, error, warn}, physics::ObjectBodyParameters, render::{self, Vertex, ViewProj}}, math_utils::deg_to_rad};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
 
 #[derive(Debug)]
 pub struct ModelObject {
@@ -110,7 +110,7 @@ impl Object for ModelObject {
                 }
             }
 
-            let setup_mat_result = self.setup_mat(transform.unwrap());
+            let setup_mat_result = self.setup_mat(None, transform.unwrap());
             let mvp: Mat4 = setup_mat_result.mvp;
             let model: Mat4 = setup_mat_result.model;
 
@@ -172,8 +172,87 @@ impl Object for ModelObject {
         } 
     }
 
-    fn shadow_render(&mut self, target: &mut glium::Frame) {
-        todo!()
+    fn shadow_render(&mut self, view_proj: &ViewProj, display: &mut Display, target: &mut glium::Frame) {
+        if self.error {
+            return;
+        }
+
+        for i in 0..self.model_asset.objects.len() {
+            let object = &self.model_asset.objects[i];
+
+            let indices = IndexBuffer::new(
+                display,
+                glium::index::PrimitiveType::TrianglesList,
+                &object.indices,
+            );
+
+            let mut transform: Option<&NodeTransform> = None;
+            for tr in &self.nodes_transforms {
+                if tr.node_id == self.model_asset.objects[i].node_index {
+                    transform = Some(tr);
+                    break;
+                } 
+            }
+
+            match transform {
+                Some(_) => (), 
+                None => {
+                    error("no node transform found!");
+                    return;
+                }
+            }
+
+            let setup_mat_result = self.setup_mat(Some(&view_proj), transform.unwrap());
+            let mvp: Mat4 = setup_mat_result.mvp;
+            let model: Mat4 = setup_mat_result.model;
+
+            let mvp_cols = mvp.to_cols_array_2d();
+            let model_cols = model.to_cols_array_2d();
+
+            let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
+            let inverse_bind_mats = UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
+
+            let uniforms = uniform! {
+                jointsMats: &joints,
+                jointsInverseBindMats: &inverse_bind_mats,
+                mesh: object.transform,
+                mvp: [
+                    mvp_cols[0],
+                    mvp_cols[1],
+                    mvp_cols[2],
+                    mvp_cols[3],
+                ],
+                model: [
+                    model_cols[0],
+                    model_cols[1],
+                    model_cols[2],
+                    model_cols[3],
+                ],
+                lightPos: render::get_light_direction().to_array(),
+            };
+
+            let draw_params = glium::DrawParameters {
+                depth: glium::Depth {
+                    test: glium::draw_parameters::DepthTest::IfLessOrEqual, // set to IfLess if it
+                                                                            // won't work
+                    write: true,
+                    ..Default::default()
+                },
+                //blend: glium::draw_parameters::Blend::alpha_blending(),
+                backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+                ..Default::default()
+            };
+
+            target
+                .draw(
+                    &self.vertex_buffer[i],
+                    &indices.unwrap(),
+                    &self.program[i],
+                    &uniforms,
+                    &draw_params,
+                )
+                .unwrap();
+        } 
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -378,7 +457,7 @@ impl ModelObject {
         }
     }
 
-    fn setup_mat(&self, node_transform: &NodeTransform) -> SetupMatrixResult {
+    fn setup_mat(&self, view_proj: Option<&ViewProj>, node_transform: &NodeTransform) -> SetupMatrixResult {
         match node_transform.global_transform {
             Some(_) => (),
             None => {
@@ -420,8 +499,19 @@ impl ModelObject {
 
 
         let transform = Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
-        let view = render::get_view_matrix();
-        let proj = render::get_projection_matrix();
+
+        let view;
+        let proj;
+        match view_proj {
+            Some(view_proj) => {
+                view = view_proj.view;
+                proj = view_proj.proj;
+            },
+            None => {
+                view = render::get_view_matrix();
+                proj = render::get_projection_matrix();
+            }
+        }
 
         let mvp = proj * view * transform;
 
@@ -638,3 +728,4 @@ pub struct NodeTransform {
 pub enum ModelObjectError {
     AnimationNotFound
 }
+
