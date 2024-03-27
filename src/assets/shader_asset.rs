@@ -28,6 +28,17 @@ impl ShaderAsset {
         }
     }
 
+    pub fn load_shadow_shader() -> Result<ShaderAsset, ShaderError> {
+        unsafe {
+            let shader_path = ShaderAssetPath {
+                vertex_shader_path: "shaders/shadow_map.vert".into(),
+                fragment_shader_path: "shaders/shadow_map.frag".into(),
+            };
+
+            ShaderAsset::load_from_file(shader_path)
+        }
+    }
+
     pub fn load_from_file(path: ShaderAssetPath) -> Result<ShaderAsset, ShaderError> {
         let vertex_shader_source = read_to_string(get_full_asset_path(&path.vertex_shader_path));
         let fragment_shader_source = read_to_string(get_full_asset_path(&path.fragment_shader_path));

@@ -21,6 +21,7 @@ pub struct ModelObject {
     texture: Option<glium::texture::Texture2d>,
     vertex_buffer: Vec<VertexBuffer<Vertex>>,
     program: Vec<Program>,
+    shadow_program: Vec<Program>,
     started: bool,
     error: bool,
 }
@@ -58,6 +59,7 @@ impl ModelObject {
             texture: None,
             vertex_buffer: vec![], 
             program: vec![],
+            shadow_program: vec![],
             started: false, error: false,
             animation_settings: CurrentAnimationSettings { animation: None, looping: false, timer: None },
             body: None,
@@ -522,6 +524,14 @@ impl ModelObject {
     }
 
     fn start_mesh(&mut self, display: &Display) {
+        let shadow_shader = ShaderAsset::load_shadow_shader();
+        let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
+            shadow_shader
+        } else {
+            error("failed to load shadow shader!");
+            return;
+        };
+
         for i in &self.model_asset.objects {
             let vertex_buffer = VertexBuffer::new(display, &i.vertices);
             match vertex_buffer {
@@ -540,6 +550,9 @@ impl ModelObject {
         let vertex_shader_source = &self.shader_asset.vertex_shader_source;
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
 
+        let vertex_shadow_shader_src = &shadow_shader.vertex_shader_source;
+        let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
+
         for _ in &self.model_asset.objects {
             let program = Program::from_source(
                 display,
@@ -547,11 +560,30 @@ impl ModelObject {
                 &fragment_shader_source,
                 None,
             );
+
+            let shadow_program = Program::from_source(
+                display,
+                &vertex_shadow_shader_src,
+                &fragment_shadow_shader_src,
+                None,
+            );
             match program {
                 Ok(prog) => self.program.push(prog),
                 Err(err) => {
                     error(&format!(
                         "Mesh object error:\nprogram creation error!\nErr: {}",
+                        err
+                    ));
+                    self.error = true;
+                    return;
+                }
+            }
+
+            match shadow_program {
+                Ok(prog) => self.shadow_program.push(prog),
+                Err(err) => {
+                    error(&format!(
+                        "Mesh object error:\nprogram creation error(shadow)!\nErr: {}",
                         err
                     ));
                     self.error = true;
