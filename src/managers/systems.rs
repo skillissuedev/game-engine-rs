@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use glium::{Frame, Display};
+use crate::{objects::ObjectGroup, systems::System};
+use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use once_cell::sync::Lazy;
-use crate::{systems::System, objects::ObjectGroup};
 
 use super::{networking, render::ViewProj};
 
@@ -40,7 +40,7 @@ pub fn update() {
                 system.server_update();
                 system.update_objects();
             }
-        } else { 
+        } else {
             for system in &mut SYSTEMS {
                 system.client_update();
                 system.update_objects();
@@ -56,7 +56,7 @@ pub fn render(display: &mut Display, target: &mut Frame) {
                 system.server_render();
                 //system.render_objects();
             }
-        } else { 
+        } else {
             for system in &mut SYSTEMS {
                 system.client_render();
                 system.render_objects(display, target);
@@ -65,7 +65,7 @@ pub fn render(display: &mut Display, target: &mut Frame) {
     }
 }
 
-pub fn shadow_render(view_proj: ViewProj, display: &mut Display, target: &mut Frame) {
+pub fn shadow_render(view_proj: ViewProj, display: &Display, target: &mut SimpleFrameBuffer) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {
@@ -77,11 +77,17 @@ pub fn shadow_render(view_proj: ViewProj, display: &mut Display, target: &mut Fr
 
 pub fn add_system(system: Box<dyn System>) {
     unsafe {
-        SYSTEMS.push(system);    
+        SYSTEMS.push(system);
         if networking::is_server() {
-            SYSTEMS.last_mut().expect("Failed to add system").server_start();
+            SYSTEMS
+                .last_mut()
+                .expect("Failed to add system")
+                .server_start();
         } else {
-            SYSTEMS.last_mut().expect("Failed to add system").client_start();
+            SYSTEMS
+                .last_mut()
+                .expect("Failed to add system")
+                .client_start();
         }
     }
 }
@@ -93,13 +99,12 @@ pub fn register_object_id_name(id: u128, name: &str) {
         match OBJECTS_ID_NAMES.get_mut(&id) {
             Some(name_in_map) => {
                 *name_in_map = name.into();
-            },
+            }
             None => {
                 OBJECTS_ID_NAMES.insert(id, name.into());
-            },
+            }
         };
     }
-
 }
 
 pub fn register_object_id_system(id: u128, system: &str) {
@@ -107,10 +112,10 @@ pub fn register_object_id_system(id: u128, system: &str) {
         match OBJECTS_ID_SYSTEMS.get_mut(&id) {
             Some(system_in_map) => {
                 *system_in_map = system.into();
-            },
+            }
             None => {
                 OBJECTS_ID_SYSTEMS.insert(id, system.into());
-            },
+            }
         };
     }
 }
@@ -120,29 +125,24 @@ pub fn register_object_id_groups(id: u128, groups: &Vec<ObjectGroup>) {
         match OBJECTS_ID_GROUPS.get_mut(&id) {
             Some(group_in_map) => {
                 *group_in_map = groups.to_vec();
-            },
+            }
             None => {
                 OBJECTS_ID_GROUPS.insert(id, groups.to_vec());
-            },
+            }
         };
     }
 }
 
 pub fn get_object_groups_with_id(id: u128) -> Option<Vec<ObjectGroup>> {
-    unsafe {
-        OBJECTS_ID_GROUPS.get(&id).cloned()
-    }
+    unsafe { OBJECTS_ID_GROUPS.get(&id).cloned() }
 }
 
 pub fn get_object_name_with_id(id: u128) -> Option<String> {
-    unsafe {
-        OBJECTS_ID_NAMES.get(&id).cloned()
-    }
+    unsafe { OBJECTS_ID_NAMES.get(&id).cloned() }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct CallList {
     pub immut_call: Vec<String>,
-    pub mut_call: Vec<String>
+    pub mut_call: Vec<String>,
 }

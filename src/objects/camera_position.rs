@@ -1,5 +1,5 @@
-use crate::managers::{render, physics::ObjectBodyParameters};
-use super::{Object, Transform, gen_object_id, ObjectGroup};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
+use crate::managers::{physics::ObjectBodyParameters, render};
 
 #[derive(Debug)]
 pub struct CameraPosition {
@@ -7,9 +7,9 @@ pub struct CameraPosition {
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
-    body: Option<ObjectBodyParameters>, 
+    body: Option<ObjectBodyParameters>,
     id: u128,
-    groups: Vec<ObjectGroup>
+    groups: Vec<ObjectGroup>,
 }
 
 impl CameraPosition {
@@ -21,13 +21,13 @@ impl CameraPosition {
             parent_transform: None,
             body: None,
             id: gen_object_id(),
-            groups: vec![]
+            groups: vec![],
         }
     }
 }
 
 impl Object for CameraPosition {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
     fn update(&mut self) {
         let global_transform = self.global_transform();
@@ -35,8 +35,7 @@ impl Object for CameraPosition {
         render::set_camera_rotation(global_transform.rotation);
     }
 
-
-    fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
+    fn render(&mut self, _display: &glium::Display, _target: &mut glium::Frame) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -45,8 +44,6 @@ impl Object for CameraPosition {
     fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
         &mut self.children
     }
-
-
 
     fn name(&self) -> &str {
         &self.name

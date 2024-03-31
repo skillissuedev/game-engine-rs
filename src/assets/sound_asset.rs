@@ -1,9 +1,9 @@
-use ez_al::{WavAsset, SoundError};
+use ez_al::{SoundError, WavAsset};
 
 use crate::managers::{assets::get_full_asset_path, debugger};
 
 pub struct SoundAsset {
-    pub wav: WavAsset
+    pub wav: WavAsset,
 }
 
 impl SoundAsset {
@@ -14,8 +14,7 @@ impl SoundAsset {
             Err(err) => {
                 debugger::error(&format!("failed to create a SoundAsset\nerr: {:?}", err));
                 return Err(err);
-            },
-        }
-        
+            }
+        };
     }
 }

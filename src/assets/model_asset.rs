@@ -1,10 +1,14 @@
 use std::path::Path;
 
+use crate::managers::{
+    assets::{self, get_full_asset_path},
+    debugger::{self, error, warn},
+    render::Vertex,
+};
 use data_url::DataUrl;
 use glam::Mat4;
 use gltf::Gltf;
-use splines::{Spline, Key};
-use crate::managers::{assets::{self, get_full_asset_path}, debugger::{error, warn, self}, render::Vertex };
+use splines::{Key, Spline};
 
 #[derive(Debug, Clone)]
 pub struct Object {
@@ -18,7 +22,7 @@ pub struct Object {
 pub struct Node {
     pub transform: [[f32; 4]; 4],
     pub node_index: usize,
-    pub children_id: Vec<usize>
+    pub children_id: Vec<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +47,7 @@ pub struct ModelAsset {
 pub struct Animation {
     pub name: String,
     pub channels: Vec<AnimationChannel>,
-    pub duration: f32
+    pub duration: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -102,26 +106,29 @@ impl ModelAsset {
                                     return Err(ModelAssetError::BufferDecodingError);
                                 }
                             }
-                        },
-                        Err(err) => {
-                            match err {
-                                data_url::DataUrlError::NotADataUrl => {
-                                    let bin_path = get_full_asset_path(&Path::new(path).with_extension("bin").into_os_string().into_string().unwrap());
-                                    match std::fs::read(bin_path) {
-                                        Ok(bin) => buffer_data.push(bin),
-                                        Err(err) => {
-                                            debugger::error(&format!(
+                        }
+                        Err(err) => match err {
+                            data_url::DataUrlError::NotADataUrl => {
+                                let bin_path = get_full_asset_path(
+                                    &Path::new(path)
+                                        .with_extension("bin")
+                                        .into_os_string()
+                                        .into_string()
+                                        .unwrap(),
+                                );
+                                match std::fs::read(bin_path) {
+                                    Ok(bin) => buffer_data.push(bin),
+                                    Err(err) => {
+                                        debugger::error(&format!(
                                                 "model asset loading error\nfailed to read bin file\nerr: {}",
                                                 err));
-                                            return Err(ModelAssetError::FailedToReadBin);
-                                        },
-                                    };
-                                },
-                                _ => ()
+                                        return Err(ModelAssetError::FailedToReadBin);
+                                    }
+                                };
                             }
-                        }
+                            _ => (),
+                        },
                     };
-
                 }
             }
         }
@@ -131,13 +138,24 @@ impl ModelAsset {
         let mut root_nodes: Vec<Node> = Vec::new();
         for scene in gltf.scenes() {
             for node in scene.nodes() {
-                add_object_and_children(&node, &buffer_data, &full_path, &mut objects, &mut nodes, Some(node.transform().matrix()));
+                add_object_and_children(
+                    &node,
+                    &buffer_data,
+                    &full_path,
+                    &mut objects,
+                    &mut nodes,
+                    Some(node.transform().matrix()),
+                );
                 let mut children_id: Vec<usize> = Vec::new();
                 for child in node.children() {
                     children_id.push(child.index());
                 }
 
-                root_nodes.push(Node { transform: node.transform().matrix(), node_index: node.index(), children_id });
+                root_nodes.push(Node {
+                    transform: node.transform().matrix(),
+                    node_index: node.index(),
+                    children_id,
+                });
             }
         }
 
@@ -265,10 +283,14 @@ impl ModelAsset {
             });
 
             let animation_name = match anim.name() {
-                Some(name) => name.to_string(), 
-                None => "".to_string()
+                Some(name) => name.to_string(),
+                None => "".to_string(),
             };
-            animations.push(Animation { name: animation_name, channels, duration: animation_duration });
+            animations.push(Animation {
+                name: animation_name,
+                channels,
+                duration: animation_duration,
+            });
         }
 
         let mut joints: Vec<Joint> = Vec::new();
@@ -283,10 +305,10 @@ impl ModelAsset {
 
             let mut joint_iteration = 0;
             for joint in skin.joints() {
-                joints.push(Joint { 
-                    inverse_bind_mat: inv_mats[joint_iteration], 
+                joints.push(Joint {
+                    inverse_bind_mat: inv_mats[joint_iteration],
                     transform_mat: joint.transform().matrix(),
-                    node_index: joint.index()
+                    node_index: joint.index(),
                 });
                 joint_iteration += 1;
             }
@@ -296,14 +318,14 @@ impl ModelAsset {
             warn("warning when creating model asset.\n0 mesh data found");
         }
 
-        Ok(ModelAsset { 
-            objects, 
-            animations, 
-            joints: joints.clone(), 
-            nodes, 
+        Ok(ModelAsset {
+            objects,
+            animations,
+            joints: joints.clone(),
+            nodes,
             root_nodes,
-            joints_mats: joints_vec_to_array(joints.clone()), 
-            joints_inverse_bind_mats: joints_vec_to_inverse_mat_array(joints.clone()) 
+            joints_mats: joints_vec_to_array(joints.clone()),
+            joints_inverse_bind_mats: joints_vec_to_inverse_mat_array(joints.clone()),
         })
     }
 
@@ -335,7 +357,7 @@ impl ModelAsset {
             }
         }
 
-        return false;
+        false
     }
 
     pub fn find_animation(&self, anim_name: &str) -> Option<Animation> {
@@ -345,69 +367,89 @@ impl ModelAsset {
             }
         }
 
-        return None;
+        None
     }
 }
 
 fn joints_vec_to_array(joints_vec: Vec<Joint>) -> [[[f32; 4]; 4]; 128] {
-    let identity_mat: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+    let identity_mat: [[f32; 4]; 4] = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
     let mut joints_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
     let mut joints_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
 
     if joints_vec.len() > 128 {
         warn("model asset warning! model contains more than 128 joints!\nonly 100 joints would be used");
     }
-    joints_vec.into_iter().for_each(|joint| joints_mat_options_vec.insert(joint.node_index, Some(joint.transform_mat)));
-    
+    joints_vec.into_iter().for_each(|joint| {
+        joints_mat_options_vec.insert(joint.node_index, Some(joint.transform_mat))
+    });
+
     for joint_idx in 0..joints_mat_options_vec.len() {
         match joints_mat_options_vec[joint_idx] {
-            Some(mat) => joints_mat_vec.insert(joint_idx, mat), 
+            Some(mat) => joints_mat_vec.insert(joint_idx, mat),
             None => joints_mat_vec.insert(joint_idx, identity_mat),
         }
     }
     joints_mat_vec.truncate(128);
 
-    let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec.try_into().expect("joints_vec_to_array failed!");
+    let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec
+        .try_into()
+        .expect("joints_vec_to_array failed!");
     joints_array
 }
 
 fn joints_vec_to_inverse_mat_array(joints_vec: Vec<Joint>) -> [[[f32; 4]; 4]; 128] {
-    let identity_mat: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+    let identity_mat: [[f32; 4]; 4] = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
     let mut inv_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
     let mut inv_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
 
     if joints_vec.len() > 128 {
         warn("model asset warning! model contains more than 128 joints!\nonly 100 joints would be used");
     }
-    joints_vec.into_iter().for_each(|joint| inv_mat_options_vec.insert(joint.node_index, Some(joint.inverse_bind_mat)));
-    
+    joints_vec.into_iter().for_each(|joint| {
+        inv_mat_options_vec.insert(joint.node_index, Some(joint.inverse_bind_mat))
+    });
+
     for joint_idx in 0..inv_mat_options_vec.len() {
         match inv_mat_options_vec[joint_idx] {
-            Some(mat) => inv_mat_vec.insert(joint_idx, mat), 
+            Some(mat) => inv_mat_vec.insert(joint_idx, mat),
             None => inv_mat_vec.insert(joint_idx, identity_mat),
         }
     }
     inv_mat_vec.truncate(128);
 
-    let inv_mat_array: [[[f32; 4]; 4]; 128] = inv_mat_vec.try_into().expect("joints_vec_to_array failed!");
+    let inv_mat_array: [[[f32; 4]; 4]; 128] =
+        inv_mat_vec.try_into().expect("joints_vec_to_array failed!");
     inv_mat_array
 }
 
 fn add_object_and_children(
-    node: &gltf::Node, 
-    buffer_data: &Vec<Vec<u8>>, 
-    full_path: &str, 
-    objects: &mut Vec<Object>, 
-    nodes: &mut Vec<Node>, 
-    parent_transform_mat: Option<[[f32; 4]; 4]>) {
-
+    node: &gltf::Node,
+    buffer_data: &Vec<Vec<u8>>,
+    full_path: &str,
+    objects: &mut Vec<Object>,
+    nodes: &mut Vec<Node>,
+    parent_transform_mat: Option<[[f32; 4]; 4]>,
+) {
     let node_index = node.index();
     let transform = node.transform().matrix();
 
     let global_transform_mat: Mat4;
     match parent_transform_mat {
-        Some(parent_tr_mat) => global_transform_mat = Mat4::from_cols_array_2d(&parent_tr_mat) * Mat4::from_cols_array_2d(&transform),
-        None => global_transform_mat = Mat4::from_cols_array_2d(&transform)
+        Some(parent_tr_mat) => {
+            global_transform_mat =
+                Mat4::from_cols_array_2d(&parent_tr_mat) * Mat4::from_cols_array_2d(&transform)
+        }
+        None => global_transform_mat = Mat4::from_cols_array_2d(&transform),
     }
     let global_transform_mat_cols = global_transform_mat.to_cols_array_2d();
 
@@ -429,11 +471,14 @@ fn add_object_and_children(
                             normal: Default::default(),
                             tex_coords: Default::default(),
                             joints: Default::default(),
-                            weights: Default::default()
+                            weights: Default::default(),
                         })
                     });
                 } else {
-                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no vertices", full_path));
+                    warn(&format!(
+                        "mesh asset loading warning\npath: {}\nwarning: no vertices",
+                        full_path
+                    ));
                 }
 
                 if let Some(normal_attribute) = reader.read_normals() {
@@ -444,7 +489,10 @@ fn add_object_and_children(
                         normal_index += 1;
                     });
                 } else {
-                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no normals", full_path));
+                    warn(&format!(
+                        "mesh asset loading warning\npath: {}\nwarning: no normals",
+                        full_path
+                    ));
                 }
 
                 if let Some(tex_coord_attribute) = reader.read_tex_coords(0).map(|v| v.into_f32()) {
@@ -455,7 +503,10 @@ fn add_object_and_children(
                         tex_coord_index += 1;
                     });
                 } else {
-                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
+                    warn(&format!(
+                        "mesh asset loading warning\npath: {}\nwarning: no texture coords",
+                        &full_path
+                    ));
                 }
 
                 let mut indices = Vec::new();
@@ -465,13 +516,21 @@ fn add_object_and_children(
                         indices.push(*ind as u16);
                     });
                 } else {
-                    warn(&format!("mesh asset loading warning\npath: {}\nwarning: no texture coords", &full_path));
+                    warn(&format!(
+                        "mesh asset loading warning\npath: {}\nwarning: no texture coords",
+                        &full_path
+                    ));
                 }
 
                 let mut joint_index: usize = 0;
                 if let Some(joint_iter) = reader.read_joints(0) {
                     joint_iter.into_u16().for_each(|joints| {
-                        let joints_f32: [f32; 4] = [joints[0] as f32, joints[1] as f32, joints[2] as f32, joints[3] as f32]; 
+                        let joints_f32: [f32; 4] = [
+                            joints[0] as f32,
+                            joints[1] as f32,
+                            joints[2] as f32,
+                            joints[3] as f32,
+                        ];
                         vertices[joint_index].joints = joints_f32;
                         joint_index += 1;
                     });
@@ -485,7 +544,12 @@ fn add_object_and_children(
                     });
                 }
 
-                objects.push(Object { vertices, indices, transform: global_transform_mat_cols, node_index });
+                objects.push(Object {
+                    vertices,
+                    indices,
+                    transform: global_transform_mat_cols,
+                    node_index,
+                });
             });
         }
         None => (),
@@ -496,14 +560,23 @@ fn add_object_and_children(
         children_id.push(child.index());
     }
 
-    nodes.push(Node { transform: global_transform_mat_cols, node_index: node.index(), children_id });
+    nodes.push(Node {
+        transform: global_transform_mat_cols,
+        node_index: node.index(),
+        children_id,
+    });
 
     for child in node.children() {
-        add_object_and_children(&child, buffer_data, full_path, objects, nodes, Some(global_transform_mat_cols));
+        add_object_and_children(
+            &child,
+            buffer_data,
+            full_path,
+            objects,
+            nodes,
+            Some(global_transform_mat_cols),
+        );
     }
 }
-
-
 
 #[derive(Debug)]
 pub enum ModelAssetError {
@@ -511,6 +584,5 @@ pub enum ModelAssetError {
     //SparseKeyframesError,
     BufferDecodingError,
     GlbError,
-    FailedToReadBin
-    //ChannelCurveBuildingError,
+    FailedToReadBin, //ChannelCurveBuildingError,
 }

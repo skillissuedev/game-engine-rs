@@ -17,4 +17,3 @@ pub fn set_listener_transform(position: Vec3, at: Vec3) {
     set_listener_position(position);
     set_listener_orientation(at);
 }
-

@@ -1,8 +1,9 @@
+use crate::managers::{
+    navigation, navigation::NavMeshObstacleTransform, physics::ObjectBodyParameters,
+};
 use glam::{Vec2, Vec3};
-use glium::Display;
-use crate::managers::{navigation::{self, NavMeshObstacleTransform}, physics::ObjectBodyParameters};
 
-use super::{Object, Transform, gen_object_id, ObjectGroup};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
 
 #[derive(Debug)]
 pub struct NavObstacle {
@@ -13,12 +14,12 @@ pub struct NavObstacle {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    size: Vec3
+    size: Vec3,
 }
 
 impl NavObstacle {
     pub fn new(name: &str, size: Vec3) -> Self {
-        NavObstacle { 
+        NavObstacle {
             transform: Transform::default(),
             children: vec![],
             name: name.to_string(),
@@ -26,7 +27,7 @@ impl NavObstacle {
             body: None,
             id: gen_object_id(),
             groups: vec![],
-            size
+            size,
         }
     }
 
@@ -35,9 +36,8 @@ impl NavObstacle {
     }
 }
 
-
 impl Object for NavObstacle {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
     fn update(&mut self) {
         let position = self.global_transform().position;
@@ -45,8 +45,6 @@ impl Object for NavObstacle {
         let size_xz = Vec2::new(self.size.x, self.size.z);
         navigation::add_obstacle(NavMeshObstacleTransform::new(position_xz, size_xz));
     }
-
-    fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -71,8 +69,6 @@ impl Object for NavObstacle {
     fn local_transform(&self) -> Transform {
         self.transform
     }
-
-
 
     fn set_local_transform(&mut self, transform: Transform) {
         self.transform = transform

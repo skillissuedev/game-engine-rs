@@ -1,20 +1,38 @@
 use crate::{
     game::game_main,
     managers::{
-        input, navigation, networking::{self, NetworkingMode}, physics, render, sound::{self, set_listener_transform}, systems
+        input, navigation,
+        networking::{self, NetworkingMode},
+        physics, render,
+        sound::{self, set_listener_transform},
+        systems,
     },
 };
-use glium::{glutin::{ContextBuilder, event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, event::WindowEvent}, Display, backend::glutin};
-use std::{num::NonZeroU32, time::{Duration, Instant}};
+use glium::{
+    backend::glutin,
+    glutin::{
+        event::WindowEvent,
+        event_loop::{ControlFlow, EventLoop},
+        window::WindowBuilder,
+        ContextBuilder,
+    },
+    Display,
+};
+use std::{
+    num::NonZeroU32,
+    time::{Duration, Instant},
+};
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
 static mut DELTA_TIME: Duration = Duration::new(0, 0);
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
-    unsafe { DEBUG_MODE = debug_mode } 
+    unsafe { DEBUG_MODE = debug_mode }
 
     let event_loop = EventLoop::new();
-    let wb = WindowBuilder::new().with_title("projectbaldej").with_transparent(false);
+    let wb = WindowBuilder::new()
+        .with_title("projectbaldej")
+        .with_transparent(false);
     let cb = ContextBuilder::new().with_srgb(false).with_vsync(true);
     let mut display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
 
@@ -35,7 +53,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
     let frame_time = Duration::from_millis(16);
 
-
     event_loop.run(move |ev, _, control_flow| {
         let time_since_last_frame = last_frame.elapsed();
         update_game(time_since_last_frame);
@@ -54,7 +71,10 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                 match networking::get_current_networking_mode() {
                     networking::NetworkingMode::Server(_) => (),
                     _ => {
-                        set_listener_transform(render::get_camera_position(), render::get_camera_front());
+                        set_listener_transform(
+                            render::get_camera_position(),
+                            render::get_camera_front(),
+                        );
 
                         win_w = display.gl_window().window().inner_size().width;
                         win_h = display.gl_window().window().inner_size().height;
@@ -81,7 +101,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit;
                         networking::disconnect();
-                    },
+                    }
                     _ => (),
                 }
             }
@@ -100,7 +120,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             frames_count = 0;
                             now = Instant::now();
                         }
-                    },
+                    }
                     _ => {
                         let fps = get_fps(&now, &frames_count);
                         if fps.is_some() {
@@ -132,8 +152,8 @@ pub fn start_game_without_render() {
         match tick {
             chron::clock::Tick::Update => {
                 update_game(tickrate_tick);
-            },
-            chron::clock::Tick::Render { interpolation: _ } => { }
+            }
+            chron::clock::Tick::Render { interpolation: _ } => {}
         }
     }
 }
@@ -189,5 +209,5 @@ pub enum DebugMode {
 
 pub struct GameSettings {
     master_volume: u8,
-    shadowmap_size: u32
+    shadowmap_size: u32,
 }

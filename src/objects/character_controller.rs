@@ -1,8 +1,18 @@
+use super::{gen_object_id, Object, ObjectGroup, Transform};
+use crate::{
+    framework,
+    managers::{
+        debugger, navigation,
+        physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters},
+    },
+    math_utils::deg_to_rad,
+};
 use glam::{Vec2, Vec3};
-use glium::Display;
-use rapier3d::{control::{KinematicCharacterController, CharacterLength}, geometry::{ColliderHandle, ActiveCollisionTypes}, pipeline::{QueryFilter, ActiveEvents}};
-use crate::{framework, managers::{debugger, navigation, physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters}}, math_utils::deg_to_rad};
-use super::{Object, Transform, gen_object_id, ObjectGroup};
+use rapier3d::{
+    control::{CharacterLength, KinematicCharacterController},
+    geometry::{ActiveCollisionTypes, ColliderHandle},
+    pipeline::{ActiveEvents, QueryFilter},
+};
 
 pub struct CharacterController {
     name: String,
@@ -14,17 +24,22 @@ pub struct CharacterController {
     controller: KinematicCharacterController,
     collider: ColliderHandle,
     movement: Option<CharacterControllerMovement>,
-    last_path_point: Option<Vec3>
+    last_path_point: Option<Vec3>,
 }
 
 #[derive(Debug)]
 pub struct CharacterControllerMovement {
     pub target: Vec3,
-    pub speed: f32
+    pub speed: f32,
 }
 
 impl CharacterController {
-    pub fn new(name: &str, shape: BodyColliderType, membership_groups: Option<CollisionGroups>, mask: Option<CollisionGroups>) -> Option<Self> {
+    pub fn new(
+        name: &str,
+        shape: BodyColliderType,
+        membership_groups: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
+    ) -> Option<Self> {
         let mut controller = KinematicCharacterController::default();
         controller.max_slope_climb_angle = deg_to_rad(45.0);
         controller.up = nalgebra::Vector::y_axis();
@@ -42,24 +57,23 @@ impl CharacterController {
 
         let id = gen_object_id();
 
-
         let collider = physics::collider_type_to_collider_builder(shape, membership_groups, mask)
             .active_events(ActiveEvents::COLLISION_EVENTS)
-            .active_collision_types(ActiveCollisionTypes::default() 
-                | ActiveCollisionTypes::FIXED_FIXED 
-                | ActiveCollisionTypes::DYNAMIC_FIXED
-                | ActiveCollisionTypes::DYNAMIC_DYNAMIC
-                | ActiveCollisionTypes::DYNAMIC_KINEMATIC
-                | ActiveCollisionTypes::DYNAMIC_FIXED
-                | ActiveCollisionTypes::KINEMATIC_FIXED)
+            .active_collision_types(
+                ActiveCollisionTypes::default()
+                    | ActiveCollisionTypes::FIXED_FIXED
+                    | ActiveCollisionTypes::DYNAMIC_FIXED
+                    | ActiveCollisionTypes::DYNAMIC_DYNAMIC
+                    | ActiveCollisionTypes::DYNAMIC_KINEMATIC
+                    | ActiveCollisionTypes::DYNAMIC_FIXED
+                    | ActiveCollisionTypes::KINEMATIC_FIXED,
+            )
             .user_data(id)
             .sensor(true)
             .build();
 
-        let collider_handle = unsafe {
-            physics::COLLIDER_SET.insert(collider)
-        };
-        
+        let collider_handle = unsafe { physics::COLLIDER_SET.insert(collider) };
+
         Some(CharacterController {
             transform: Transform::default(),
             children: vec![],
@@ -70,14 +84,13 @@ impl CharacterController {
             collider: collider_handle,
             id,
             movement: None,
-            last_path_point: None
+            last_path_point: None,
         })
     }
 }
 
-
 impl Object for CharacterController {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
     fn update(&mut self) {
         if let Some(movement) = &self.movement {
@@ -87,11 +100,13 @@ impl Object for CharacterController {
                 let direction = self.get_direction(next_pos);
                 self.move_controller(direction * speed);
                 self.last_path_point = None;
-            }
-            else {
+            } else {
                 let target = movement.target;
                 let pos = self.global_transform().position;
-                let next_pos = navigation::find_next_path_point(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z));
+                let next_pos = navigation::find_next_path_point(
+                    Vec2::new(pos.x, pos.z),
+                    Vec2::new(target.x, target.z),
+                );
                 dbg!(self.local_transform());
                 dbg!(next_pos);
                 match next_pos {
@@ -100,18 +115,16 @@ impl Object for CharacterController {
                         let direction = self.get_direction(full_pos);
                         self.move_controller(direction * speed);
                         self.last_path_point = Some(full_pos);
-                    },
+                    }
                     None => {
                         println!("done walking");
                         self.last_path_point = None;
                         self.movement = None;
-                    },
+                    }
                 }
             }
         }
     }
-
-    fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -136,7 +149,6 @@ impl Object for CharacterController {
     fn local_transform(&self) -> Transform {
         self.transform
     }
-
 
     fn set_local_transform(&mut self, transform: Transform) {
         self.transform = transform
@@ -172,7 +184,7 @@ impl Object for CharacterController {
 }
 
 impl CharacterController {
-    fn get_direction(&self, next_pos: Vec3) -> Vec3 { 
+    fn get_direction(&self, next_pos: Vec3) -> Vec3 {
         let global_pos = self.global_transform().position;
 
         let direction = global_pos - next_pos;
@@ -193,7 +205,7 @@ impl CharacterController {
                 };
 
                 let movement = self.controller.move_shape(
-                    framework::get_delta_time().as_secs_f32(), 
+                    framework::get_delta_time().as_secs_f32(),
                     &physics::RIGID_BODY_SET,
                     &physics::COLLIDER_SET,
                     &physics::QUERY_PIPELINE,
@@ -201,28 +213,27 @@ impl CharacterController {
                     &global_position.into(),
                     direction.into(),
                     QueryFilter::new().exclude_sensors(),
-                    |_| { }
+                    |_| {},
                 );
 
                 let translation = movement.translation;
-                let new_position: Vec3 = self.local_transform().position + Vec3::new(translation.x, translation.y, translation.z);
+                let new_position: Vec3 = self.local_transform().position
+                    + Vec3::new(translation.x, translation.y, translation.z);
                 self.set_position(new_position, false);
                 collider.set_position(new_position.into());
 
                 //let total_elapsed = timer.elapsed();
                 //dbg!(total_elapsed);
-            }
-            else {
-                debugger::error("CharacterController's move_controller error!\nfailed to get collider");
+            } else {
+                debugger::error(
+                    "CharacterController's move_controller error!\nfailed to get collider",
+                );
             }
         }
     }
 
     pub fn walk_to(&mut self, target: Vec3, speed: f32) {
-        let movement = CharacterControllerMovement {
-            target,
-            speed
-        };
+        let movement = CharacterControllerMovement { target, speed };
         //dbg!(&movement);
         self.movement = Some(movement);
     }

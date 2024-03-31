@@ -1,8 +1,11 @@
-use std::fmt::Debug;
-use ez_al::{SoundSource, SoundSourceType, SoundError};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
+use crate::{
+    assets::sound_asset::SoundAsset,
+    managers::{debugger::warn, physics::ObjectBodyParameters},
+};
+use ez_al::{SoundError, SoundSource, SoundSourceType};
 use glam::Vec3;
-use crate::{assets::sound_asset::SoundAsset, managers::{debugger::warn, physics::ObjectBodyParameters}};
-use super::{Transform, Object, gen_object_id, ObjectGroup};
+use std::fmt::Debug;
 
 pub struct SoundEmitter {
     name: String,
@@ -17,7 +20,11 @@ pub struct SoundEmitter {
 }
 
 impl SoundEmitter {
-    pub fn new(name: &str, asset: &SoundAsset, emitter_type: SoundSourceType) -> Result<SoundEmitter, SoundError> {
+    pub fn new(
+        name: &str,
+        asset: &SoundAsset,
+        emitter_type: SoundSourceType,
+    ) -> Result<SoundEmitter, SoundError> {
         let source = SoundSource::new(&asset.wav, emitter_type.clone());
         match source {
             Ok(source) => {
@@ -32,10 +39,10 @@ impl SoundEmitter {
                     source_type: emitter_type,
                     source,
                 });
-            },
+            }
             Err(err) => {
                 return Err(err);
-            },
+            }
         }
     }
 
@@ -80,13 +87,11 @@ impl SoundEmitter {
 }
 
 impl Object for SoundEmitter {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
     fn update(&mut self) {
         self.update_sound_transforms(self.global_transform().position);
     }
-
-    fn render(&mut self, _display: &mut glium::Display, _target: &mut glium::Frame) { }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children

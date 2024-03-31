@@ -1,13 +1,15 @@
-use std::collections::HashMap;
 use glam::Vec2;
 use grid_pathfinding::PathingGrid;
 use grid_util::{Grid, Point, Rect};
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 /// u128 is object's id
-static mut NAVMESH_DIMENSIONS: Lazy<HashMap<u128, NavMeshDimensions>> = Lazy::new(|| HashMap::new());
+static mut NAVMESH_DIMENSIONS: Lazy<HashMap<u128, NavMeshDimensions>> =
+    Lazy::new(|| HashMap::new());
 /// u128 is navmesh's id
-static mut NAVMESH_OBSTACLES: Lazy<HashMap<u128, Vec<NavMeshObstacleTransform>>> = Lazy::new(|| HashMap::new());
+static mut NAVMESH_OBSTACLES: Lazy<HashMap<u128, Vec<NavMeshObstacleTransform>>> =
+    Lazy::new(|| HashMap::new());
 //static mut NAVMESH_GRIDS: Lazy<HashMap<u128, Grid<Option<()>>>> = Lazy::new(|| HashMap::new());
 static mut NAVMESH_GRIDS: Lazy<HashMap<u128, PathingGrid>> = Lazy::new(|| HashMap::new());
 
@@ -42,7 +44,7 @@ impl NavMeshDimensions {
 }
 
 #[derive(Debug, Clone)]
-/// all positions are in grid coords 
+/// all positions are in grid coords
 pub struct NavMeshObstacleTransform {
     pub position_x: i32,
     pub position_z: i32,
@@ -57,7 +59,7 @@ impl NavMeshObstacleTransform {
         let size_x = size.x.round() as i32;
         let size_z = size.y.round() as i32;
         let area_size = [size_x, size_z];
-        
+
         NavMeshObstacleTransform {
             position_x,
             position_z,
@@ -65,8 +67,6 @@ impl NavMeshObstacleTransform {
         }
     }
 }
-
-
 
 pub fn add_navmesh(id: u128, dimensions: NavMeshDimensions) {
     unsafe {
@@ -89,12 +89,14 @@ pub fn add_obstacle(transform: NavMeshObstacleTransform) {
             let navmesh_z2 = navmesh_dim.position[1] + navmesh_dim.area_size[1] as i32 / 2;
 
             // if obstacle is on this navmesh
-            if (obstacle_x1 >= navmesh_x1 && obstacle_x2 <= navmesh_x2) && (obstacle_z1 >= navmesh_z1 && obstacle_z2 <= navmesh_z2) {
+            if (obstacle_x1 >= navmesh_x1 && obstacle_x2 <= navmesh_x2)
+                && (obstacle_z1 >= navmesh_z1 && obstacle_z2 <= navmesh_z2)
+            {
                 match NAVMESH_OBSTACLES.get_mut(navmesh_id) {
                     Some(obstacles) => obstacles.push(transform),
                     None => {
                         NAVMESH_OBSTACLES.insert(*navmesh_id, vec![transform]);
-                    },
+                    }
                 }
                 dbg!(&NAVMESH_OBSTACLES.get(navmesh_id));
 
@@ -106,9 +108,7 @@ pub fn add_obstacle(transform: NavMeshObstacleTransform) {
 
 pub fn update() {
     create_grids();
-    unsafe {
-        NAVMESH_OBSTACLES.clear()
-    }
+    unsafe { NAVMESH_OBSTACLES.clear() }
 }
 
 pub fn create_grids() {
@@ -175,8 +175,11 @@ pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec
             let navmesh_z2 = navmesh_position_z + area_size_z as i32 / 2;
             dbg!(navmesh_x1, navmesh_x2, navmesh_z1, navmesh_z2);
 
-            if (start_x >= navmesh_x1 && start_x <= navmesh_x2) && (start_z >= navmesh_z1 && start_z <= navmesh_z2) 
-                && (finish_x >= navmesh_x1 && finish_x <= navmesh_x2) && (finish_z >= navmesh_z1 && finish_z <= navmesh_z2) {
+            if (start_x >= navmesh_x1 && start_x <= navmesh_x2)
+                && (start_z >= navmesh_z1 && start_z <= navmesh_z2)
+                && (finish_x >= navmesh_x1 && finish_x <= navmesh_x2)
+                && (finish_z >= navmesh_z1 && finish_z <= navmesh_z2)
+            {
                 dbg!(navmesh_id);
                 match NAVMESH_GRIDS.get(navmesh_id) {
                     Some(grid) => {
@@ -197,20 +200,20 @@ pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec
                                         let point_z = (navmesh_z1 + point.y) as f32;
                                         dbg!(point_x, point_z);
                                         return Some(Vec2::new(point_x, point_z));
-                                    },
+                                    }
                                     None => {
                                         //println!("path[1] is None");
-                                        return None
-                                    },
+                                        return None;
+                                    }
                                 }
-                            },
+                            }
                             None => {
                                 //println!("path is None");
                                 //println!("{}", grid);
-                                return None
-                            },
+                                return None;
+                            }
                         }
-                    },
+                    }
                     None => return None,
                 }
             }
@@ -218,4 +221,3 @@ pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec
     }
     None
 }
-

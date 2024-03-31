@@ -85,7 +85,5 @@ pub fn set_default_texture_path(path: &'static str) {
 }
 
 pub fn get_default_texture_path() -> String {
-    unsafe {
-        DEFAULT_TEXTURE_PATH.into()
-    }
+    unsafe { DEFAULT_TEXTURE_PATH.into() }
 }

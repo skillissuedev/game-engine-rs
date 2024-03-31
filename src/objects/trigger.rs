@@ -1,9 +1,16 @@
+use crate::managers::{
+    debugger,
+    physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
+    render, systems,
+};
 use glam::Vec3;
-use glium::Display;
-use rapier3d::{geometry::{ColliderHandle, CollisionEvent, ColliderSet, ActiveCollisionTypes}, pipeline::ActiveEvents, dynamics::{RigidBodyBuilder, RigidBodyType, RigidBodyHandle}};
-use crate::managers::{physics::{ObjectBodyParameters, CollisionGroups, BodyColliderType, self, RenderColliderType}, debugger, render, systems};
+use rapier3d::{
+    dynamics::{RigidBodyBuilder, RigidBodyHandle, RigidBodyType},
+    geometry::{ActiveCollisionTypes, ColliderHandle, ColliderSet, CollisionEvent},
+    pipeline::ActiveEvents,
+};
 
-use super::{Object, Transform, gen_object_id, ObjectGroup};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
 
 pub struct Trigger {
     name: String,
@@ -16,12 +23,16 @@ pub struct Trigger {
     body_handle: RigidBodyHandle,
     collider_handle: ColliderHandle,
     render_collider: Option<RenderColliderType>,
-    current_events: Vec<CollisionEvent>
-    // collider,  mask(CollisionGroups)
+    current_events: Vec<CollisionEvent>, // collider,  mask(CollisionGroups)
 }
 
 impl Trigger {
-    pub fn new(name: &str, membership_group: Option<CollisionGroups>, mask: Option<CollisionGroups>, collider: BodyColliderType) -> Self {
+    pub fn new(
+        name: &str,
+        membership_group: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
+        collider: BodyColliderType,
+    ) -> Self {
         let id = gen_object_id();
         let mask = match mask {
             Some(mask) => mask,
@@ -33,25 +44,34 @@ impl Trigger {
         };
         let render_collider = physics::collider_type_to_render_collider(&collider, true);
 
-        let mut collider = physics::collider_type_to_collider_builder(collider, membership_group, mask)
-            .sensor(true)
-            .active_events(ActiveEvents::COLLISION_EVENTS)
-            .active_collision_types(ActiveCollisionTypes::default() 
-                | ActiveCollisionTypes::FIXED_FIXED 
-                | ActiveCollisionTypes::DYNAMIC_FIXED
-                | ActiveCollisionTypes::DYNAMIC_DYNAMIC
-                | ActiveCollisionTypes::DYNAMIC_KINEMATIC
-                | ActiveCollisionTypes::DYNAMIC_FIXED
-                | ActiveCollisionTypes::KINEMATIC_FIXED)
-            .build();
+        let mut collider =
+            physics::collider_type_to_collider_builder(collider, membership_group, mask)
+                .sensor(true)
+                .active_events(ActiveEvents::COLLISION_EVENTS)
+                .active_collision_types(
+                    ActiveCollisionTypes::default()
+                        | ActiveCollisionTypes::FIXED_FIXED
+                        | ActiveCollisionTypes::DYNAMIC_FIXED
+                        | ActiveCollisionTypes::DYNAMIC_DYNAMIC
+                        | ActiveCollisionTypes::DYNAMIC_KINEMATIC
+                        | ActiveCollisionTypes::DYNAMIC_FIXED
+                        | ActiveCollisionTypes::KINEMATIC_FIXED,
+                )
+                .build();
         collider.user_data = id;
 
         let body = RigidBodyBuilder::new(RigidBodyType::Fixed).build();
 
         let body_handle = unsafe { physics::RIGID_BODY_SET.insert(body) };
-        let collider_handle = unsafe { physics::COLLIDER_SET.insert_with_parent(collider, body_handle, &mut physics::RIGID_BODY_SET) };
+        let collider_handle = unsafe {
+            physics::COLLIDER_SET.insert_with_parent(
+                collider,
+                body_handle,
+                &mut physics::RIGID_BODY_SET,
+            )
+        };
 
-        Trigger { 
+        Trigger {
             name: name.to_string(),
             transform: Transform::default(),
             parent_transform: None,
@@ -59,21 +79,18 @@ impl Trigger {
             id,
             mask,
             membership_group,
-            body_handle, 
+            body_handle,
             collider_handle,
             render_collider,
-            current_events: Vec::new()
+            current_events: Vec::new(),
         }
     }
 }
 
-
 impl Object for Trigger {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
-    fn update(&mut self) { }
-
-    fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
+    fn update(&mut self) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -98,8 +115,6 @@ impl Object for Trigger {
     fn local_transform(&self) -> Transform {
         self.transform
     }
-
-
 
     fn set_local_transform(&mut self, transform: Transform) {
         self.transform = transform
@@ -134,7 +149,7 @@ impl Object for Trigger {
             return match self.is_colliding() {
                 true => Some("true".into()),
                 false => Some("false".into()),
-            }
+            };
         }
 
         None
@@ -148,7 +163,7 @@ impl Object for Trigger {
 
             match object.find_object(object_name) {
                 Some(found_obj) => return Some(found_obj),
-                None => ()
+                None => (),
             }
         }
 
@@ -163,7 +178,7 @@ impl Object for Trigger {
 
             match object.find_object_mut(object_name) {
                 Some(found_obj) => return Some(found_obj),
-                None => ()
+                None => (),
             }
         }
 
@@ -190,13 +205,9 @@ impl Object for Trigger {
 
         self.children_list_mut().iter_mut().for_each(|child| {
             child.set_parent_transform(global_transform);
-            child.update(); 
-            child.update_children(); 
+            child.update();
+            child.update_children();
         });
-    }
-
-    fn render_children(&mut self, display: &mut Display, target: &mut glium::Frame) {
-        self.children_list_mut().iter_mut().for_each(|child| child.render(display, target));
     }
 
     fn debug_render(&self) {
@@ -209,9 +220,11 @@ impl Object for Trigger {
                     render::add_collider_to_draw(render_collider);
                 }
 
-                self.children_list().iter().for_each(|child| child.debug_render());
-            },
-            _ => ()
+                self.children_list()
+                    .iter()
+                    .for_each(|child| child.debug_render());
+            }
+            _ => (),
         }
     }
 
@@ -255,32 +268,33 @@ impl std::fmt::Debug for Trigger {
 impl Trigger {
     pub fn is_colliding(&self) -> bool {
         let intersections_count = unsafe {
-            physics::NARROW_PHASE.intersections_with(self.collider_handle).count()
+            physics::NARROW_PHASE
+                .intersections_with(self.collider_handle)
+                .count()
         };
 
         match intersections_count {
             0 => {
                 let contact_count = unsafe {
-                    physics::NARROW_PHASE.contacts_with(self.collider_handle).count()
+                    physics::NARROW_PHASE
+                        .contacts_with(self.collider_handle)
+                        .count()
                 };
-                if contact_count > 0 { 
+                if contact_count > 0 {
                     true
                 } else {
                     false
                 }
             }
-            _ => true
+            _ => true,
         }
     }
 
     pub fn is_intersecting_with_group(&self, group: ObjectGroup) -> bool {
-        let intersections_iter = unsafe {
-            physics::NARROW_PHASE.intersections_with(self.collider_handle)
-        };
+        let intersections_iter =
+            unsafe { physics::NARROW_PHASE.intersections_with(self.collider_handle) };
 
-        let collider_set = unsafe {
-            &physics::COLLIDER_SET
-        };
+        let collider_set = unsafe { &physics::COLLIDER_SET };
 
         for (collider1, collider2, intersecting) in intersections_iter {
             if intersecting {
@@ -294,11 +308,11 @@ impl Trigger {
                     }
                 }
             }
-        };
+        }
 
         return false;
     }
-    
+
     pub fn mask(&self) -> &CollisionGroups {
         &self.mask
     }
@@ -316,15 +330,24 @@ impl Trigger {
     }
 }
 
-fn is_collider_in_group(collider_set: &ColliderSet, collider_handle: ColliderHandle, group: &ObjectGroup) -> bool {
+fn is_collider_in_group(
+    collider_set: &ColliderSet,
+    collider_handle: ColliderHandle,
+    group: &ObjectGroup,
+) -> bool {
     let collider = collider_set.get(collider_handle);
 
     if let Some(collider) = collider {
         //dbg!(systems::get_object_name_with_id(collider.user_data));
         if let Some(groups_list) = systems::get_object_groups_with_id(collider.user_data) {
             //dbg!(&groups_list);
-            if groups_list.iter().filter(|group_in_list| *group_in_list == group).count() > 0 {
-                return true
+            if groups_list
+                .iter()
+                .filter(|group_in_list| *group_in_list == group)
+                .count()
+                > 0
+            {
+                return true;
             }
         }
     };

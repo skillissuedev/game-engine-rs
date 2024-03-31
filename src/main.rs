@@ -29,8 +29,12 @@ fn main() {
         managers::networking::NetworkingMode::Client(_) => (),
         managers::networking::NetworkingMode::Disconnected(_) => {
             println!("creating a client");
-            managers::networking::new_client(std::net::IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7777).unwrap();
-        },
+            managers::networking::new_client(
+                std::net::IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                7777,
+            )
+            .unwrap();
+        }
     }
 
     if args.contains(&"debug".into()) {

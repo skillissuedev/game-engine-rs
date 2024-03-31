@@ -1,8 +1,23 @@
-use std::time::Instant;
-use glam::{Mat4, Quat, Vec3};
-use glium::{VertexBuffer, Program, IndexBuffer, uniform, Surface, uniforms::UniformBuffer, Display};
-use crate::{assets::{model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset}, shader_asset::ShaderAsset, texture_asset::TextureAsset}, managers::{debugger::{self, error, warn}, physics::ObjectBodyParameters, render::{self, Vertex, ViewProj}}, math_utils::deg_to_rad};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
+use crate::{
+    assets::{
+        model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
+        shader_asset::ShaderAsset,
+        texture_asset::TextureAsset,
+    },
+    managers::{
+        debugger::{self, error, warn},
+        physics::ObjectBodyParameters,
+        render::{self, Vertex, ViewProj},
+    },
+    math_utils::deg_to_rad,
+};
+use glam::{Mat4, Quat, Vec3};
+use glium::{
+    framebuffer::SimpleFrameBuffer, uniform, uniforms::UniformBuffer, Display, IndexBuffer,
+    Program, Surface, VertexBuffer,
+};
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct ModelObject {
@@ -27,23 +42,29 @@ pub struct ModelObject {
 }
 
 impl ModelObject {
-    pub fn new(name: &str, asset: ModelAsset, texture_asset: Option<TextureAsset>, shader_asset: ShaderAsset) -> Self {
+    pub fn new(
+        name: &str,
+        asset: ModelAsset,
+        texture_asset: Option<TextureAsset>,
+        shader_asset: ShaderAsset,
+    ) -> Self {
         let mut nodes_transforms: Vec<NodeTransform> = vec![];
         for node in &asset.nodes {
             let node_local_transform_mat = Mat4::from_cols_array_2d(&node.transform);
-            let node_scale_rotation_translation = node_local_transform_mat.to_scale_rotation_translation();
-            let node_rotation = node_scale_rotation_translation.1.to_euler(glam::EulerRot::XYZ);
+            let node_scale_rotation_translation =
+                node_local_transform_mat.to_scale_rotation_translation();
+            let node_rotation = node_scale_rotation_translation
+                .1
+                .to_euler(glam::EulerRot::XYZ);
 
-            nodes_transforms.push(
-                NodeTransform { 
-                    local_position: node_scale_rotation_translation.2,
-                    local_rotation: node_rotation.into(), 
-                    local_scale: node_scale_rotation_translation.0,
-                    global_transform: None, 
-                    node_id: node.node_index,
-                    parent_global_transform: None
-                }
-            );
+            nodes_transforms.push(NodeTransform {
+                local_position: node_scale_rotation_translation.2,
+                local_rotation: node_rotation.into(),
+                local_scale: node_scale_rotation_translation.0,
+                global_transform: None,
+                node_id: node.node_index,
+                parent_global_transform: None,
+            });
         }
 
         ModelObject {
@@ -51,35 +72,44 @@ impl ModelObject {
             nodes_transforms,
             children: vec![],
             name: name.to_string(),
-            parent_transform: None, 
+            parent_transform: None,
             model_asset: asset,
             groups: vec![],
             texture_asset,
             shader_asset,
             texture: None,
-            vertex_buffer: vec![], 
+            vertex_buffer: vec![],
             program: vec![],
             shadow_program: vec![],
-            started: false, error: false,
-            animation_settings: CurrentAnimationSettings { animation: None, looping: false, timer: None },
+            started: false,
+            error: false,
+            animation_settings: CurrentAnimationSettings {
+                animation: None,
+                looping: false,
+                timer: None,
+            },
             body: None,
-            id: gen_object_id()
+            id: gen_object_id(),
         }
     }
 }
 
-
 impl Object for ModelObject {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
     fn update(&mut self) {
         self.update_animation();
         for node in &self.model_asset.root_nodes {
-            set_nodes_global_transform(&node, &self.model_asset.nodes, None, &mut self.nodes_transforms);
+            set_nodes_global_transform(
+                &node,
+                &self.model_asset.nodes,
+                None,
+                &mut self.nodes_transforms,
+            );
         }
     }
 
-    fn render(&mut self, display: &mut Display, target: &mut glium::Frame) {
+    fn render(&mut self, display: &Display, target: &mut glium::Frame) {
         if self.error {
             return;
         }
@@ -101,11 +131,11 @@ impl Object for ModelObject {
                 if tr.node_id == self.model_asset.objects[i].node_index {
                     transform = Some(tr);
                     break;
-                } 
+                }
             }
 
             match transform {
-                Some(_) => (), 
+                Some(_) => (),
                 None => {
                     error("no node transform found!");
                     return;
@@ -128,7 +158,8 @@ impl Object for ModelObject {
             let model_cols = model.to_cols_array_2d();
 
             let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
-            let inverse_bind_mats = UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
+            let inverse_bind_mats =
+                UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
 
             let uniforms = uniform! {
                 jointsMats: &joints,
@@ -171,10 +202,20 @@ impl Object for ModelObject {
                     &draw_params,
                 )
                 .unwrap();
-        } 
+        }
     }
 
-    fn shadow_render(&mut self, view_proj: &ViewProj, display: &mut Display, target: &mut glium::Frame) {
+    fn shadow_render(
+        &mut self,
+        view_proj: &ViewProj,
+        display: &Display,
+        target: &mut SimpleFrameBuffer,
+    ) {
+        println!("shadow_render!");
+        if !self.started {
+            self.start_mesh(display);
+        }
+
         if self.error {
             return;
         }
@@ -193,11 +234,11 @@ impl Object for ModelObject {
                 if tr.node_id == self.model_asset.objects[i].node_index {
                     transform = Some(tr);
                     break;
-                } 
+                }
             }
 
             match transform {
-                Some(_) => (), 
+                Some(_) => (),
                 None => {
                     error("no node transform found!");
                     return;
@@ -205,30 +246,24 @@ impl Object for ModelObject {
             }
 
             let setup_mat_result = self.setup_mat(Some(&view_proj), transform.unwrap());
-            let mvp: Mat4 = setup_mat_result.mvp;
+            let view_proj = view_proj.proj * view_proj.view;
             let model: Mat4 = setup_mat_result.model;
 
-            let mvp_cols = mvp.to_cols_array_2d();
             let model_cols = model.to_cols_array_2d();
-
-            let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
-            let inverse_bind_mats = UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
+            let view_proj_cols = view_proj.to_cols_array_2d();
 
             let uniforms = uniform! {
-                jointsMats: &joints,
-                jointsInverseBindMats: &inverse_bind_mats,
-                mesh: object.transform,
-                mvp: [
-                    mvp_cols[0],
-                    mvp_cols[1],
-                    mvp_cols[2],
-                    mvp_cols[3],
-                ],
                 model: [
                     model_cols[0],
                     model_cols[1],
                     model_cols[2],
                     model_cols[3],
+                ],
+                view_proj: [
+                    view_proj_cols[0],
+                    view_proj_cols[1],
+                    view_proj_cols[2],
+                    view_proj_cols[3],
                 ],
                 lightPos: render::get_light_direction().to_array(),
             };
@@ -236,7 +271,7 @@ impl Object for ModelObject {
             let draw_params = glium::DrawParameters {
                 depth: glium::Depth {
                     test: glium::draw_parameters::DepthTest::IfLessOrEqual, // set to IfLess if it
-                                                                            // won't work
+                    // won't work
                     write: true,
                     ..Default::default()
                 },
@@ -249,12 +284,12 @@ impl Object for ModelObject {
                 .draw(
                     &self.vertex_buffer[i],
                     &indices.unwrap(),
-                    &self.program[i],
+                    &self.shadow_program[i],
                     &uniforms,
                     &draw_params,
                 )
                 .unwrap();
-        } 
+        }
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -277,7 +312,6 @@ impl Object for ModelObject {
         self.name = name.to_string();
     }
 
-
     fn local_transform(&self) -> Transform {
         self.transform
     }
@@ -289,8 +323,6 @@ impl Object for ModelObject {
     fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
-
-
 
     fn set_parent_transform(&mut self, transform: Transform) {
         self.parent_transform = Some(transform);
@@ -308,7 +340,6 @@ impl Object for ModelObject {
         &self.id
     }
 
-
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
         &mut self.groups
     }
@@ -324,25 +355,31 @@ impl Object for ModelObject {
                 let x = match args[0].parse::<f32>() {
                     Ok(x_num) => x_num,
                     Err(_) => {
-                        error("set_position model object error - wrong args(1st arg is not number)");
+                        error(
+                            "set_position model object error - wrong args(1st arg is not number)",
+                        );
                         return None;
-                    },
+                    }
                 };
 
                 let y = match args[1].parse::<f32>() {
                     Ok(y_num) => y_num,
                     Err(_) => {
-                        error("set_position model object error - wrong args(2st arg is not number)");
+                        error(
+                            "set_position model object error - wrong args(2st arg is not number)",
+                        );
                         return None;
-                    },
+                    }
                 };
 
                 let z = match args[2].parse::<f32>() {
                     Ok(z_num) => z_num,
                     Err(_) => {
-                        error("set_position model object error - wrong args(3st arg is not number)");
+                        error(
+                            "set_position model object error - wrong args(3st arg is not number)",
+                        );
                         return None;
-                    },
+                    }
                 };
 
                 let _ = self.set_position(Vec3::new(x, y, z), true);
@@ -369,8 +406,6 @@ impl Object for ModelObject {
             return None;
         }
 
-        
-
         return None;
     }
 }
@@ -388,12 +423,12 @@ impl ModelObject {
                 self.animation_settings = CurrentAnimationSettings {
                     animation: Some(animation),
                     looping: self.animation_settings.looping,
-                    timer: Some(Instant::now())
+                    timer: Some(Instant::now()),
                 };
 
                 return Ok(());
-            },
-            None => return Err(ModelObjectError::AnimationNotFound)
+            }
+            None => return Err(ModelObjectError::AnimationNotFound),
         }
     }
 
@@ -407,8 +442,12 @@ impl ModelObject {
             }
         }
 
-
-        let identity_mat: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        let identity_mat: [[f32; 4]; 4] = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         let mut joints_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
         let mut joints_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
 
@@ -424,13 +463,15 @@ impl ModelObject {
 
         for joint_idx in 0..joints_mat_options_vec.len() {
             match joints_mat_options_vec[joint_idx] {
-                Some(mat) => joints_mat_vec.insert(joint_idx, mat), 
+                Some(mat) => joints_mat_vec.insert(joint_idx, mat),
                 None => joints_mat_vec.insert(joint_idx, identity_mat),
             }
         }
         joints_mat_vec.truncate(128);
 
-        let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec.try_into().expect("joints_vec_to_array failed!");
+        let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec
+            .try_into()
+            .expect("joints_vec_to_array failed!");
         joints_array
     }
 
@@ -442,11 +483,19 @@ impl ModelObject {
             Some(ref mut animation) => {
                 let timer = &anim_settings.timer;
                 let time_elapsed = timer.expect("no timer(why)").elapsed().as_secs_f32();
-                set_objects_anim_node_transform(&mut animation.channels, &mut self.nodes_transforms, time_elapsed);
+                set_objects_anim_node_transform(
+                    &mut animation.channels,
+                    &mut self.nodes_transforms,
+                    time_elapsed,
+                );
 
                 if time_elapsed >= animation.duration {
                     if anim_settings.looping {
-                        set_objects_anim_node_transform(&mut animation.channels, &mut self.nodes_transforms, time_elapsed);
+                        set_objects_anim_node_transform(
+                            &mut animation.channels,
+                            &mut self.nodes_transforms,
+                            time_elapsed,
+                        );
                         anim_settings.timer = Some(Instant::now());
                     } else {
                         anim_settings.animation = None;
@@ -454,12 +503,16 @@ impl ModelObject {
                         return;
                     }
                 }
-            },
-            None => ()
+            }
+            None => (),
         }
     }
 
-    fn setup_mat(&self, view_proj: Option<&ViewProj>, node_transform: &NodeTransform) -> SetupMatrixResult {
+    fn setup_mat(
+        &self,
+        view_proj: Option<&ViewProj>,
+        node_transform: &NodeTransform,
+    ) -> SetupMatrixResult {
         match node_transform.global_transform {
             Some(_) => (),
             None => {
@@ -469,7 +522,7 @@ impl ModelObject {
                     mvp: Mat4::IDENTITY,
                     model: Mat4::IDENTITY,
                 };
-            },
+            }
         }
 
         let node_global_transform = node_transform.global_transform.unwrap();
@@ -481,26 +534,36 @@ impl ModelObject {
         let model_object_translation: [f32; 3] = self.transform.position.into();
         let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
         let model_object_scale: [f32; 3] = self.transform.scale.into();
-        let model_object_rotation_vec = 
-            [deg_to_rad(model_object_rotation_vec[0]), deg_to_rad(model_object_rotation_vec[1]), deg_to_rad(model_object_rotation_vec[2])];
+        let model_object_rotation_vec = [
+            deg_to_rad(model_object_rotation_vec[0]),
+            deg_to_rad(model_object_rotation_vec[1]),
+            deg_to_rad(model_object_rotation_vec[2]),
+        ];
 
-        let full_translation = 
-            Vec3::new(
-                model_object_translation[0] + translation_vector.x, 
-                model_object_translation[1] + translation_vector.y, 
-                model_object_translation[2] + translation_vector.z);
-        let full_scale = 
-            Vec3::new(
-                model_object_scale[0] + scale_vector.x, 
-                model_object_scale[1] + scale_vector.y, 
-                model_object_scale[2] + scale_vector.z);
-        let full_rotation = 
-            [model_object_rotation_vec[0] + rotation_vector.0, model_object_rotation_vec[1] + rotation_vector.1, model_object_rotation_vec[2] + rotation_vector.2];
-        let rotation_quat = 
-            Quat::from_euler(glam::EulerRot::XYZ, full_rotation[0], full_rotation[1], full_rotation[2]);
+        let full_translation = Vec3::new(
+            model_object_translation[0] + translation_vector.x,
+            model_object_translation[1] + translation_vector.y,
+            model_object_translation[2] + translation_vector.z,
+        );
+        let full_scale = Vec3::new(
+            model_object_scale[0] + scale_vector.x,
+            model_object_scale[1] + scale_vector.y,
+            model_object_scale[2] + scale_vector.z,
+        );
+        let full_rotation = [
+            model_object_rotation_vec[0] + rotation_vector.0,
+            model_object_rotation_vec[1] + rotation_vector.1,
+            model_object_rotation_vec[2] + rotation_vector.2,
+        ];
+        let rotation_quat = Quat::from_euler(
+            glam::EulerRot::XYZ,
+            full_rotation[0],
+            full_rotation[1],
+            full_rotation[2],
+        );
 
-
-        let transform = Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
+        let transform =
+            Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
 
         let view;
         let proj;
@@ -508,7 +571,7 @@ impl ModelObject {
             Some(view_proj) => {
                 view = view_proj.view;
                 proj = view_proj.proj;
-            },
+            }
             None => {
                 view = render::get_view_matrix();
                 proj = render::get_projection_matrix();
@@ -610,8 +673,7 @@ impl ModelObject {
                     self.texture = None;
                 }
             }
-        }
-        else {
+        } else {
             let asset_result = TextureAsset::default_texture();
             match asset_result {
                 Ok(asset) => {
@@ -625,8 +687,8 @@ impl ModelObject {
                         Ok(tx) => self.texture = Some(tx),
                         Err(err) => {
                             error(&format!(
-                                    "Mesh object error:\ntexture creating error!\nErr: {}",
-                                    err
+                                "Mesh object error:\ntexture creating error!\nErr: {}",
+                                err
                             ));
                             self.texture = None;
                         }
@@ -638,7 +700,7 @@ impl ModelObject {
                         self.name, err
                     ));
                     self.texture = None;
-                },
+                }
             }
         };
 
@@ -646,7 +708,11 @@ impl ModelObject {
     }
 }
 
-fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_transforms: &mut Vec<NodeTransform>, time_elapsed: f32) {
+fn set_objects_anim_node_transform(
+    channels: &mut Vec<AnimationChannel>,
+    nodes_transforms: &mut Vec<NodeTransform>,
+    time_elapsed: f32,
+) {
     for channel in channels {
         match channel.channel_type {
             AnimationChannelType::Translation => {
@@ -658,7 +724,7 @@ fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_t
                         node.local_position = Vec3::new(x_pos, y_pos, z_pos);
                     }
                 }
-            },
+            }
             AnimationChannelType::Rotation => {
                 for node in &mut *nodes_transforms {
                     if node.node_id == channel.node_index {
@@ -668,7 +734,7 @@ fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_t
                         node.local_rotation = Vec3::new(x_rot, y_rot, z_rot);
                     }
                 }
-            },
+            }
             AnimationChannelType::Scale => {
                 for node in &mut *nodes_transforms {
                     if node.node_id == channel.node_index {
@@ -678,14 +744,17 @@ fn set_objects_anim_node_transform(channels: &mut Vec<AnimationChannel>, nodes_t
                         node.local_scale = Vec3::new(x_scale, y_scale, z_scale);
                     }
                 }
-            },
+            }
         }
     }
 }
 
-fn set_nodes_global_transform
-    (node: &model_asset::Node, nodes_list: &Vec<model_asset::Node>, parent_transform_mat: Option<Mat4>, nodes_transforms: &mut Vec<NodeTransform>) {
-
+fn set_nodes_global_transform(
+    node: &model_asset::Node,
+    nodes_list: &Vec<model_asset::Node>,
+    parent_transform_mat: Option<Mat4>,
+    nodes_transforms: &mut Vec<NodeTransform>,
+) {
     let node_index = node.node_index;
     let mut node_transform: Option<&mut NodeTransform> = None;
 
@@ -702,23 +771,29 @@ fn set_nodes_global_transform
     let node_transform = node_transform.expect("node transform was None(why)");
 
     let local_rotation = node_transform.local_rotation;
-    let local_rotation_quat = Quat::from_euler(glam::EulerRot::XYZ, local_rotation.x, local_rotation.y, local_rotation.z);
-    let local_transform = Mat4::from_scale_rotation_translation(node_transform.local_scale, local_rotation_quat, node_transform.local_position);
-
+    let local_rotation_quat = Quat::from_euler(
+        glam::EulerRot::XYZ,
+        local_rotation.x,
+        local_rotation.y,
+        local_rotation.z,
+    );
+    let local_transform = Mat4::from_scale_rotation_translation(
+        node_transform.local_scale,
+        local_rotation_quat,
+        node_transform.local_position,
+    );
 
     let global_transform_mat: Mat4;
     match parent_transform_mat {
         Some(parent_tr_mat) => {
             global_transform_mat = parent_tr_mat * local_transform;
             node_transform.parent_global_transform = Some(parent_tr_mat);
-        },
-        None => global_transform_mat = local_transform
+        }
+        None => global_transform_mat = local_transform,
     }
 
     node_transform.global_transform = Some(global_transform_mat);
-    
 
-    
     let mut children_nodes: Vec<&model_asset::Node> = vec![];
     for child_id in &node.children_id {
         for current_node in nodes_list {
@@ -729,21 +804,26 @@ fn set_nodes_global_transform
     }
 
     for child in children_nodes {
-        set_nodes_global_transform(child, nodes_list, Some(global_transform_mat), nodes_transforms);
+        set_nodes_global_transform(
+            child,
+            nodes_list,
+            Some(global_transform_mat),
+            nodes_transforms,
+        );
     }
 }
 
 #[derive(Debug)]
 pub struct CurrentAnimationSettings {
-    pub animation: Option<Animation>, 
+    pub animation: Option<Animation>,
     pub looping: bool,
-    pub timer: Option<Instant>
+    pub timer: Option<Instant>,
 }
 
 #[derive(Debug)]
 pub struct SetupMatrixResult {
     pub mvp: Mat4,
-    pub model: Mat4
+    pub model: Mat4,
 }
 
 #[derive(Debug)]
@@ -753,11 +833,10 @@ pub struct NodeTransform {
     pub local_scale: Vec3,
     pub global_transform: Option<Mat4>,
     pub parent_global_transform: Option<Mat4>,
-    pub node_id: usize
+    pub node_id: usize,
 }
 
 #[derive(Debug)]
 pub enum ModelObjectError {
-    AnimationNotFound
+    AnimationNotFound,
 }
-

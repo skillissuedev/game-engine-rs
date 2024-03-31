@@ -1,12 +1,12 @@
+pub mod animator;
 pub mod assets;
 pub mod debugger;
 pub mod navigation;
 pub mod physics;
 pub mod render;
 pub mod sound;
-pub mod ui;
 pub mod systems;
-pub mod animator;
+pub mod ui;
 //pub mod scripting;
 pub mod input;
 pub mod networking;

@@ -1,6 +1,5 @@
 use crate::{managers::systems::add_system, systems::test_system::TestSystem};
 
-
 pub fn start() {
     add_system(Box::new(TestSystem::new()));
 
@@ -8,7 +7,6 @@ pub fn start() {
     //add_system(Box::new(lua));
 }
 
-pub fn update() {
-}
+pub fn update() {}
 
 pub fn render() {}

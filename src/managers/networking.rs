@@ -1,12 +1,19 @@
-use std::{net::{SocketAddr, IpAddr, Ipv4Addr, UdpSocket}, time::{SystemTime, Duration}, num::ParseIntError};
-use machineid_rs::{IdBuilder, HWIDComponent};
+use crate::objects::Transform;
+use machineid_rs::{HWIDComponent, IdBuilder};
 use once_cell::sync::Lazy;
 use renet::{
-    RenetServer, ConnectionConfig, DefaultChannel, RenetClient, ServerEvent,
-    transport::{ServerConfig, NetcodeServerTransport, ServerAuthentication, NetcodeClientTransport, ClientAuthentication}, DisconnectReason
+    transport::{
+        ClientAuthentication, NetcodeClientTransport, NetcodeServerTransport, ServerAuthentication,
+        ServerConfig,
+    },
+    ConnectionConfig, DefaultChannel, DisconnectReason, RenetClient, RenetServer, ServerEvent,
 };
-use serde::{Serialize, Deserialize};
-use crate::objects::Transform;
+use serde::{Deserialize, Serialize};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+    num::ParseIntError,
+    time::{Duration, SystemTime},
+};
 
 use super::{debugger, systems::get_system_mut_with_id};
 
@@ -18,34 +25,34 @@ static mut CLIENT_ID: Lazy<u64> = Lazy::new(generate_client_id);
 #[derive(Debug)]
 pub struct ServerHandle {
     server: RenetServer,
-    transport: NetcodeServerTransport
+    transport: NetcodeServerTransport,
 }
 
 #[derive(Debug)]
 pub struct ClientHandle {
     client: RenetClient,
     transport: NetcodeClientTransport,
-    status: ClientStatus
+    status: ClientStatus,
 }
 
 #[derive(Debug)]
 pub enum MessageReliability {
     Reliable,
-    Unreliable
+    Unreliable,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageReceiver {
     Everybody,
     EverybodyExcept(u64),
-    OneClient(u64)
+    OneClient(u64),
 }
 
 #[derive(Debug)]
 pub enum NetworkingMode {
-    Server(ServerHandle), 
-    Client(ClientHandle), 
-    Disconnected(Option<DisconnectReason>)
+    Server(ServerHandle),
+    Client(ClientHandle),
+    Disconnected(Option<DisconnectReason>),
 }
 
 #[derive(Debug)]
@@ -59,7 +66,7 @@ pub struct Message {
     pub receiver: MessageReceiver,
     pub system_id: String,
     pub message_id: String,
-    pub message: MessageContents
+    pub message: MessageContents,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,25 +77,24 @@ pub enum MessageContents {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncObjectMessage {
-    pub object_name: String, 
-    pub transform: Transform
+    pub object_name: String,
+    pub transform: Transform,
 }
-
 
 #[derive(Debug)]
 pub enum NetworkError {
     MessageSerializeErr(serde_bare::error::Error),
     NotDisconnected,
     IsDisconnected,
-    WrongClientStatus
+    WrongClientStatus,
 }
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     ClientConnected(u64),
-    ClientDisconnected(u64, String), 
-    ConnectedSuccessfully, 
-    Disconnected(Option<DisconnectReason>), 
+    ClientDisconnected(u64, String),
+    ConnectedSuccessfully,
+    Disconnected(Option<DisconnectReason>),
 }
 
 fn set_current_networking_mode(mode: NetworkingMode) {
@@ -98,16 +104,16 @@ fn set_current_networking_mode(mode: NetworkingMode) {
 }
 
 pub fn get_current_networking_mode() -> &'static NetworkingMode {
-    unsafe {
-        &CURRENT_NETWORKING_MODE
-    }
+    unsafe { &CURRENT_NETWORKING_MODE }
 }
 
 pub fn new_server(port: u16, max_players: usize) -> Result<(), NetworkError> {
     match get_current_networking_mode() {
         NetworkingMode::Disconnected(_) => (),
         _ => {
-            debugger::error(&format!("new_server call error!\nCURRENT_NETWORK_MODE is not Disconnected"));
+            debugger::error(&format!(
+                "new_server call error!\nCURRENT_NETWORK_MODE is not Disconnected"
+            ));
             return Err(NetworkError::NotDisconnected);
         }
     }
@@ -122,9 +128,11 @@ pub fn new_server(port: u16, max_players: usize) -> Result<(), NetworkError> {
         max_clients: max_players,
         protocol_id: 0,
         public_addr: server_address,
-        authentication: ServerAuthentication::Unsecure
+        authentication: ServerAuthentication::Unsecure,
     };
-    let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let current_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
     let transport = NetcodeServerTransport::new(current_time, server_config, socket).unwrap();
 
     let handle = ServerHandle { server, transport };
@@ -137,7 +145,9 @@ pub fn new_client(ip_address: IpAddr, port: u16) -> Result<(), NetworkError> {
     match get_current_networking_mode() {
         NetworkingMode::Disconnected(_) => (),
         _ => {
-            debugger::error(&format!("new_client call error!\nCURRENT_NETWORK_MODE is not Disconnected"));
+            debugger::error(&format!(
+                "new_client call error!\nCURRENT_NETWORK_MODE is not Disconnected"
+            ));
             return Err(NetworkError::NotDisconnected);
         }
     }
@@ -148,24 +158,34 @@ pub fn new_client(ip_address: IpAddr, port: u16) -> Result<(), NetworkError> {
 
     let server_addr: SocketAddr = SocketAddr::new(ip_address, port);
     let socket: UdpSocket = UdpSocket::bind("127.0.0.1:0").unwrap();
-    let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-    let auth = ClientAuthentication::Unsecure { 
-        protocol_id: 0, 
-        client_id: unsafe { *CLIENT_ID }, 
-        server_addr, 
-        user_data: None
+    let current_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+    let auth = ClientAuthentication::Unsecure {
+        protocol_id: 0,
+        client_id: unsafe { *CLIENT_ID },
+        server_addr,
+        user_data: None,
     };
 
     let transport = NetcodeClientTransport::new(current_time, auth, socket).unwrap();
 
     let status = ClientStatus::Connecting;
-    let handle = ClientHandle { client, transport, status };
+    let handle = ClientHandle {
+        client,
+        transport,
+        status,
+    };
     set_current_networking_mode(NetworkingMode::Client(handle));
     Ok(())
 }
 
 impl ServerHandle {
-    pub fn send_message(&mut self, message_reliability: MessageReliability, message: Message) -> Result<(), NetworkError> {
+    pub fn send_message(
+        &mut self,
+        message_reliability: MessageReliability,
+        message: Message,
+    ) -> Result<(), NetworkError> {
         let renet_message_reliability = match message_reliability {
             MessageReliability::Reliable => DefaultChannel::ReliableOrdered,
             MessageReliability::Unreliable => DefaultChannel::Unreliable,
@@ -176,25 +196,36 @@ impl ServerHandle {
             Err(err) => {
                 debugger::error(&format!("got an error when calling send_message in ServerHandle\nfailed to serialize message to bytes vec\nerr: {}", err));
                 return Err(NetworkError::MessageSerializeErr(err));
-            },
+            }
         };
 
         match message.receiver {
             MessageReceiver::Everybody => {
-                self.server.broadcast_message(renet_message_reliability, message_bytes_vec);
-            },
-            MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(client_id, renet_message_reliability, message_bytes_vec),
-            MessageReceiver::OneClient(client_id) => self.server.send_message(client_id, renet_message_reliability, message_bytes_vec),
+                self.server
+                    .broadcast_message(renet_message_reliability, message_bytes_vec);
+            }
+            MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(
+                client_id,
+                renet_message_reliability,
+                message_bytes_vec,
+            ),
+            MessageReceiver::OneClient(client_id) => {
+                self.server
+                    .send_message(client_id, renet_message_reliability, message_bytes_vec)
+            }
         };
 
-        return Ok(())
+        return Ok(());
     }
 
     pub fn update(&mut self, delta_time: Duration) {
         self.server.update(delta_time);
         match self.transport.update(delta_time, &mut self.server) {
             Ok(_) => (),
-            Err(err) => debugger::warn(&format!("failed to update server transport\nerror: {}", err))
+            Err(err) => debugger::warn(&format!(
+                "failed to update server transport\nerror: {}",
+                err
+            )),
         }
 
         while let Some(ev) = self.server.get_event() {
@@ -202,20 +233,29 @@ impl ServerHandle {
                 ServerEvent::ClientConnected { client_id } => {
                     println!("client connected! client_id: {}", client_id);
                     set_network_event(NetworkEvent::ClientConnected(client_id));
-                },
+                }
                 ServerEvent::ClientDisconnected { client_id, reason } => {
                     println!("client disconnected! client_id: {}", client_id);
-                    set_network_event(NetworkEvent::ClientDisconnected(client_id, reason.to_string()));
-                },
+                    set_network_event(NetworkEvent::ClientDisconnected(
+                        client_id,
+                        reason.to_string(),
+                    ));
+                }
             }
         }
 
         for client_id in self.server.clients_id() {
-            while let Some(message_bytes) = self.server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
+            while let Some(message_bytes) = self
+                .server
+                .receive_message(client_id, DefaultChannel::ReliableOrdered)
+            {
                 send_message_to_system(message_bytes.into());
             }
 
-            while let Some(message_bytes) = self.server.receive_message(client_id, DefaultChannel::Unreliable) {
+            while let Some(message_bytes) = self
+                .server
+                .receive_message(client_id, DefaultChannel::Unreliable)
+            {
                 send_message_to_system(message_bytes.into());
             }
         }
@@ -225,13 +265,20 @@ impl ServerHandle {
 }
 
 impl ClientHandle {
-    pub fn send_message(&mut self, message_reliability: MessageReliability, message: Message) -> Result<(), NetworkError> {
+    pub fn send_message(
+        &mut self,
+        message_reliability: MessageReliability,
+        message: Message,
+    ) -> Result<(), NetworkError> {
         match self.status {
             ClientStatus::Connected => (),
             _ => {
-                debugger::error(&format!("failed to send message\nclient status is not Connected\nstatus: {:?}", self.status));
+                debugger::error(&format!(
+                    "failed to send message\nclient status is not Connected\nstatus: {:?}",
+                    self.status
+                ));
                 return Err(NetworkError::WrongClientStatus);
-            },
+            }
         }
 
         let renet_message_reliability = match message_reliability {
@@ -244,11 +291,12 @@ impl ClientHandle {
             Err(err) => {
                 debugger::error(&format!("got an error when calling send_message in ServerHandle\nfailed to serialize message to bytes vec\nerr: {}", err));
                 return Err(NetworkError::MessageSerializeErr(err));
-            },
+            }
         };
 
-        self.client.send_message(renet_message_reliability, message_bytes_vec);
-        return Ok(())
+        self.client
+            .send_message(renet_message_reliability, message_bytes_vec);
+        return Ok(());
     }
 
     pub fn update(&mut self, delta_time: Duration) {
@@ -264,7 +312,8 @@ impl ClientHandle {
             Err(err) => debugger::warn(&format!("failed to update client transport\nerr: {}", err)),
         }
 
-        while let Some(message_bytes) = self.client.receive_message(DefaultChannel::ReliableOrdered) {
+        while let Some(message_bytes) = self.client.receive_message(DefaultChannel::ReliableOrdered)
+        {
             send_message_to_system(message_bytes.into());
         }
 
@@ -316,8 +365,8 @@ pub fn send_message(reliability: MessageReliability, message: Message) -> Result
             NetworkingMode::Client(client) => client.send_message(reliability, message),
             NetworkingMode::Disconnected(_) => {
                 debugger::error(&format!("can't send a message while being disconnected!"));
-                return Err(NetworkError::IsDisconnected)
-            },
+                return Err(NetworkError::IsDisconnected);
+            }
         }
     }
 }
@@ -354,7 +403,6 @@ fn generate_client_id() -> u64 {
     id_builer.add_component(HWIDComponent::OSName);
     id_builer.add_component(HWIDComponent::SystemID);
     id_builer.add_component(HWIDComponent::DriveSerial);
-    
 
     match id_builer.build("really great key") {
         Ok(id_str) => {
@@ -376,11 +424,11 @@ fn generate_client_id() -> u64 {
                     unreachable!()
                 }
             }
-        },
+        }
         Err(err) => {
             debugger::crash(&format!("Failed to generate CLIENT_ID! Error: {}", err));
             unreachable!();
-        },
+        }
     }
 }
 
@@ -388,7 +436,7 @@ pub fn is_server() -> bool {
     match get_current_networking_mode() {
         NetworkingMode::Server(_) => true,
         NetworkingMode::Client(_) => false,
-        NetworkingMode::Disconnected(_) => false
+        NetworkingMode::Disconnected(_) => false,
     }
 }
 
@@ -396,7 +444,7 @@ pub fn is_client() -> bool {
     match get_current_networking_mode() {
         NetworkingMode::Server(_) => false,
         NetworkingMode::Client(_) => true,
-        NetworkingMode::Disconnected(_) => false
+        NetworkingMode::Disconnected(_) => false,
     }
 }
 
@@ -405,14 +453,13 @@ pub fn disconnect() {
         match &mut CURRENT_NETWORKING_MODE {
             NetworkingMode::Server(_) => {
                 debugger::error("failed to disconnect!\ncurrent networking mode is Server");
-            },
+            }
             NetworkingMode::Client(client) => {
                 client.client.disconnect();
-            },
+            }
             NetworkingMode::Disconnected(_) => {
                 debugger::error("failed to disconnect!\ncurrent networking mode is Disconnected");
-            },
-
+            }
         }
     }
 }

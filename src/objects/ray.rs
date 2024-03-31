@@ -1,9 +1,19 @@
-use glam::{Vec3, Quat};
-use glium::Display;
-use rapier3d::{pipeline::QueryFilter, geometry::InteractionGroups};
-use crate::{managers::{physics::{ObjectBodyParameters, CollisionGroups, is_ray_intersecting, RenderRay, get_ray_intersaction_position}, debugger, render}, math_utils::deg_vec_to_rad, framework::{self, DebugMode}};
+use crate::{
+    framework::{self, DebugMode},
+    managers::{
+        debugger,
+        physics::{
+            get_ray_intersaction_position, is_ray_intersecting, CollisionGroups,
+            ObjectBodyParameters, RenderRay,
+        },
+        render,
+    },
+    math_utils::deg_vec_to_rad,
+};
+use glam::{Quat, Vec3};
+use rapier3d::{geometry::InteractionGroups, pipeline::QueryFilter};
 
-use super::{Object, Transform, gen_object_id, ObjectGroup};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
 
 #[derive(Debug)]
 pub struct Ray {
@@ -14,8 +24,7 @@ pub struct Ray {
     id: u128,
     groups: Vec<ObjectGroup>,
     direction: Vec3,
-    mask: CollisionGroups
-    // TODO: direction, point(using object's position), mask(CollisionGroups)
+    mask: CollisionGroups, // TODO: direction, point(using object's position), mask(CollisionGroups)
 }
 
 impl Ray {
@@ -33,18 +42,15 @@ impl Ray {
             id: gen_object_id(),
             groups: vec![],
             direction,
-            mask
+            mask,
         }
     }
 }
 
-
 impl Object for Ray {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
-    fn update(&mut self) { }
-
-    fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
+    fn update(&mut self) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -74,8 +80,6 @@ impl Object for Ray {
         self.transform = transform
     }
 
-
-
     fn parent_transform(&self) -> Option<Transform> {
         self.parent_transform
     }
@@ -103,9 +107,9 @@ impl Object for Ray {
     fn call(&mut self, name: &str, args: Vec<&str>) -> Option<std::string::String> {
         if name == "is_intersecting" {
             if self.is_intersecting() == true {
-                return Some("true".into())
+                return Some("true".into());
             } else {
-                return Some("false".into())
+                return Some("false".into());
             }
         }
         if name == "get_intersection_position" {
@@ -116,8 +120,8 @@ impl Object for Ray {
                     let z_string = &pos.z.to_string();
                     let array_string = x_string + ";" + y_string + ";" + z_string;
                     return Some(array_string);
-                },
-                None => return None
+                }
+                None => return None,
             }
         }
         None
@@ -125,7 +129,10 @@ impl Object for Ray {
 
     fn debug_render(&self) {
         if let DebugMode::Full = framework::get_debug_mode() {
-            render::add_ray_to_draw(RenderRay { origin: self.global_transform().position, direction: self.rotated_direction() });
+            render::add_ray_to_draw(RenderRay {
+                origin: self.global_transform().position,
+                direction: self.rotated_direction(),
+            });
         }
     }
 }
@@ -136,9 +143,15 @@ impl Ray {
         let rotated_direction = self.rotated_direction();
 
         let toi = rotated_direction.distance(global_transform.position);
-        let query_filter = QueryFilter::new().groups(InteractionGroups::new(CollisionGroups::Group1.bits().into(), self.mask.bits().into()));
+        let query_filter = QueryFilter::new().groups(InteractionGroups::new(
+            CollisionGroups::Group1.bits().into(),
+            self.mask.bits().into(),
+        ));
 
-        let ray = rapier3d::geometry::Ray::new(global_transform.position.into(), rotated_direction.into());
+        let ray = rapier3d::geometry::Ray::new(
+            global_transform.position.into(),
+            rotated_direction.into(),
+        );
 
         //dbg!(toi);
         //dbg!(rotated_direction.normalize());
@@ -152,9 +165,15 @@ impl Ray {
         let rotated_direction = self.rotated_direction();
 
         let toi = rotated_direction.distance(global_transform.position);
-        let query_filter = QueryFilter::new().groups(InteractionGroups::new(CollisionGroups::Group1.bits().into(), self.mask.bits().into()));
+        let query_filter = QueryFilter::new().groups(InteractionGroups::new(
+            CollisionGroups::Group1.bits().into(),
+            self.mask.bits().into(),
+        ));
 
-        let ray = rapier3d::geometry::Ray::new(global_transform.position.into(), rotated_direction.into());
+        let ray = rapier3d::geometry::Ray::new(
+            global_transform.position.into(),
+            rotated_direction.into(),
+        );
 
         get_ray_intersaction_position(ray, toi, query_filter)
     }
@@ -162,12 +181,12 @@ impl Ray {
     fn rotated_direction(&self) -> Vec3 {
         let global_transform = self.global_transform();
         let rotation = deg_vec_to_rad(global_transform.rotation);
-        let rotation_quat = Quat::from_euler(glam::EulerRot::XYZ, rotation.x, rotation.y, rotation.z);
+        let rotation_quat =
+            Quat::from_euler(glam::EulerRot::XYZ, rotation.x, rotation.y, rotation.z);
         //let direction_quat = Quat::from_euler(glam::EulerRot::XYZ, self.direction.x, self.direction.y, self.direction.z);
         //let rotated_direction = direction_quat
         //    .mul_vec3(global_transform.rotation);
-        let rotated_direction = rotation_quat
-            .mul_vec3(self.direction);
+        let rotated_direction = rotation_quat.mul_vec3(self.direction);
 
         rotated_direction
     }

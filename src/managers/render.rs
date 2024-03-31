@@ -1,8 +1,15 @@
-use glium::{framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer};
-use glam::{Mat4, Quat, Vec3, Vec4};
 use crate::math_utils::deg_to_rad;
+use glam::{Mat4, Quat, Vec3, Vec4};
+use glium::{
+    framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,
+    texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer,
+};
+use once_cell::sync::Lazy;
 
-use super::physics::{RenderColliderType, RenderRay};
+use super::{
+    physics::{RenderColliderType, RenderRay},
+    systems,
+};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -17,20 +24,27 @@ implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
 pub fn init(display: &Display) {
     unsafe {
         COLLIDER_CUBOID_VERTEX_BUFFER = Some(VertexBuffer::new(display, &CUBE_VERTS_LIST).unwrap());
-        COLLIDER_CUBOID_INDEX_BUFFER = 
-            Some(IndexBuffer::new(display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap());
-        COLLIDER_CUBOID_SHADER = Some(Program::from_source(
-            display,
-            include_str!("../assets/collider_shader.vert"),
-            include_str!("../assets/collider_shader.frag"),
-            None,
-        ).unwrap());
-        RAY_SHADER = Some(Program::from_source(
-            display,
-            include_str!("../assets/ray_shader.vert"),
-            include_str!("../assets/ray_shader.frag"),
-            None,
-        ).unwrap());
+        COLLIDER_CUBOID_INDEX_BUFFER = Some(
+            IndexBuffer::new(display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap(),
+        );
+        COLLIDER_CUBOID_SHADER = Some(
+            Program::from_source(
+                display,
+                include_str!("../assets/collider_shader.vert"),
+                include_str!("../assets/collider_shader.frag"),
+                None,
+            )
+            .unwrap(),
+        );
+        RAY_SHADER = Some(
+            Program::from_source(
+                display,
+                include_str!("../assets/ray_shader.vert"),
+                include_str!("../assets/ray_shader.frag"),
+                None,
+            )
+            .unwrap(),
+        );
     }
 }
 
@@ -60,39 +74,85 @@ pub fn debug_draw(display: &Display, target: &mut Frame) {
             let dir = origin + ray.direction;
 
             let verts_list: [Vertex; 9] = [
-                Vertex { position: [origin.x - 0.15, origin.y + 0.15, origin.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                Vertex { position: [origin.x + 0.15, origin.y + 0.15, origin.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                Vertex { position: [origin.x - 0.15, origin.y - 0.15, origin.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                Vertex { position: [origin.x + 0.15, origin.y - 0.15, origin.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-
-                Vertex { position: [dir.x - 0.15, dir.y + 0.15, dir.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                Vertex { position: [dir.x + 0.15, dir.y + 0.15, dir.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                Vertex { position: [dir.x - 0.15, dir.y - 0.15, dir.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                Vertex { position: [dir.x + 0.15, dir.y - 0.15, dir.z], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
-                
-                Vertex { position: [dir.x, dir.y, dir.z + 0.15], 
-                    normal: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0]},
+                Vertex {
+                    position: [origin.x - 0.15, origin.y + 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [origin.x + 0.15, origin.y + 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [origin.x - 0.15, origin.y - 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [origin.x + 0.15, origin.y - 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x - 0.15, dir.y + 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x + 0.15, dir.y + 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x - 0.15, dir.y - 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x + 0.15, dir.y - 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x, dir.y, dir.z + 0.15],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
             ];
 
-            let indices: [u32; 48] = [0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0, 1, 5, 2, 3, 6, 2, 3, 7,
-                4, 5, 8, 4, 6, 8, 5, 7, 8, 6, 7, 8];
+            let indices: [u32; 48] = [
+                0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0,
+                1, 5, 2, 3, 6, 2, 3, 7, 4, 5, 8, 4, 6, 8, 5, 7, 8, 6, 7, 8,
+            ];
 
             //dbg!(ray);
             //dbg!(origin);
             //dbg!(dir);
 
-            let vert_buffer = VertexBuffer::new(display, &verts_list).expect("failed to create vertex buffer while debug rendering rays");
+            let vert_buffer = VertexBuffer::new(display, &verts_list)
+                .expect("failed to create vertex buffer while debug rendering rays");
             let index_buffer = IndexBuffer::new(display, PrimitiveType::TriangleFan, &indices)
                 .expect("failed to create index buffer while debug rendering rays");
-            
+
             let shader = RAY_SHADER.take().unwrap();
 
             target // drawing solid semi-transparent cuboid
@@ -109,8 +169,6 @@ pub fn debug_draw(display: &Display, target: &mut Frame) {
         });
         RENDER_RAYS.clear();
     }
-
-
 
     let colliders = unsafe { &mut RENDER_COLLIDERS };
     colliders.iter().for_each(|collider| {
@@ -167,21 +225,39 @@ pub fn add_ray_to_draw(ray: RenderRay) {
 }
 
 pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture2d) {
-    let mut shadow_target = SimpleFrameBuffer::depth_only(display, shadow_texture).unwrap();
-    shadow_target.clear_color(1.0, 1.0, 1.0, 1.0);
-    shadow_target.clear_depth(1.0);
-    let view_proj = SunCamera::new().view_proj;
-
     target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
+
+    let mut shadow_fbo = SimpleFrameBuffer::depth_only(display, shadow_texture).unwrap();
+    shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    shadow_fbo.clear_depth(1.0);
+    let view_proj = SunCamera::new().view_proj;
+    systems::shadow_render(view_proj, display, &mut shadow_fbo);
+
     update_camera_vectors();
 }
 
 /* some consts to make code cleaner */
-const ZERO_VEC3: Vec3 = Vec3 { x: 0.0, y: 0.0, z: 0.0 };
-const DEFAULT_UP_VECTOR: Vec3 = Vec3 { x: 0.0, y: 1.0, z: 0.0 };
-const DEFAULT_FRONT_VECTOR: Vec3 = Vec3 { x: 0.0, y: 0.0, z: -1.0 };
+const ZERO_VEC3: Vec3 = Vec3 {
+    x: 0.0,
+    y: 0.0,
+    z: 0.0,
+};
+const DEFAULT_UP_VECTOR: Vec3 = Vec3 {
+    x: 0.0,
+    y: 1.0,
+    z: 0.0,
+};
+const DEFAULT_FRONT_VECTOR: Vec3 = Vec3 {
+    x: 0.0,
+    y: 0.0,
+    z: -1.0,
+};
 
-pub static mut LIGHT_POSITION: Vec3 = ZERO_VEC3;
+pub static mut LIGHT_POSITION: Vec3 = Vec3 {
+    x: -1.0,
+    y: 0.0,
+    z: 0.0,
+};
 
 pub static mut CAMERA_LOCATION: CameraLocation = CameraLocation {
     position: ZERO_VEC3,
@@ -198,7 +274,6 @@ pub fn set_camera_position(pos: Vec3) {
         CAMERA_LOCATION.position = pos;
     }
 }
-
 
 pub fn set_camera_rotation(rot: Vec3) {
     unsafe {
@@ -219,9 +294,7 @@ pub fn set_light_position(pos: Vec3) {
 }
 
 pub fn get_light_direction() -> Vec3 {
-    unsafe {
-        LIGHT_POSITION
-    }
+    unsafe { LIGHT_POSITION }
 }
 
 pub fn get_view_matrix() -> Mat4 {
@@ -235,9 +308,7 @@ pub fn get_view_matrix() -> Mat4 {
 }
 
 pub fn get_projection_matrix() -> Mat4 {
-    unsafe {
-        Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 560.0)
-    }
+    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 560.0) }
 }
 
 fn update_camera_vectors() {
@@ -285,22 +356,75 @@ pub struct CameraLocation {
     up: Vec3,
 }
 
-const CUBE_VERTS_LIST: [Vertex; 8] = 
-    [Vertex { position: [1.0, 1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [1.0, -1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [1.0, 1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [1.0, -1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [-1.0, 1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [-1.0, -1.0, -1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [-1.0, 1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] },
-    Vertex { position: [-1.0, -1.0, 1.0], normal: [0.0, 0.0, 0.0], joints: [0.0, 0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], weights: [0.0, 0.0, 0.0, 0.0] }]; 
-const CUBE_INDICES_LIST: [u32; 36] = [1, 2, 0, 3, 6, 2, 7, 5, 6, 5, 0, 4, 6, 0, 2, 3, 5, 7, 1, 3, 2, 3, 7, 6, 7, 5, 4, 5, 1, 0, 6, 4, 0, 3, 1, 5];
+const CUBE_VERTS_LIST: [Vertex; 8] = [
+    Vertex {
+        position: [1.0, 1.0, -1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [1.0, -1.0, -1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [1.0, 1.0, 1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [1.0, -1.0, 1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-1.0, 1.0, -1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-1.0, -1.0, -1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-1.0, 1.0, 1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-1.0, -1.0, 1.0],
+        normal: [0.0, 0.0, 0.0],
+        joints: [0.0, 0.0, 0.0, 0.0],
+        tex_coords: [0.0, 0.0],
+        weights: [0.0, 0.0, 0.0, 0.0],
+    },
+];
+const CUBE_INDICES_LIST: [u32; 36] = [
+    1, 2, 0, 3, 6, 2, 7, 5, 6, 5, 0, 4, 6, 0, 2, 3, 5, 7, 1, 3, 2, 3, 7, 6, 7, 5, 4, 5, 1, 0, 6, 4,
+    0, 3, 1, 5,
+];
 static mut COLLIDER_CUBOID_VERTEX_BUFFER: Option<VertexBuffer<Vertex>> = None;
 static mut COLLIDER_CUBOID_INDEX_BUFFER: Option<IndexBuffer<u32>> = None;
 static mut RENDER_COLLIDERS: Vec<RenderColliderType> = vec![];
 static mut RENDER_RAYS: Vec<RenderRay> = vec![];
 static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
+static mut SUN_CAMERA: Lazy<SunCamera> = Lazy::new(|| SunCamera::new());
 
 pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f32; 4]; 4], bool) {
     let view = get_view_matrix();
@@ -312,7 +436,14 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
     match collider {
         RenderColliderType::Ball(pos, rot, radius, sensor) => {
             match rot {
-                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                Some(rot) => {
+                    rot_quat = Quat::from_euler(
+                        glam::EulerRot::XYZ,
+                        deg_to_rad(rot.x),
+                        deg_to_rad(rot.y),
+                        deg_to_rad(rot.z),
+                    )
+                }
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
             }
             match pos {
@@ -321,13 +452,21 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             }
 
             let scale = Vec3::new(*radius, *radius, *radius);
-            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+            let transform =
+                Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return ((proj * view * transform).to_cols_array_2d(), *sensor);
-        },
+        }
         RenderColliderType::Cuboid(pos, rot, half_x, half_y, half_z, sensor) => {
             match rot {
-                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                Some(rot) => {
+                    rot_quat = Quat::from_euler(
+                        glam::EulerRot::XYZ,
+                        deg_to_rad(rot.x),
+                        deg_to_rad(rot.y),
+                        deg_to_rad(rot.z),
+                    )
+                }
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
             }
             match pos {
@@ -336,13 +475,21 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             }
 
             let scale = Vec3::new(*half_x + 0.001, *half_y + 0.001, *half_z + 0.001);
-            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+            let transform =
+                Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return ((proj * view * transform).to_cols_array_2d(), *sensor);
         }
         RenderColliderType::Capsule(pos, rot, radius, height, sensor) => {
             match rot {
-                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                Some(rot) => {
+                    rot_quat = Quat::from_euler(
+                        glam::EulerRot::XYZ,
+                        deg_to_rad(rot.x),
+                        deg_to_rad(rot.y),
+                        deg_to_rad(rot.z),
+                    )
+                }
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
             }
             match pos {
@@ -351,13 +498,21 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             }
 
             let scale = Vec3::new(*radius, *height, *radius);
-            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+            let transform =
+                Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return ((proj * view * transform).to_cols_array_2d(), *sensor);
         }
         RenderColliderType::Cylinder(pos, rot, radius, height, sensor) => {
             match rot {
-                Some(rot) => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z)),
+                Some(rot) => {
+                    rot_quat = Quat::from_euler(
+                        glam::EulerRot::XYZ,
+                        deg_to_rad(rot.x),
+                        deg_to_rad(rot.y),
+                        deg_to_rad(rot.z),
+                    )
+                }
                 None => rot_quat = Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
             }
             match pos {
@@ -366,27 +521,39 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             }
 
             let scale = Vec3::new(*radius, *height, *radius);
-            let transform = Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
+            let transform =
+                Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
             return ((proj * view * transform).to_cols_array_2d(), *sensor);
-        },
+        }
     }
 }
 
 struct SunCamera {
-    pub view_proj: ViewProj
+    pub view_proj: ViewProj,
 }
 
 impl SunCamera {
     fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
-        Mat4::orthographic_rh_gl(corners.min_x, corners.max_x, corners.min_y, corners.max_y, corners.min_z, corners.max_z)
+        Mat4::orthographic_rh_gl(
+            corners.min_x,
+            corners.max_x,
+            corners.min_y,
+            corners.max_y,
+            corners.min_z,
+            corners.max_z,
+        )
     }
 
     fn get_sun_camera_view_matrix(corners: &CameraCorners) -> Mat4 {
         //let direction = get_light_direction().normalize();
         let view_center = corners.get_center();
         let view_up = Vec3::new(0.0, 1.0, 0.0);
-        let view_matrix = Mat4::look_at_rh(Vec3::new(10000.0, 10000.0, 10000.0), view_center, view_up);
+
+        //let main_camera_position = get_camera_position();
+        let sun_camera_position = get_light_direction() + Vec3::new(0.0, 200.0, 0.0);
+
+        let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
 
         view_matrix
     }
@@ -394,12 +561,11 @@ impl SunCamera {
     pub fn new() -> SunCamera {
         let corners = &CameraCorners::new();
         let proj = Self::get_sun_camera_projection_matrix(corners);
-        let view = Self::get_sun_camera_projection_matrix(corners);
+        let view = Self::get_sun_camera_view_matrix(corners);
         let view_proj = ViewProj { view, proj };
         SunCamera { view_proj }
     }
 }
-
 
 struct CameraCorners {
     min_x: f32,
@@ -421,7 +587,13 @@ impl CameraCorners {
         for x in 0..2 {
             for y in 0..2 {
                 for z in 0..2 {
-                    let pt = inv * Vec4::new(2.0 * x as f32 - 1.0, 2.0 * y as f32 - 1.0, 2.0 * z as f32 - 1.0, 1.0);
+                    let pt = inv
+                        * Vec4::new(
+                            2.0 * x as f32 - 1.0,
+                            2.0 * y as f32 - 1.0,
+                            2.0 * z as f32 - 1.0,
+                            1.0,
+                        );
                     frustum_corners.push(pt / pt.w);
                 }
             }
@@ -435,6 +607,9 @@ impl CameraCorners {
         vec3_frustum_corners
     }
 
+    pub fn get_sun_eye(&self) -> Vec3 {
+        Vec3::new(self.min_x, self.max_y, self.min_z)
+    }
 
     pub fn new() -> CameraCorners {
         let corners = Self::get_camera_corners(get_projection_matrix(), get_view_matrix());
@@ -490,6 +665,6 @@ impl CameraCorners {
 }
 
 pub struct ViewProj {
-    pub view: Mat4, 
-    pub proj: Mat4
+    pub view: Mat4,
+    pub proj: Mat4,
 }

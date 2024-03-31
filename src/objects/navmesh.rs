@@ -1,8 +1,11 @@
 use glam::Vec2;
-use glium::Display;
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
-use crate::managers::{debugger, navigation::{self, NavMeshDimensions}, physics::ObjectBodyParameters};
-use super::{Object, Transform, ObjectGroup, gen_object_id};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
+use crate::managers::{
+    debugger,
+    navigation::{self, NavMeshDimensions},
+    physics::ObjectBodyParameters,
+};
 
 //#[derive(Debug)]
 pub struct NavigationGround {
@@ -18,7 +21,7 @@ pub struct NavigationGround {
 
 impl NavigationGround {
     pub fn new(name: &str, area_size: Vec2) -> Self {
-        Self { 
+        Self {
             name: name.into(),
             transform: Transform::default(),
             parent_transform: None,
@@ -31,18 +34,15 @@ impl NavigationGround {
     }
 }
 
-
 impl Object for NavigationGround {
-    fn start(&mut self) { }
+    fn start(&mut self) {}
 
-    fn update(&mut self) { 
+    fn update(&mut self) {
         let pos = self.global_transform().position;
         self.dimensions.set_position(Vec2::new(pos.x, pos.z));
 
         navigation::add_navmesh(*self.object_id(), self.dimensions.clone());
     }
-
-    fn render(&mut self, _display: &mut Display, _target: &mut glium::Frame) { }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -68,8 +68,6 @@ impl Object for NavigationGround {
         self.transform
     }
 
-
-
     fn set_local_transform(&mut self, transform: Transform) {
         self.transform = transform
     }
@@ -83,7 +81,9 @@ impl Object for NavigationGround {
     }
 
     fn set_body_parameters(&mut self, _rigid_body: Option<ObjectBodyParameters>) {
-        debugger::error("NavMesh object error!\ncan't use set_body_parameters in this type of objects");
+        debugger::error(
+            "NavMesh object error!\ncan't use set_body_parameters in this type of objects",
+        );
     }
 
     fn body_parameters(&self) -> Option<ObjectBodyParameters> {
@@ -119,13 +119,12 @@ impl std::fmt::Debug for NavigationGround {
 enum CurrentAxis {
     X,
     Y,
-    Z
+    Z,
 }
 
 #[derive(Debug)]
 pub enum NavMeshError {
     HeightmapError,
     RasterizeError,
-    PolyMeshError
+    PolyMeshError,
 }
-

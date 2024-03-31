@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use glium::glutin::event::{VirtualKeyCode, WindowEvent, MouseButton, ElementState};
-use once_cell::sync::Lazy;
 use super::debugger;
+use glium::glutin::event::{ElementState, MouseButton, VirtualKeyCode, WindowEvent};
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 static mut BINDS: Lazy<HashMap<String, Vec<InputEventType>>> = Lazy::new(|| HashMap::new());
 static mut DOWN_EVENTS: Vec<InputEventType> = vec![];
@@ -9,15 +9,15 @@ static mut JUST_PRESSED_EVENTS: Vec<InputEventType> = vec![];
 static mut UP_EVENTS: Vec<InputEventType> = vec![];
 
 pub fn new_bind(name: &str, input_events: Vec<InputEventType>) {
-    unsafe { 
+    unsafe {
         match BINDS.get_mut(name) {
             Some(bind_evs) => {
                 debugger::warn("Binds '{}' already exist, adding new key in list");
                 input_events.iter().for_each(|ev| bind_evs.push(*ev));
-            },
+            }
             None => {
                 BINDS.insert(name.into(), input_events);
-            },
+            }
         }
     }
 }
@@ -26,15 +26,19 @@ pub fn get_bind_keys(name: String) -> Option<Vec<InputEventType>> {
     unsafe {
         match BINDS.get(&name) {
             Some(bind) => Some(bind.to_owned()),
-            None => None
+            None => None,
         }
     }
 }
 
-pub fn reg_event(event: &WindowEvent) { 
+pub fn reg_event(event: &WindowEvent) {
     unsafe {
         match event {
-            WindowEvent::KeyboardInput { device_id: _, input, is_synthetic: _ } => {
+            WindowEvent::KeyboardInput {
+                device_id: _,
+                input,
+                is_synthetic: _,
+            } => {
                 BINDS.iter().for_each(|bind_events| {
                     for bind_ev in bind_events.1 {
                         match bind_ev {
@@ -47,27 +51,34 @@ pub fn reg_event(event: &WindowEvent) {
                                                 DOWN_EVENTS.push(input_ev_type);
                                                 JUST_PRESSED_EVENTS.push(input_ev_type);
                                             }
-                                        },
+                                        }
                                         ElementState::Released => {
                                             if UP_EVENTS.contains(&input_ev_type) == false {
                                                 UP_EVENTS.push(input_ev_type);
                                             }
-                                            DOWN_EVENTS.iter().enumerate().for_each(|(idx, value)| {
-                                                if value == &input_ev_type {
-                                                    DOWN_EVENTS.remove(idx);
-                                                }
-                                            });
-                                        },
+                                            DOWN_EVENTS.iter().enumerate().for_each(
+                                                |(idx, value)| {
+                                                    if value == &input_ev_type {
+                                                        DOWN_EVENTS.remove(idx);
+                                                    }
+                                                },
+                                            );
+                                        }
                                     };
                                 }
-                            },
+                            }
                             InputEventType::Mouse(_) => (),
                         }
                     }
                 });
-            },
+            }
             #[allow(deprecated)]
-            WindowEvent::MouseInput { device_id: _, state, button, modifiers: _ } => {
+            WindowEvent::MouseInput {
+                device_id: _,
+                state,
+                button,
+                modifiers: _,
+            } => {
                 let input_ev_type = InputEventType::Mouse(*button);
                 match state {
                     ElementState::Pressed => {
@@ -75,7 +86,7 @@ pub fn reg_event(event: &WindowEvent) {
                             DOWN_EVENTS.push(input_ev_type);
                             JUST_PRESSED_EVENTS.push(input_ev_type);
                         }
-                    },
+                    }
                     ElementState::Released => {
                         println!("released");
                         if UP_EVENTS.contains(&input_ev_type) == false {
@@ -102,12 +113,8 @@ pub fn update() {
 }
 
 pub fn is_bind_pressed(requested_bind_name: &str) -> bool {
-    let events = unsafe {
-        &JUST_PRESSED_EVENTS
-    };
-    let binds = unsafe {
-        &BINDS
-    };
+    let events = unsafe { &JUST_PRESSED_EVENTS };
+    let binds = unsafe { &BINDS };
 
     for event in events {
         for (bind_name, bind) in binds.iter() {
@@ -116,7 +123,7 @@ pub fn is_bind_pressed(requested_bind_name: &str) -> bool {
                     if &input_event_type == &event {
                         return true;
                     }
-                };
+                }
             }
         }
     }
@@ -125,12 +132,8 @@ pub fn is_bind_pressed(requested_bind_name: &str) -> bool {
 }
 
 pub fn is_bind_down(requested_bind_name: &str) -> bool {
-    let events = unsafe {
-        &DOWN_EVENTS
-    };
-    let binds = unsafe {
-        &BINDS
-    };
+    let events = unsafe { &DOWN_EVENTS };
+    let binds = unsafe { &BINDS };
 
     for event in events {
         for (bind_name, bind) in binds.iter() {
@@ -139,7 +142,7 @@ pub fn is_bind_down(requested_bind_name: &str) -> bool {
                     if &input_event_type == &event {
                         return true;
                     }
-                };
+                }
             }
         }
     }
@@ -148,12 +151,8 @@ pub fn is_bind_down(requested_bind_name: &str) -> bool {
 }
 
 pub fn is_bind_up(requested_bind_name: &str) -> bool {
-    let events = unsafe {
-        &UP_EVENTS
-    };
-    let binds = unsafe {
-        &BINDS
-    };
+    let events = unsafe { &UP_EVENTS };
+    let binds = unsafe { &BINDS };
 
     for event in events {
         for (bind_name, bind) in binds.iter() {
@@ -162,7 +161,7 @@ pub fn is_bind_up(requested_bind_name: &str) -> bool {
                     if &input_event_type == &event {
                         return true;
                     }
-                };
+                }
             }
         }
     }
@@ -173,13 +172,12 @@ pub fn is_bind_up(requested_bind_name: &str) -> bool {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum InputEventType {
     Key(VirtualKeyCode),
-    Mouse(MouseButton)
+    Mouse(MouseButton),
 }
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum InputEventPressType {
-    JustPressed, 
+    JustPressed,
     Down,
-    Up
+    Up,
 }
-
