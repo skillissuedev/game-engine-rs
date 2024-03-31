@@ -284,7 +284,7 @@ impl Object for ModelObject {
                     ..Default::default()
                 },
                 //blend: glium::draw_parameters::Blend::alpha_blending(),
-                backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+                backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
                 ..Default::default()
             };
 

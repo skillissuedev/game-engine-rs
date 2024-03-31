@@ -49,7 +49,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = 0;
     let mut win_h = 0;
 
-    let shadow_texture = glium::texture::DepthTexture2d::empty(&display, 8192, 8192).unwrap();
+    let shadow_texture = glium::texture::DepthTexture2d::empty(&display, 16384, 16384).unwrap();
 
     let frame_time = Duration::from_millis(16);
 

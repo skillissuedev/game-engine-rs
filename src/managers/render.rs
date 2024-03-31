@@ -231,6 +231,7 @@ pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture
     shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
     shadow_fbo.clear_depth(1.0);
     let view_proj = SunCamera::new().view_proj;
+    dbg!(CameraCorners::new().get_center());
     systems::shadow_render(&view_proj, display, &mut shadow_fbo);
 
     update_camera_vectors();
@@ -426,7 +427,6 @@ static mut RENDER_COLLIDERS: Vec<RenderColliderType> = vec![];
 static mut RENDER_RAYS: Vec<RenderRay> = vec![];
 static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
-static mut SUN_CAMERA: Lazy<SunCamera> = Lazy::new(|| SunCamera::new());
 
 pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f32; 4]; 4], bool) {
     let view = get_view_matrix();
@@ -457,7 +457,7 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             let transform =
                 Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return ((proj * view * transform).to_cols_array_2d(), *sensor);
+            ((proj * view * transform).to_cols_array_2d(), *sensor)
         }
         RenderColliderType::Cuboid(pos, rot, half_x, half_y, half_z, sensor) => {
             match rot {
@@ -480,7 +480,7 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             let transform =
                 Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return ((proj * view * transform).to_cols_array_2d(), *sensor);
+            ((proj * view * transform).to_cols_array_2d(), *sensor)
         }
         RenderColliderType::Capsule(pos, rot, radius, height, sensor) => {
             match rot {
@@ -503,7 +503,7 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             let transform =
                 Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return ((proj * view * transform).to_cols_array_2d(), *sensor);
+            ((proj * view * transform).to_cols_array_2d(), *sensor)
         }
         RenderColliderType::Cylinder(pos, rot, radius, height, sensor) => {
             match rot {
@@ -526,7 +526,7 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
             let transform =
                 Mat4::from_scale_rotation_translation(scale, rot_quat, *position_vector);
 
-            return ((proj * view * transform).to_cols_array_2d(), *sensor);
+            ((proj * view * transform).to_cols_array_2d(), *sensor)
         }
     }
 }
@@ -543,6 +543,7 @@ impl SunCamera {
             corners.min_y,
             corners.max_y,
             corners.min_z,
+            //corners.min_z + corners.max_z / 2.0,
             corners.max_z,
         )
     }
@@ -553,7 +554,7 @@ impl SunCamera {
         let view_up = Vec3::new(0.0, 1.0, 0.0);
 
         //let main_camera_position = get_camera_position();
-        let sun_camera_position = get_light_direction() + Vec3::new(0.0, 200.0, 0.0);
+        let sun_camera_position = get_light_direction() + view_center + Vec3::new(0.0, corners.max_y / 2.0, 0.0);
 
         let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
 
