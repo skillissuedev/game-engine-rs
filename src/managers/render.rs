@@ -231,9 +231,11 @@ pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture
     shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
     shadow_fbo.clear_depth(1.0);
     let view_proj = SunCamera::new().view_proj;
-    systems::shadow_render(view_proj, display, &mut shadow_fbo);
+    systems::shadow_render(&view_proj, display, &mut shadow_fbo);
 
     update_camera_vectors();
+
+    systems::render(&display, target, &view_proj.as_mat4(), shadow_texture);
 }
 
 /* some consts to make code cleaner */
@@ -308,7 +310,7 @@ pub fn get_view_matrix() -> Mat4 {
 }
 
 pub fn get_projection_matrix() -> Mat4 {
-    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 560.0) }
+    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 300.0) }
 }
 
 fn update_camera_vectors() {
@@ -565,6 +567,7 @@ impl SunCamera {
         let view_proj = ViewProj { view, proj };
         SunCamera { view_proj }
     }
+
 }
 
 struct CameraCorners {
@@ -668,3 +671,9 @@ pub struct ViewProj {
     pub view: Mat4,
     pub proj: Mat4,
 }
+
+impl ViewProj {
+    pub fn as_mat4(&self) -> Mat4 {
+        self.proj * self.view
+    }
+ }

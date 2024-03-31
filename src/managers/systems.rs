@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{objects::ObjectGroup, systems::System};
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glam::Mat4;
+use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
 use once_cell::sync::Lazy;
 
 use super::{networking, render::ViewProj};
@@ -49,7 +50,7 @@ pub fn update() {
     }
 }
 
-pub fn render(display: &mut Display, target: &mut Frame) {
+pub fn render(display: &Display, target: &mut Frame, shadow_view_proj: &Mat4, shadow_texture: &DepthTexture2d) {
     unsafe {
         if networking::is_server() {
             for system in &mut SYSTEMS {
@@ -59,17 +60,17 @@ pub fn render(display: &mut Display, target: &mut Frame) {
         } else {
             for system in &mut SYSTEMS {
                 system.client_render();
-                system.render_objects(display, target);
+                system.render_objects(display, target, shadow_view_proj, shadow_texture);
             }
         }
     }
 }
 
-pub fn shadow_render(view_proj: ViewProj, display: &Display, target: &mut SimpleFrameBuffer) {
+pub fn shadow_render(view_proj: &ViewProj, display: &Display, target: &mut SimpleFrameBuffer) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {
-                system.shadow_render_objects(&view_proj, display, target);
+                system.shadow_render_objects(view_proj, display, target);
             }
         }
     }

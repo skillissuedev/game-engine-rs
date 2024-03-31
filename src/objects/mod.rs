@@ -7,8 +7,8 @@ use crate::{
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
-use glam::Vec3;
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glam::{Mat4, Vec3};
+use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
 use serde::{Deserialize, Serialize};
 
 pub mod camera_position;
@@ -58,15 +58,15 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> {
         println!("call function is not implemented in this object.");
-        return None;
+        None
     }
 
-    fn render(&mut self, display: &Display, target: &mut Frame) {}
+    fn render(&mut self, _display: &Display, _target: &mut Frame, _shadow_view_proj: &Mat4, _shadow_texture: &DepthTexture2d) {}
     fn shadow_render(
         &mut self,
-        view_proj: &ViewProj,
-        display: &Display,
-        target: &mut SimpleFrameBuffer,
+        _view_proj: &ViewProj,
+        _display: &Display,
+        _target: &mut SimpleFrameBuffer,
     ) {
     }
 
@@ -138,10 +138,10 @@ pub trait Object: std::fmt::Debug + Downcast {
         });
     }
 
-    fn render_children(&mut self, display: &Display, target: &mut Frame) {
+    fn render_children(&mut self, display: &Display, target: &mut Frame, shadow_view_proj: &Mat4, shadow_texture: &DepthTexture2d) {
         self.children_list_mut().iter_mut().for_each(|child| {
-            child.render(display, target);
-            child.render_children(display, target);
+            child.render(display, target, shadow_view_proj, shadow_texture);
+            child.render_children(display, target, shadow_view_proj, shadow_texture);
         });
     }
 

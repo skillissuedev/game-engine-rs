@@ -35,8 +35,6 @@ impl Object for CameraPosition {
         render::set_camera_rotation(global_transform.rotation);
     }
 
-    fn render(&mut self, _display: &glium::Display, _target: &mut glium::Frame) {}
-
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
     }

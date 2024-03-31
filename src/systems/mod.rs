@@ -8,7 +8,8 @@ use crate::{
     },
     objects::Object,
 };
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glam::Mat4;
+use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
 
 pub trait System {
     fn client_start(&mut self);
@@ -78,13 +79,13 @@ pub trait System {
             .for_each(|object| object.update_children());
     }
 
-    fn render_objects(&mut self, display: &mut Display, target: &mut Frame) {
+    fn render_objects(&mut self, display: &Display, target: &mut Frame, shadow_view_proj: &Mat4, shadow_texture: &DepthTexture2d) {
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.render(display, target));
+            .for_each(|object| object.render(display, target, shadow_view_proj, shadow_texture));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.render_children(display, target));
+            .for_each(|object| object.render_children(display, target, shadow_view_proj, shadow_texture));
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.debug_render());

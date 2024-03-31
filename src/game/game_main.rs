@@ -9,4 +9,4 @@ pub fn start() {
 
 pub fn update() {}
 
-pub fn render() {}
+//pub fn render() {}

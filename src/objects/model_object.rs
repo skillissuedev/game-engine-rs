@@ -14,8 +14,7 @@ use crate::{
 };
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer, uniform, uniforms::UniformBuffer, Display, IndexBuffer,
-    Program, Surface, VertexBuffer,
+    framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, uniform, uniforms::UniformBuffer, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -109,13 +108,15 @@ impl Object for ModelObject {
         }
     }
 
-    fn render(&mut self, display: &Display, target: &mut glium::Frame) {
+    fn render(&mut self, display: &Display, target: &mut glium::Frame, shadow_view_proj: &Mat4, shadow_texture: &DepthTexture2d) {
         if self.error {
             return;
         }
         if !self.started {
             self.start_mesh(display);
         }
+
+        let shadow_view_proj_cols = shadow_view_proj.to_cols_array_2d();
 
         for i in 0..self.model_asset.objects.len() {
             let object = &self.model_asset.objects[i];
@@ -179,6 +180,13 @@ impl Object for ModelObject {
                 ],
                 tex: texture,
                 lightPos: render::get_light_direction().to_array(),
+                shadowTexture: shadow_texture,
+                shadowViewProj: [
+                    shadow_view_proj_cols[0],
+                    shadow_view_proj_cols[1],
+                    shadow_view_proj_cols[2],
+                    shadow_view_proj_cols[3],
+                ],
             };
 
             let draw_params = glium::DrawParameters {

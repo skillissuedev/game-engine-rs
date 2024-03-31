@@ -34,7 +34,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .with_title("projectbaldej")
         .with_transparent(false);
     let cb = ContextBuilder::new().with_srgb(false).with_vsync(true);
-    let mut display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
+    let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
 
     let mut frames_count: usize = 0;
     let mut now = std::time::Instant::now();
@@ -49,7 +49,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = 0;
     let mut win_h = 0;
 
-    let shadow_texture = glium::texture::DepthTexture2d::empty(&display, 2048, 2048).unwrap();
+    let shadow_texture = glium::texture::DepthTexture2d::empty(&display, 8192, 8192).unwrap();
 
     let frame_time = Duration::from_millis(16);
 
@@ -86,8 +86,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         let mut target = display.draw();
 
                         render::draw(&display, &mut target, &shadow_texture);
-                        game_main::render();
-                        systems::render(&mut display, &mut target);
+                        //game_main::render();
                         render::debug_draw(&display, &mut target);
 
                         target.finish().unwrap();
