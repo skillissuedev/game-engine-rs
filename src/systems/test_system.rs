@@ -2,16 +2,12 @@ use super::System;
 use crate::{
     assets::{model_asset::ModelAsset, shader_asset::ShaderAsset},
     managers::{
-        input::{self, InputEventType},
-        networking::{
+        input::{self, InputEventType}, networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
-        },
-        physics::{BodyColliderType, BodyType, RenderColliderType},
-        systems::CallList,
+        }, physics::{BodyColliderType, BodyType, RenderColliderType}, render, systems::CallList
     },
     objects::{
-        character_controller::CharacterController, empty_object::EmptyObject,
-        model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object,
+        camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object
     },
 };
 use glam::{Vec2, Vec3};
@@ -48,7 +44,7 @@ impl System for TestSystem {
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
         ground_collider.set_scale(Vec3::new(5.0, 1.0, 5.0));
 
-        knife_model.set_position(Vec3::new(5.0, 6.0, 6.0), true);
+        knife_model.set_position(Vec3::new(0.0, 6.0, 3.0), true);
         knife_model.build_object_rigid_body(
             Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(
                 0.2, 2.0, 0.2,
@@ -99,13 +95,14 @@ impl System for TestSystem {
         let asset = ModelAsset::from_file("models/knife_test.gltf");
         let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
+
         let mut knife_model = Box::new(ModelObject::new(
             "knife_model",
             asset.unwrap(),
             None,
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        knife_model.set_position(Vec3::new(5.0, 6.0, 6.0), true);
+        knife_model.set_position(Vec3::new(0.0, 6.0, 10.0), true);
 
         let mut ground_collider = Box::new(ModelObject::new(
             "ground_collider",

@@ -311,7 +311,7 @@ pub fn get_view_matrix() -> Mat4 {
 }
 
 pub fn get_projection_matrix() -> Mat4 {
-    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 300.0) }
+    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 150.0) }
 }
 
 fn update_camera_vectors() {
@@ -537,6 +537,9 @@ struct SunCamera {
 
 impl SunCamera {
     fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
+        dbg!((corners.min_x as i32).abs_diff(corners.max_x as i32));
+        dbg!((corners.min_y as i32).abs_diff(corners.max_y as i32));
+        dbg!((corners.min_z as i32).abs_diff(corners.max_z as i32));
         Mat4::orthographic_rh_gl(
             corners.min_x,
             corners.max_x,
