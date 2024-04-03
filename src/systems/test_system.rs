@@ -4,10 +4,10 @@ use crate::{
     managers::{
         input::{self, InputEventType}, networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
-        }, physics::{BodyColliderType, BodyType, RenderColliderType}, render, systems::CallList
+        }, physics::{BodyColliderType, BodyType, RenderColliderType}, systems::CallList
     },
     objects::{
-        camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object
+        character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object
     },
 };
 use glam::{Vec2, Vec3};
@@ -44,7 +44,7 @@ impl System for TestSystem {
         ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
         ground_collider.set_scale(Vec3::new(5.0, 1.0, 5.0));
 
-        knife_model.set_position(Vec3::new(0.0, 6.0, 3.0), true);
+        knife_model.set_position(Vec3::new(0.0, 6.0, 5.0), true);
         knife_model.build_object_rigid_body(
             Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(
                 0.2, 2.0, 0.2,
@@ -94,6 +94,9 @@ impl System for TestSystem {
     fn client_start(&mut self) {
         let asset = ModelAsset::from_file("models/knife_test.gltf");
         let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
+        let shadow_model_asset = ModelAsset::from_file("models/test_model_for_shadows.gltf").unwrap();
+        let mut test_shadow_model = Box::new(ModelObject::new("test_shadow_model", shadow_model_asset, None, ShaderAsset::load_default_shader().unwrap()));
+        test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
 
         let mut knife_model = Box::new(ModelObject::new(
@@ -144,6 +147,7 @@ impl System for TestSystem {
 
         self.add_object(knife_model);
         self.add_object(ground_collider);
+        self.add_object(test_shadow_model);
 
         input::new_bind(
             "forward",

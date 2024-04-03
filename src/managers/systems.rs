@@ -5,7 +5,7 @@ use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
 use once_cell::sync::Lazy;
 
-use super::{networking, render::ViewProj};
+use super::networking;
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
@@ -66,7 +66,7 @@ pub fn render(display: &Display, target: &mut Frame, shadow_view_proj: &Mat4, sh
     }
 }
 
-pub fn shadow_render(view_proj: &ViewProj, display: &Display, target: &mut SimpleFrameBuffer) {
+pub fn shadow_render(view_proj: &Mat4, display: &Display, target: &mut SimpleFrameBuffer) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {

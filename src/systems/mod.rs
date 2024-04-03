@@ -3,7 +3,6 @@ pub mod test_system;
 use crate::{
     managers::{
         networking::{self, Message, MessageReliability, NetworkError},
-        render::ViewProj,
         systems::{register_object_id_name, register_object_id_system, CallList},
     },
     objects::Object,
@@ -93,7 +92,7 @@ pub trait System {
 
     fn shadow_render_objects(
         &mut self,
-        view_proj: &ViewProj,
+        view_proj: &Mat4,
         display: &Display,
         target: &mut SimpleFrameBuffer,
     ) {

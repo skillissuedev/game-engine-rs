@@ -8,7 +8,7 @@ use crate::{
     managers::{
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
-        render::{self, Vertex, ViewProj},
+        render::{self, Vertex},
     },
     math_utils::deg_to_rad,
 };
@@ -143,7 +143,7 @@ impl Object for ModelObject {
                 }
             }
 
-            let setup_mat_result = self.setup_mat(None, transform.unwrap());
+            let setup_mat_result = self.setup_mat(transform.unwrap());
             let mvp: Mat4 = setup_mat_result.mvp;
             let model: Mat4 = setup_mat_result.model;
 
@@ -215,7 +215,7 @@ impl Object for ModelObject {
 
     fn shadow_render(
         &mut self,
-        view_proj: &ViewProj,
+        view_proj: &Mat4,
         display: &Display,
         target: &mut SimpleFrameBuffer,
     ) {
@@ -253,8 +253,7 @@ impl Object for ModelObject {
                 }
             }
 
-            let setup_mat_result = self.setup_mat(Some(&view_proj), transform.unwrap());
-            let view_proj = view_proj.proj * view_proj.view;
+            let setup_mat_result = self.setup_mat(transform.unwrap());
             let model: Mat4 = setup_mat_result.model;
 
             let model_cols = model.to_cols_array_2d();
@@ -518,7 +517,6 @@ impl ModelObject {
 
     fn setup_mat(
         &self,
-        view_proj: Option<&ViewProj>,
         node_transform: &NodeTransform,
     ) -> SetupMatrixResult {
         match node_transform.global_transform {
@@ -573,18 +571,8 @@ impl ModelObject {
         let transform =
             Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
 
-        let view;
-        let proj;
-        match view_proj {
-            Some(view_proj) => {
-                view = view_proj.view;
-                proj = view_proj.proj;
-            }
-            None => {
-                view = render::get_view_matrix();
-                proj = render::get_projection_matrix();
-            }
-        }
+        let view = render::get_view_matrix();
+        let proj = render::get_projection_matrix();
 
         let mvp = proj * view * transform;
 

@@ -3,7 +3,7 @@ use crate::{
     managers::{
         self,
         physics::{self, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-        render::{self, ViewProj},
+        render,
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
@@ -64,7 +64,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn render(&mut self, _display: &Display, _target: &mut Frame, _shadow_view_proj: &Mat4, _shadow_texture: &DepthTexture2d) {}
     fn shadow_render(
         &mut self,
-        _view_proj: &ViewProj,
+        _view_proj: &Mat4,
         _display: &Display,
         _target: &mut SimpleFrameBuffer,
     ) {
@@ -147,7 +147,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn shadow_render_children(
         &mut self,
-        view_proj: &ViewProj,
+        view_proj: &Mat4,
         display: &Display,
         target: &mut SimpleFrameBuffer,
     ) {

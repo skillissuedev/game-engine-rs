@@ -4,7 +4,6 @@ use glium::{
     framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,
     texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer,
 };
-use once_cell::sync::Lazy;
 
 use super::{
     physics::{RenderColliderType, RenderRay},
@@ -230,13 +229,13 @@ pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture
     let mut shadow_fbo = SimpleFrameBuffer::depth_only(display, shadow_texture).unwrap();
     shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
     shadow_fbo.clear_depth(1.0);
-    let view_proj = SunCamera::new().view_proj;
+    let view_proj = SunCamera::new().as_mat4();
     dbg!(CameraCorners::new().get_center());
     systems::shadow_render(&view_proj, display, &mut shadow_fbo);
 
     update_camera_vectors();
 
-    systems::render(&display, target, &view_proj.as_mat4(), shadow_texture);
+    systems::render(&display, target, &view_proj, shadow_texture);
 }
 
 /* some consts to make code cleaner */
@@ -311,7 +310,8 @@ pub fn get_view_matrix() -> Mat4 {
 }
 
 pub fn get_projection_matrix() -> Mat4 {
-    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 150.0) }
+    dbg!(unsafe {CAMERA_LOCATION.fov});
+    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 25.0) }
 }
 
 fn update_camera_vectors() {
@@ -532,20 +532,38 @@ pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f3
 }
 
 struct SunCamera {
-    pub view_proj: ViewProj,
+    pub view: Mat4,
+    pub proj: Mat4,
+}
+
+struct Cascades {
+    closest: SunCamera, 
+    furthest: SunCamera, 
+    camera_corners: CameraCorners
+}
+impl Cascades {
+    pub fn new() -> Cascades {
+        let corners = CameraCorners::new();
+        todo!()
+    }
 }
 
 impl SunCamera {
-    fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
-        dbg!((corners.min_x as i32).abs_diff(corners.max_x as i32));
-        dbg!((corners.min_y as i32).abs_diff(corners.max_y as i32));
-        dbg!((corners.min_z as i32).abs_diff(corners.max_z as i32));
+    fn get_sun_camera_projection_matrix(corners: &CameraCorners, start_distance: f32, end_distance: Option<f32>) -> Mat4 {
+        dbg!(corners.min_x, corners.max_x);
+        dbg!(corners.min_y, corners.max_y);
+        dbg!(corners.min_z + start_distance, corners.max_z);
+        let end_distance = match end_distance {
+            Some(distance) => distance,
+            None => corners.max_z,
+        };
+
         Mat4::orthographic_rh_gl(
             corners.min_x,
             corners.max_x,
             corners.min_y,
             corners.max_y,
-            corners.min_z,
+            corners.min_z + start_distance,
             //corners.min_z + corners.max_z / 2.0,
             corners.max_z,
         )
@@ -564,14 +582,15 @@ impl SunCamera {
         view_matrix
     }
 
-    pub fn new() -> SunCamera {
-        let corners = &CameraCorners::new();
-        let proj = Self::get_sun_camera_projection_matrix(corners);
+    pub fn new(corners: &CameraCorners, start_distance: f32, end_distance: Option<f32>) -> SunCamera {
+        let proj = Self::get_sun_camera_projection_matrix(corners, start_distance, end_distance);
         let view = Self::get_sun_camera_view_matrix(corners);
-        let view_proj = ViewProj { view, proj };
-        SunCamera { view_proj }
+        SunCamera { view, proj }
     }
 
+    pub fn as_mat4(&self) -> Mat4 {
+        self.proj * self.view
+    }
 }
 
 struct CameraCorners {
@@ -671,13 +690,3 @@ impl CameraCorners {
     }
 }
 
-pub struct ViewProj {
-    pub view: Mat4,
-    pub proj: Mat4,
-}
-
-impl ViewProj {
-    pub fn as_mat4(&self) -> Mat4 {
-        self.proj * self.view
-    }
- }

@@ -46,10 +46,10 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     navigation::update();
     game_main::start();
 
-    let mut win_w = 0;
-    let mut win_h = 0;
+    let mut win_w = display.gl_window().window().inner_size().width;
+    let mut win_h = display.gl_window().window().inner_size().height;
 
-    let shadow_texture = glium::texture::DepthTexture2d::empty(&display, 8192, 8192).unwrap();
+    let shadow_texture = glium::texture::DepthTexture2dArray::empty(&display, 4096, 4096, 2).unwrap(); // 2 Cascades
 
     let frame_time = Duration::from_millis(16);
 
@@ -76,13 +76,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             render::get_camera_front(),
                         );
 
-                        win_w = display.gl_window().window().inner_size().width;
-                        win_h = display.gl_window().window().inner_size().height;
-
-                        unsafe {
-                            render::ASPECT_RATIO = win_w as f32 / win_h as f32;
-                        }
-
                         let mut target = display.draw();
 
                         render::draw(&display, &mut target, &shadow_texture);
@@ -100,7 +93,15 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit;
                         networking::disconnect();
-                    }
+                    }, 
+                    WindowEvent::Resized(size) => {
+                        win_w = size.width;
+                        win_h = size.height;
+
+                        unsafe {
+                            render::ASPECT_RATIO = win_w as f32 / win_h as f32;
+                        }
+                    },
                     _ => (),
                 }
             }
