@@ -223,19 +223,25 @@ pub fn add_ray_to_draw(ray: RenderRay) {
     }
 }
 
-pub fn draw(display: &Display, target: &mut Frame, shadow_texture: &DepthTexture2d) {
+pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextures) {
     target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
 
-    let mut shadow_fbo = SimpleFrameBuffer::depth_only(display, shadow_texture).unwrap();
-    shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
-    shadow_fbo.clear_depth(1.0);
-    let view_proj = SunCamera::new().as_mat4();
-    dbg!(CameraCorners::new().get_center());
-    systems::shadow_render(&view_proj, display, &mut shadow_fbo);
+    let mut closest_shadow_fbo = SimpleFrameBuffer::depth_only(display, &shadow_textures.closest).unwrap();
+    closest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    closest_shadow_fbo.clear_depth(1.0);
+
+    let mut furthest_shadow_fbo = SimpleFrameBuffer::depth_only(display, &shadow_textures.furthest).unwrap();
+    furthest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    furthest_shadow_fbo.clear_depth(1.0);
+
+    let view = get_view_matrix();
+    let cascades = Cascades::new(view);
+    systems::shadow_render(&cascades.closest.as_mat4(), display, &mut closest_shadow_fbo);
+    systems::shadow_render(&cascades.furthest.as_mat4(), display, &mut furthest_shadow_fbo);
 
     update_camera_vectors();
 
-    systems::render(&display, target, &view_proj, shadow_texture);
+    systems::render(&display, target, &cascades, shadow_textures);
 }
 
 /* some consts to make code cleaner */
@@ -310,8 +316,7 @@ pub fn get_view_matrix() -> Mat4 {
 }
 
 pub fn get_projection_matrix() -> Mat4 {
-    dbg!(unsafe {CAMERA_LOCATION.fov});
-    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 25.0) }
+    unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, 0.001, 500.0) }
 }
 
 fn update_camera_vectors() {
@@ -536,34 +541,36 @@ struct SunCamera {
     pub proj: Mat4,
 }
 
-struct Cascades {
+pub struct Cascades {
     closest: SunCamera, 
     furthest: SunCamera, 
-    camera_corners: CameraCorners
+    pub closest_view_proj: Mat4, 
+    pub furthest_view_proj: Mat4
 }
+
 impl Cascades {
-    pub fn new() -> Cascades {
-        let corners = CameraCorners::new();
-        todo!()
+    pub fn new(view: Mat4) -> Cascades {
+        let closest = SunCamera::new(view, 0.0, Some(50.0));
+        let furthest = SunCamera::new(view, 50.0, None);
+        let closest_view_proj = closest.as_mat4();
+        let furthest_view_proj = furthest.as_mat4();
+
+        Cascades { closest, furthest, closest_view_proj, furthest_view_proj } 
     }
 }
 
 impl SunCamera {
-    fn get_sun_camera_projection_matrix(corners: &CameraCorners, start_distance: f32, end_distance: Option<f32>) -> Mat4 {
+    fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
         dbg!(corners.min_x, corners.max_x);
         dbg!(corners.min_y, corners.max_y);
-        dbg!(corners.min_z + start_distance, corners.max_z);
-        let end_distance = match end_distance {
-            Some(distance) => distance,
-            None => corners.max_z,
-        };
+        dbg!(corners.min_z, corners.max_z);
 
         Mat4::orthographic_rh_gl(
             corners.min_x,
             corners.max_x,
             corners.min_y,
             corners.max_y,
-            corners.min_z + start_distance,
+            corners.min_z,
             //corners.min_z + corners.max_z / 2.0,
             corners.max_z,
         )
@@ -582,9 +589,10 @@ impl SunCamera {
         view_matrix
     }
 
-    pub fn new(corners: &CameraCorners, start_distance: f32, end_distance: Option<f32>) -> SunCamera {
-        let proj = Self::get_sun_camera_projection_matrix(corners, start_distance, end_distance);
-        let view = Self::get_sun_camera_view_matrix(corners);
+    pub fn new(view: Mat4, start_distance: f32, end_distance: Option<f32>) -> SunCamera {
+        let corners = CameraCorners::new(start_distance, end_distance, view);
+        let proj = Self::get_sun_camera_projection_matrix(&corners);
+        let view = Self::get_sun_camera_view_matrix(&corners);
         SunCamera { view, proj }
     }
 
@@ -633,12 +641,23 @@ impl CameraCorners {
         vec3_frustum_corners
     }
 
+    pub fn get_camera_proj(mut start_distance: f32, end_distance: Option<f32>) -> Mat4 {
+        start_distance += 0.01;
+        let end_distance = match end_distance {
+            Some(distance) => distance,
+            None => 500.0,
+        };
+        dbg!(start_distance, end_distance);
+        unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, start_distance, end_distance) }
+    }
+
     pub fn get_sun_eye(&self) -> Vec3 {
         Vec3::new(self.min_x, self.max_y, self.min_z)
     }
 
-    pub fn new() -> CameraCorners {
-        let corners = Self::get_camera_corners(get_projection_matrix(), get_view_matrix());
+    pub fn new(start_distance: f32, end_distance: Option<f32>, view: Mat4) -> CameraCorners {
+        let corners = Self::get_camera_corners(Self::get_camera_proj(start_distance, end_distance), view);
+        dbg!(&corners);
 
         let mut min_x = 0.0;
         let mut min_y = 0.0;
@@ -690,3 +709,16 @@ impl CameraCorners {
     }
 }
 
+pub struct ShadowTextures {
+    pub closest: DepthTexture2d,
+    pub furthest: DepthTexture2d
+}
+
+impl ShadowTextures {
+    pub fn new(display: &Display, closest_size: u32, furthest_size: u32) -> ShadowTextures {
+        let closest = glium::texture::DepthTexture2d::empty(display, closest_size, closest_size).unwrap(); // 1st Cascade
+        let furthest = glium::texture::DepthTexture2d::empty(display, furthest_size, furthest_size).unwrap(); // 2st Cascade
+        
+        ShadowTextures { closest, furthest }
+    }
+}

@@ -2,8 +2,7 @@ pub mod test_system;
 
 use crate::{
     managers::{
-        networking::{self, Message, MessageReliability, NetworkError},
-        systems::{register_object_id_name, register_object_id_system, CallList},
+        networking::{self, Message, MessageReliability, NetworkError}, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList}
     },
     objects::Object,
 };
@@ -78,13 +77,13 @@ pub trait System {
             .for_each(|object| object.update_children());
     }
 
-    fn render_objects(&mut self, display: &Display, target: &mut Frame, shadow_view_proj: &Mat4, shadow_texture: &DepthTexture2d) {
+    fn render_objects(&mut self, display: &Display, target: &mut Frame, cascades: &Cascades, shadow_textures: &ShadowTextures) {
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.render(display, target, shadow_view_proj, shadow_texture));
+            .for_each(|object| object.render(display, target, cascades, shadow_textures));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.render_children(display, target, shadow_view_proj, shadow_texture));
+            .for_each(|object| object.render_children(display, target, cascades, shadow_textures));
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.debug_render());

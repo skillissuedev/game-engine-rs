@@ -3,7 +3,7 @@ use crate::{
     managers::{
         self,
         physics::{self, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-        render,
+        render::{self, Cascades, ShadowTextures},
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
@@ -61,7 +61,8 @@ pub trait Object: std::fmt::Debug + Downcast {
         None
     }
 
-    fn render(&mut self, _display: &Display, _target: &mut Frame, _shadow_view_proj: &Mat4, _shadow_texture: &DepthTexture2d) {}
+    fn render(&mut self, _display: &Display, _target: &mut Frame, _cascades: &Cascades, _shadow_textures: &ShadowTextures) {}
+
     fn shadow_render(
         &mut self,
         _view_proj: &Mat4,
@@ -138,10 +139,10 @@ pub trait Object: std::fmt::Debug + Downcast {
         });
     }
 
-    fn render_children(&mut self, display: &Display, target: &mut Frame, shadow_view_proj: &Mat4, shadow_texture: &DepthTexture2d) {
+    fn render_children(&mut self, display: &Display, target: &mut Frame, cascades: &Cascades, shadow_texture: &ShadowTextures) {
         self.children_list_mut().iter_mut().for_each(|child| {
-            child.render(display, target, shadow_view_proj, shadow_texture);
-            child.render_children(display, target, shadow_view_proj, shadow_texture);
+            child.render(display, target, cascades, shadow_texture);
+            child.render_children(display, target, cascades, shadow_texture);
         });
     }
 

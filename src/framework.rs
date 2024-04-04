@@ -3,7 +3,7 @@ use crate::{
     managers::{
         input, navigation,
         networking::{self, NetworkingMode},
-        physics, render,
+        physics, render::{self, ShadowTextures},
         sound::{self, set_listener_transform},
         systems,
     },
@@ -49,7 +49,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = display.gl_window().window().inner_size().width;
     let mut win_h = display.gl_window().window().inner_size().height;
 
-    let shadow_texture = glium::texture::DepthTexture2dArray::empty(&display, 4096, 4096, 2).unwrap(); // 2 Cascades
+    let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
 
     let frame_time = Duration::from_millis(16);
 
@@ -78,7 +78,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
                         let mut target = display.draw();
 
-                        render::draw(&display, &mut target, &shadow_texture);
+                        render::draw(&display, &mut target, &shadow_textures);
                         //game_main::render();
                         render::debug_draw(&display, &mut target);
 
