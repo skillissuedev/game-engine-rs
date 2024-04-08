@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{objects::ObjectGroup, systems::System};
 use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use once_cell::sync::Lazy;
 
 use super::{networking, render::{Cascades, ShadowTextures}};

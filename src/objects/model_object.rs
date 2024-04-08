@@ -14,7 +14,7 @@ use crate::{
 };
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, uniform, uniforms::UniformBuffer, Display, IndexBuffer, Program, Surface, VertexBuffer
+    framebuffer::SimpleFrameBuffer, uniform, uniforms::UniformBuffer, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -162,6 +162,7 @@ impl Object for ModelObject {
             let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
             let inverse_bind_mats =
                 UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
+            let camera_position: [f32; 3] = render::get_camera_position().into();
 
             let uniforms = uniform! {
                 jointsMats: &joints,
@@ -195,6 +196,7 @@ impl Object for ModelObject {
                     furthest_shadow_view_proj_cols[2],
                     furthest_shadow_view_proj_cols[3],
                 ],
+                cameraPosition: camera_position,
             };
 
             let draw_params = glium::DrawParameters {
