@@ -229,7 +229,6 @@ impl Object for ModelObject {
         display: &Display,
         target: &mut SimpleFrameBuffer,
     ) {
-        println!("shadow_render!");
         if !self.started {
             self.start_mesh(display);
         }

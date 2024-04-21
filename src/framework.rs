@@ -11,10 +11,7 @@ use crate::{
 use glium::{
     backend::glutin,
     glutin::{
-        event::WindowEvent,
-        event_loop::{ControlFlow, EventLoop},
-        window::WindowBuilder,
-        ContextBuilder,
+        dpi::PhysicalSize, event::WindowEvent, event_loop::{ControlFlow, EventLoop}, window::WindowBuilder, ContextBuilder
     },
     Display,
 };
@@ -32,6 +29,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let event_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("projectbaldej")
+        .with_inner_size(PhysicalSize::new(1280, 720))
         .with_transparent(false);
     let cb = ContextBuilder::new().with_srgb(false);//.with_vsync(true);
     let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
@@ -49,7 +47,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = display.gl_window().window().inner_size().width;
     let mut win_h = display.gl_window().window().inner_size().height;
 
-    let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
+    let shadow_textures = ShadowTextures::new(&display, 8192, 4096);
 
     let frame_time = Duration::from_millis(16);
 

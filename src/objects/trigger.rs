@@ -269,7 +269,7 @@ impl Trigger {
     pub fn is_colliding(&self) -> bool {
         let intersections_count = unsafe {
             physics::NARROW_PHASE
-                .intersections_with(self.collider_handle)
+                .intersection_pairs_with(self.collider_handle)
                 .count()
         };
 
@@ -277,7 +277,7 @@ impl Trigger {
             0 => {
                 let contact_count = unsafe {
                     physics::NARROW_PHASE
-                        .contacts_with(self.collider_handle)
+                        .contact_pairs_with(self.collider_handle)
                         .count()
                 };
                 if contact_count > 0 {
@@ -292,7 +292,7 @@ impl Trigger {
 
     pub fn is_intersecting_with_group(&self, group: ObjectGroup) -> bool {
         let intersections_iter =
-            unsafe { physics::NARROW_PHASE.intersections_with(self.collider_handle) };
+            unsafe { physics::NARROW_PHASE.intersection_pairs_with(self.collider_handle) };
 
         let collider_set = unsafe { &physics::COLLIDER_SET };
 

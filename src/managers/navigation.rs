@@ -98,7 +98,7 @@ pub fn add_obstacle(transform: NavMeshObstacleTransform) {
                         NAVMESH_OBSTACLES.insert(*navmesh_id, vec![transform]);
                     }
                 }
-                dbg!(&NAVMESH_OBSTACLES.get(navmesh_id));
+                //dbg!(&NAVMESH_OBSTACLES.get(navmesh_id));
 
                 break;
             }
@@ -160,7 +160,7 @@ pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec
 
     let finish_x = finish_world.x.round() as i32;
     let finish_z = finish_world.y.round() as i32;
-    dbg!(start_x, start_z, finish_x, finish_z);
+    //dbg!(start_x, start_z, finish_x, finish_z);
 
     unsafe {
         for (navmesh_id, dim) in NAVMESH_DIMENSIONS.iter() {
@@ -173,14 +173,14 @@ pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec
             let navmesh_x2 = navmesh_position_x + area_size_x as i32 / 2;
             let navmesh_z1 = navmesh_position_z - area_size_z as i32 / 2;
             let navmesh_z2 = navmesh_position_z + area_size_z as i32 / 2;
-            dbg!(navmesh_x1, navmesh_x2, navmesh_z1, navmesh_z2);
+            //dbg!(navmesh_x1, navmesh_x2, navmesh_z1, navmesh_z2);
 
             if (start_x >= navmesh_x1 && start_x <= navmesh_x2)
                 && (start_z >= navmesh_z1 && start_z <= navmesh_z2)
                 && (finish_x >= navmesh_x1 && finish_x <= navmesh_x2)
                 && (finish_z >= navmesh_z1 && finish_z <= navmesh_z2)
             {
-                dbg!(navmesh_id);
+                //dbg!(navmesh_id);
                 match NAVMESH_GRIDS.get(navmesh_id) {
                     Some(grid) => {
                         let grid_start_x = navmesh_x1.abs_diff(start_x);
@@ -190,15 +190,15 @@ pub fn find_next_path_point(start_world: Vec2, finish_world: Vec2) -> Option<Vec
 
                         let grid_start = Point::new(grid_start_x as i32, grid_start_z as i32);
                         let grid_finish = Point::new(grid_finish_x as i32, grid_finish_z as i32);
-                        dbg!(grid_start, grid_finish);
+                        //dbg!(grid_start, grid_finish);
                         match grid.get_path_single_goal(grid_start, grid_finish, false) {
                             Some(path) => {
-                                dbg!(&path);
+                                //dbg!(&path);
                                 match path.get(1) {
                                     Some(point) => {
                                         let point_x = (navmesh_x1 + point.x) as f32;
                                         let point_z = (navmesh_z1 + point.y) as f32;
-                                        dbg!(point_x, point_z);
+                                        //dbg!(point_x, point_z);
                                         return Some(Vec2::new(point_x, point_z));
                                     }
                                     None => {

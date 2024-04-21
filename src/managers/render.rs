@@ -224,7 +224,7 @@ pub fn add_ray_to_draw(ray: RenderRay) {
 }
 
 pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextures) {
-    target.clear_color_srgb_and_depth((0.1, 0.1, 0.1, 1.0), 1.0);
+    target.clear_color_and_depth((0.4, 0.4, 0.4, 1.0), 1.0);
 
     let mut closest_shadow_fbo = SimpleFrameBuffer::depth_only(display, &shadow_textures.closest).unwrap();
     closest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
@@ -295,7 +295,7 @@ pub fn set_camera_fov(fov: f32) {
     }
 }
 
-pub fn set_light_position(pos: Vec3) {
+pub fn set_light_direction(pos: Vec3) {
     unsafe {
         LIGHT_POSITION = pos;
     }
@@ -307,9 +307,11 @@ pub fn get_light_direction() -> Vec3 {
 
 pub fn get_view_matrix() -> Mat4 {
     unsafe {
+        let mut camera_position = CAMERA_LOCATION.position;
+        camera_position.x = -camera_position.x;
         Mat4::look_at_lh(
-            CAMERA_LOCATION.position,
-            -(CAMERA_LOCATION.position + CAMERA_LOCATION.front),
+            camera_position,
+            camera_position - CAMERA_LOCATION.front,
             DEFAULT_UP_VECTOR,
         )
     }
@@ -561,9 +563,9 @@ impl Cascades {
 
 impl SunCamera {
     fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
-        dbg!(corners.min_x, corners.max_x);
-        dbg!(corners.min_y, corners.max_y);
-        dbg!(corners.min_z, corners.max_z);
+        //dbg!(corners.min_x, corners.max_x);
+        //dbg!(corners.min_y, corners.max_y);
+        //dbg!(corners.min_z, corners.max_z);
 
         Mat4::orthographic_rh_gl(
             corners.min_x,
@@ -637,7 +639,7 @@ impl CameraCorners {
             vec3_frustum_corners.push(Vec3::new(corner.x, corner.y, corner.z));
         }
 
-        dbg!(&vec3_frustum_corners);
+        //dbg!(&vec3_frustum_corners);
         vec3_frustum_corners
     }
 
@@ -647,7 +649,7 @@ impl CameraCorners {
             Some(distance) => distance,
             None => 500.0,
         };
-        dbg!(start_distance, end_distance);
+        //dbg!(start_distance, end_distance);
         unsafe { Mat4::perspective_rh_gl(CAMERA_LOCATION.fov, ASPECT_RATIO, start_distance, end_distance) }
     }
 
@@ -657,7 +659,7 @@ impl CameraCorners {
 
     pub fn new(start_distance: f32, end_distance: Option<f32>, view: Mat4) -> CameraCorners {
         let corners = Self::get_camera_corners(Self::get_camera_proj(start_distance, end_distance), view);
-        dbg!(&corners);
+        //dbg!(&corners);
 
         let mut min_x = 0.0;
         let mut min_y = 0.0;

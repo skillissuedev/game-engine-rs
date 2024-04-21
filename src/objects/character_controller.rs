@@ -43,7 +43,7 @@ impl CharacterController {
         let mut controller = KinematicCharacterController::default();
         controller.max_slope_climb_angle = deg_to_rad(45.0);
         controller.up = nalgebra::Vector::y_axis();
-        controller.offset = CharacterLength::Absolute(0.1);
+        controller.offset = CharacterLength::Absolute(0.2);
 
         let mask = match mask {
             Some(mask) => mask,
@@ -107,8 +107,8 @@ impl Object for CharacterController {
                     Vec2::new(pos.x, pos.z),
                     Vec2::new(target.x, target.z),
                 );
-                dbg!(self.local_transform());
-                dbg!(next_pos);
+                //dbg!(self.local_transform());
+                //dbg!(next_pos);
                 match next_pos {
                     Some(next_pos) => {
                         let full_pos = Vec3::new(next_pos.x, 0.0, next_pos.y);
@@ -117,7 +117,7 @@ impl Object for CharacterController {
                         self.last_path_point = Some(full_pos);
                     }
                     None => {
-                        println!("done walking");
+                        //println!("done walking");
                         self.last_path_point = None;
                         self.movement = None;
                     }

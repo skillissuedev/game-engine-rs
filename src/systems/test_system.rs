@@ -1,10 +1,10 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset},
+    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, texture_asset::TextureAsset},
     managers::{
         input::{self, InputEventType}, networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
-        }, physics::{BodyColliderType, BodyType, RenderColliderType}, systems::CallList
+        }, physics::{BodyColliderType, BodyType, RenderColliderType}, render::{get_camera_position, set_camera_position, set_camera_rotation, set_light_direction}, systems::CallList
     },
     objects::{
         character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object
@@ -31,7 +31,7 @@ impl System for TestSystem {
     fn call_mut(&mut self, _call_id: &str) {}
 
     fn server_start(&mut self) {
-        let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
+        let ground_asset = ModelAsset::from_file("models/ground_1.gltf").unwrap();
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = Box::new(EmptyObject::new("knife_model"));
 
@@ -41,13 +41,14 @@ impl System for TestSystem {
             None,
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
-        ground_collider.set_scale(Vec3::new(5.0, 1.0, 5.0));
+        ground_collider.set_position(Vec3::new(100.0, 90.0, 30.0), true);
+        //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
+        //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
 
-        knife_model.set_position(Vec3::new(0.0, 6.0, 5.0), true);
+        knife_model.set_position(Vec3::new(0.0, 105.0, 15.0), true);
         knife_model.build_object_rigid_body(
             Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(
-                0.2, 2.0, 0.2,
+                0.4, 2.81, 0.2
             )))),
             None,
             1.0,
@@ -55,14 +56,15 @@ impl System for TestSystem {
             None,
         );
         ground_collider.build_object_rigid_body(
-            Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(
-                100.0, 1.0, 100.0,
-            )))),
+            Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(ground_asset)))),
             None,
             1.0,
             None,
             None,
         );
+        /*ground_collider.build_object_rigid_body(
+            Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(103.0, 1.0, 102.0)))), 
+            None, 1.0, None, None);*/
 
         let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(100.0, 100.0));
         navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
@@ -92,8 +94,10 @@ impl System for TestSystem {
     }
 
     fn client_start(&mut self) {
+        set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         let asset = ModelAsset::from_file("models/knife_test.gltf");
-        let ground_asset = ModelAsset::from_file("models/ground.gltf").unwrap();
+        let ground_asset = ModelAsset::from_file("models/ground_1.gltf").unwrap();
+        let ground_texture_asset = TextureAsset::from_file("textures/default_texture.png");
         let shadow_model_asset = ModelAsset::from_file("models/test_model_for_shadows.gltf").unwrap();
         let mut test_shadow_model = Box::new(ModelObject::new("test_shadow_model", shadow_model_asset, None, ShaderAsset::load_default_shader().unwrap()));
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
@@ -110,28 +114,25 @@ impl System for TestSystem {
         let mut ground_collider = Box::new(ModelObject::new(
             "ground_collider",
             ground_asset.clone(),
-            None,
+            Some(ground_texture_asset.unwrap()),
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        ground_collider.set_position(Vec3::new(0.0, -2.0, 0.0), true);
-        ground_collider.set_scale(Vec3::new(5.0, 1.0, 5.0));
+        ground_collider.set_position(Vec3::new(100.0, 90.0, 30.0), true);
+        //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
+        //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
 
         knife_model.build_object_rigid_body(
             None,
-            Some(RenderColliderType::Cuboid(None, None, 0.2, 2.0, 0.2, false)),
+            Some(RenderColliderType::Cuboid(None, None, 0.4, 2.81, 0.2, false)),
             1.0,
             None,
             None,
         );
+
         ground_collider.build_object_rigid_body(
             None,
-            Some(RenderColliderType::Cuboid(
-                None, None, 10.0, 0.5, 10.0, false,
-            )),
-            1.0,
-            None,
-            None,
-        );
+            Some(RenderColliderType::Cuboid(None, None, 20.0, 1.0, 20.0, false)), 
+            1.0, None, None);
 
         let capsule_model_asset = ModelAsset::from_file("models/capsule.gltf").unwrap();
         let mut controller = Box::new(ModelObject::new(
@@ -165,6 +166,14 @@ impl System for TestSystem {
             "right",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::D)],
         );
+        input::new_bind(
+            "cam_up",
+            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::Q)],
+        );
+        input::new_bind(
+            "cam_down",
+            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
+        );
     }
 
     fn server_update(&mut self) {
@@ -196,7 +205,7 @@ impl System for TestSystem {
         }
         let controller = self.find_object_mut("controller");
         let controller: &mut CharacterController = controller.unwrap().downcast_mut().unwrap();
-        controller.walk_to(Vec3::new(3.0, 0.0, 3.0), 0.1);
+        controller.walk_to(Vec3::new(3.0, 0.0, 3.0), 0.5);
 
         //println!("tick");
         /*{
@@ -229,52 +238,35 @@ impl System for TestSystem {
         );
     }
     fn client_update(&mut self) {
+        set_light_direction(Vec3::new(0.0, 0.0, 0.0));
+
+        if input::is_bind_down("cam_up") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(camera_position.x, camera_position.y + 0.05, camera_position.z));
+        }
+        if input::is_bind_down("cam_down") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(camera_position.x, camera_position.y - 0.05, camera_position.z));
+        }
+
         if input::is_bind_down("forward") {
-            let _ = self.send_message(
-                MessageReliability::Reliable,
-                Message {
-                    receiver: networking::MessageReceiver::Everybody,
-                    system_id: self.system_id().into(),
-                    message_id: "move_controller".into(),
-                    message: MessageContents::Custom("forward".into()),
-                },
-            );
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(camera_position.x, camera_position.y, camera_position.z + 0.05));
         }
 
         if input::is_bind_down("backwards") {
-            let _ = self.send_message(
-                MessageReliability::Reliable,
-                Message {
-                    receiver: networking::MessageReceiver::Everybody,
-                    system_id: self.system_id().into(),
-                    message_id: "move_controller".into(),
-                    message: MessageContents::Custom("backwards".into()),
-                },
-            );
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(camera_position.x, camera_position.y, camera_position.z - 0.05));
         }
 
         if input::is_bind_down("left") {
-            let _ = self.send_message(
-                MessageReliability::Reliable,
-                Message {
-                    receiver: networking::MessageReceiver::Everybody,
-                    system_id: self.system_id().into(),
-                    message_id: "move_controller".into(),
-                    message: MessageContents::Custom("left".into()),
-                },
-            );
-        }
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(camera_position.x - 0.05, camera_position.y, camera_position.z));
+       }
 
         if input::is_bind_down("right") {
-            let _ = self.send_message(
-                MessageReliability::Reliable,
-                Message {
-                    receiver: networking::MessageReceiver::Everybody,
-                    system_id: self.system_id().into(),
-                    message_id: "move_controller".into(),
-                    message: MessageContents::Custom("right".into()),
-                },
-            );
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(camera_position.x + 0.05, camera_position.y, camera_position.z));
         }
     }
 
@@ -310,6 +302,7 @@ impl System for TestSystem {
     fn reg_message(&mut self, message: Message) {
         match message.message {
             networking::MessageContents::SyncObject(sync_msg) => {
+                dbg!(&sync_msg);
                 if &sync_msg.object_name == "knife_model" {
                     let object = self.find_object_mut("knife_model");
                     object.unwrap().set_local_transform(sync_msg.transform);
