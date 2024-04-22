@@ -81,16 +81,8 @@ impl Object for EmptyObject {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
-        ui.label("Position:");
-        ui.horizontal(|ui| {
-            ui.label("x: ");
-            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "123"));
-            ui.label("y: ");
-            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "420"));
-            ui.label("z: ");
-            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "69"));
-        });
+    fn inspector_ui(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Some test UI stuff going on rn!");
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {

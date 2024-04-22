@@ -54,7 +54,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>);
     fn body_parameters(&self) -> Option<ObjectBodyParameters>;
     fn object_id(&self) -> &u128;
-    fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &Context);
+    fn inspector_ui(&mut self, ui: &mut Ui);
 
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup>;
 

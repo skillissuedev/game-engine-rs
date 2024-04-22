@@ -94,7 +94,7 @@ impl Object for NavObstacle {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui, _ctx: &egui_glium::egui_winit::egui::Context) {
+    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
         todo!()
     }
 

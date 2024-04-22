@@ -14,9 +14,7 @@ mod systems;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    println!("run args:");
-    dbg!(&args);
-    println!("---\n");
+    println!("run args:\n{:#?}\n---\n\n", &args);
 
     if args.contains(&"server".into()) {
         println!("runnning game as server");

@@ -64,9 +64,14 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                     println!("pressed a button!");
                 }
             });
-            Window::new("inspector").show(ctx, |ui| {
-                managers::ui::draw_inspector(ui, &fps, &mut ui_state);
-            });
+            match get_debug_mode() {
+                DebugMode::None => (),
+                _ => {
+                    Window::new("inspector").show(ctx, |ui| {
+                        managers::ui::draw_inspector(ui, &fps, &mut ui_state);
+                    });
+                }
+            }
         });
 
         if let NetworkingMode::Server(_) = networking::get_current_networking_mode() {

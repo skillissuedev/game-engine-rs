@@ -156,8 +156,8 @@ impl Object for ModelObject {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui, _ctx: &egui_glium::egui_winit::egui::Context) {
-        todo!()
+    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+        ui.heading("inspector_ui function's not ready rn for ModelObject ,_,");
     }
 
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
