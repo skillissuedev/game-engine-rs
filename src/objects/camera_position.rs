@@ -1,3 +1,5 @@
+use egui_glium::egui_winit::egui::{self, TextEdit};
+
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::managers::{physics::ObjectBodyParameters, render};
 
@@ -83,11 +85,23 @@ impl Object for CameraPosition {
         &self.id
     }
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        None
+    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui, _ctx: &egui_glium::egui_winit::egui::Context) {
+        ui.label("Position:");
+        ui.horizontal(|ui| {
+            ui.label("x: ");
+            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "123"));
+            ui.label("y: ");
+            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "420"));
+            ui.label("z: ");
+            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "69"));
+        });
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         &mut self.groups
+    }
+
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
+        None
     }
 }

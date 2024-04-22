@@ -50,6 +50,12 @@ pub fn update() {
     }
 }
 
+pub fn get_systems_iter<'a>() -> std::slice::Iter<'a, Box<dyn System>> {
+    unsafe {
+        SYSTEMS.iter()
+    }
+}
+
 pub fn render(display: &Display, target: &mut Frame, cascades: &Cascades, shadow_textures: &ShadowTextures) {
     unsafe {
         if networking::is_server() {
@@ -147,3 +153,4 @@ pub struct CallList {
     pub immut_call: Vec<String>,
     pub mut_call: Vec<String>,
 }
+

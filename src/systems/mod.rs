@@ -7,7 +7,7 @@ use crate::{
     objects::Object,
 };
 use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 
 pub trait System {
     fn client_start(&mut self);
@@ -46,7 +46,7 @@ pub trait System {
             }
         }
 
-        return None;
+        None
     }
 
     fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
@@ -61,7 +61,7 @@ pub trait System {
             }
         }
 
-        return None;
+        None
     }
 
     fn update_objects(&mut self) {
@@ -115,9 +115,5 @@ pub trait System {
             .last_mut()
             .expect("the last object does not exist(why?..)")
             .start();
-    }
-
-    fn call_with_args(&mut self, call_id: &str, args: Vec<String>) -> Option<String> {
-        None
     }
 }

@@ -5,13 +5,9 @@ edition = "2021"
 
 [dependencies]
 colored = "2.0.0"
-#navmesh = "0.12.1"
-#ultraviolet = "0.9.1"
-#rcrefcell = "1.0.7"
 image = "0.24.6"
 gltf = { version = "1.2.0", features = ["extras", "names"] }
 data-url = "0.1.1"
-#conrod_glium = { git = "https://github.com/unknownbruhhaha/conrod_latest_glium" }
 splines = "4.2.0"
 glam = { version = "0.25", features = ["serde"] }
 serde_bare = "0.5.0"
@@ -32,13 +28,25 @@ pathfinding = "4.9.1"
 basic-pathfinding = "0.2.8"
 grid_pathfinding = "0.1.1"
 grid_util = "=0.1.1"
-#das-grid = "0.1.5"
+egui_glium = "=0.20.1"
 
 [profile.dev.package.rapier3d]
 opt-level = 3
 
 [profile.dev.package.glium]
 opt-level = 3
+
+[profile.dev.package.glutin]
+opt-level = 3
+
+[profile.dev.package.egui]
+opt-level = 3
+
+[profile.dev.package.egui_glium]
+opt-level = 3
+
+[profile.dev]
+opt-level = 2
 
 #[profile.release]
 #codegen-units = 1

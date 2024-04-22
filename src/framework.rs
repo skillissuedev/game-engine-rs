@@ -1,31 +1,24 @@
 use crate::{
     game::game_main,
     managers::{
-        input, navigation,
-        networking::{self, NetworkingMode},
-        physics, render::{self, ShadowTextures},
-        sound::{self, set_listener_transform},
-        systems,
+        self, assets::get_full_asset_path, input, navigation, networking::{self, NetworkingMode}, physics, render::{self, ShadowTextures}, sound::{self, set_listener_transform}, systems
     },
 };
+use egui_glium::egui_winit::egui::{FontData, FontDefinitions, FontFamily, SidePanel, Window};
 use glium::{
-    backend::glutin,
-    glutin::{
-        dpi::PhysicalSize, event::WindowEvent, event_loop::{ControlFlow, EventLoop}, window::WindowBuilder, ContextBuilder
-    },
-    Display,
+    backend::glutin, glutin::{dpi::PhysicalSize, event::WindowEvent, event_loop::{ControlFlow, EventLoop}, window::WindowBuilder, ContextBuilder}, Display
 };
+use once_cell::sync::Lazy;
 use std::{
-    num::NonZeroU32,
-    time::{Duration, Instant},
+    fs, num::NonZeroU32, time::{Duration, Instant}
 };
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
 static mut DELTA_TIME: Duration = Duration::new(0, 0);
+static FONT: Lazy<Vec<u8>> = Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode }
-
     let event_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("projectbaldej")
@@ -33,6 +26,17 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .with_transparent(false);
     let cb = ContextBuilder::new().with_srgb(false);//.with_vsync(true);
     let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
+    let mut egui_glium =
+        egui_glium::EguiGlium::new(&display, &event_loop);
+
+    let mut fps = 0;
+    
+
+    let mut fonts = FontDefinitions::default();
+    fonts.font_data.insert("JetBrains Mono".into(), FontData::from_static(&FONT));
+    fonts.families.get_mut(&FontFamily::Proportional).unwrap().insert(0, "JetBrains Mono".into());
+    egui_glium.egui_ctx.set_fonts(fonts);
+    let mut ui_state = managers::ui::UiState::default();
 
     let mut frames_count: usize = 0;
     let mut now = std::time::Instant::now();
@@ -54,6 +58,16 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     event_loop.run(move |ev, _, control_flow| {
         let time_since_last_frame = last_frame.elapsed();
         update_game(time_since_last_frame);
+        egui_glium.run(&display, |ctx| {
+            SidePanel::left("side panel test").show(ctx, |ui| {
+                if ui.button("cool test button").clicked() {
+                    println!("pressed a button!");
+                }
+            });
+            Window::new("inspector").show(ctx, |ui| {
+                managers::ui::draw_inspector(ui, &fps, &mut ui_state);
+            });
+        });
 
         if let NetworkingMode::Server(_) = networking::get_current_networking_mode() {
             if time_since_last_frame < frame_time {
@@ -79,63 +93,47 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         render::draw(&display, &mut target, &shadow_textures);
                         //game_main::render();
                         render::debug_draw(&display, &mut target);
+                        egui_glium.paint(&display, &mut target);
 
                         target.finish().unwrap();
+                        frames_count += 1;
                         last_frame = Instant::now();
                     }
                 }
             }
             glutin::glutin::event::Event::WindowEvent { event, .. } => {
-                input::reg_event(&event);
-                match event {
-                    WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit;
-                        networking::disconnect();
-                    }, 
-                    WindowEvent::Resized(size) => {
-                        win_w = size.width;
-                        win_h = size.height;
+                let event_response = egui_glium.on_event(&event);
+                if event_response.consumed == false {
+                    input::reg_event(&event);
+                    match event {
+                        WindowEvent::CloseRequested => {
+                            *control_flow = ControlFlow::Exit;
+                            networking::disconnect();
+                        }, 
+                        WindowEvent::Resized(size) => {
+                            win_w = size.width;
+                            win_h = size.height;
 
-                        unsafe {
-                            render::ASPECT_RATIO = win_w as f32 / win_h as f32;
-                        }
-                    },
-                    _ => (),
+                            unsafe {
+                                render::ASPECT_RATIO = win_w as f32 / win_h as f32;
+                            }
+                        },
+                        _ => (),
+                    }
                 }
             }
             _ => (),
         }
 
-        match debug_mode {
-            DebugMode::None => (),
-            _ => {
-                match networking::get_current_networking_mode() {
-                    networking::NetworkingMode::Server(_) => {
-                        let fps = get_fps(&now, &frames_count);
-                        if fps.is_some() {
-                            let _ = fps.unwrap();
-                            //println!("fps: {}", fps);
-                            frames_count = 0;
-                            now = Instant::now();
-                        }
-                    }
-                    _ => {
-                        let fps = get_fps(&now, &frames_count);
-                        if fps.is_some() {
-                            let fps = fps.unwrap();
-                            display
-                                .gl_window()
-                                .window()
-                                .set_title(&format!("projectbaldej: {fps} fps"));
-                            frames_count = 0;
-                            now = Instant::now();
-                        }
-                    }
-                }
-            }
+        if let Some(new_fps) = get_fps(&now, &frames_count) {
+            fps = new_fps;
+            display
+                .gl_window()
+                .window()
+                .set_title(&format!("projectbaldej: {fps} fps"));
+            frames_count = 0;
+            now = Instant::now();
         }
-
-        frames_count += 1;
     });
 }
 
@@ -159,12 +157,12 @@ pub fn start_game_without_render() {
 fn update_game(delta_time: Duration) {
     set_delta_time(delta_time);
     physics::update();
-    input::update();
     networking::update(delta_time);
     navigation::update();
     game_main::update();
     systems::update();
     navigation::create_grids();
+    input::update();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -178,6 +176,10 @@ fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
 
 pub fn get_debug_mode() -> DebugMode {
     unsafe { DEBUG_MODE }
+}
+
+pub fn set_debug_mode(mode: DebugMode) {
+    unsafe { DEBUG_MODE = mode }
 }
 
 fn set_audio_listener_transformations() {

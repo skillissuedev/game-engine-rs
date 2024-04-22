@@ -59,9 +59,9 @@ pub fn update() {
         );
         QUERY_PIPELINE.update(&mut RIGID_BODY_SET, &mut COLLIDER_SET);
 
-        for i in RIGID_BODY_SET.iter() {
+        /*for i in RIGID_BODY_SET.iter() {
             dbg!(i.1.translation());
-        }
+        }*/
     }
 }
 

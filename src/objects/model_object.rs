@@ -108,6 +108,127 @@ impl Object for ModelObject {
         }
     }
 
+    fn children_list(&self) -> &Vec<Box<dyn Object>> {
+        &self.children
+    }
+
+    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+        &mut self.children
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn object_type(&self) -> &str {
+        "ModelObject"
+    }
+
+    fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
+    fn local_transform(&self) -> Transform {
+        self.transform
+    }
+
+    fn set_local_transform(&mut self, transform: Transform) {
+        self.transform = transform
+    }
+
+    fn parent_transform(&self) -> Option<Transform> {
+        self.parent_transform
+    }
+
+    fn set_parent_transform(&mut self, transform: Transform) {
+        self.parent_transform = Some(transform);
+    }
+
+    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
+        self.body = rigid_body
+    }
+
+    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
+        self.body
+    }
+
+    fn object_id(&self) -> &u128 {
+        &self.id
+    }
+
+    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui, _ctx: &egui_glium::egui_winit::egui::Context) {
+        todo!()
+    }
+
+    fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
+        &mut self.groups
+    }
+
+    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
+        if name == "play_animation" && !args.is_empty() {
+            let _ = self.play_animation(args[0]);
+            return None;
+        }
+
+        if name == "set_position" {
+            if args.len() == 3 {
+                let x = match args[0].parse::<f32>() {
+                    Ok(x_num) => x_num,
+                    Err(_) => {
+                        error(
+                            "set_position model object error - wrong args(1st arg is not number)",
+                        );
+                        return None;
+                    }
+                };
+
+                let y = match args[1].parse::<f32>() {
+                    Ok(y_num) => y_num,
+                    Err(_) => {
+                        error(
+                            "set_position model object error - wrong args(2st arg is not number)",
+                        );
+                        return None;
+                    }
+                };
+
+                let z = match args[2].parse::<f32>() {
+                    Ok(z_num) => z_num,
+                    Err(_) => {
+                        error(
+                            "set_position model object error - wrong args(3st arg is not number)",
+                        );
+                        return None;
+                    }
+                };
+
+                let _ = self.set_position(Vec3::new(x, y, z), true);
+
+                return None;
+            } else {
+                error("set_position model object error - wrong args(args.len should be = 3 and all of them should be numbers)");
+                return None;
+            }
+        }
+
+        if name == "set_looping" && !args.is_empty() {
+            let looping = match args[0] {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    error("set_looping model object call failed - wrong args(only 'true' and 'false' avaliable)");
+                    return None;
+                }
+            };
+
+            self.animation_settings.looping = looping;
+
+            return None;
+        }
+
+        return None;
+    }
+
     fn render(&mut self, display: &Display, target: &mut glium::Frame, cascades: &Cascades, shadow_texture: &ShadowTextures) {
         if self.error {
             return;
@@ -306,123 +427,6 @@ impl Object for ModelObject {
                 )
                 .unwrap();
         }
-    }
-
-    fn children_list(&self) -> &Vec<Box<dyn Object>> {
-        &self.children
-    }
-
-    fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
-        &mut self.children
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn object_type(&self) -> &str {
-        "ModelObject"
-    }
-
-    fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-    }
-
-    fn local_transform(&self) -> Transform {
-        self.transform
-    }
-
-    fn set_local_transform(&mut self, transform: Transform) {
-        self.transform = transform
-    }
-
-    fn parent_transform(&self) -> Option<Transform> {
-        self.parent_transform
-    }
-
-    fn set_parent_transform(&mut self, transform: Transform) {
-        self.parent_transform = Some(transform);
-    }
-
-    fn set_body_parameters(&mut self, rigid_body: Option<ObjectBodyParameters>) {
-        self.body = rigid_body
-    }
-
-    fn body_parameters(&self) -> Option<ObjectBodyParameters> {
-        self.body
-    }
-
-    fn object_id(&self) -> &u128 {
-        &self.id
-    }
-
-    fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
-        &mut self.groups
-    }
-
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        if name == "play_animation" && !args.is_empty() {
-            let _ = self.play_animation(args[0]);
-            return None;
-        }
-
-        if name == "set_position" {
-            if args.len() == 3 {
-                let x = match args[0].parse::<f32>() {
-                    Ok(x_num) => x_num,
-                    Err(_) => {
-                        error(
-                            "set_position model object error - wrong args(1st arg is not number)",
-                        );
-                        return None;
-                    }
-                };
-
-                let y = match args[1].parse::<f32>() {
-                    Ok(y_num) => y_num,
-                    Err(_) => {
-                        error(
-                            "set_position model object error - wrong args(2st arg is not number)",
-                        );
-                        return None;
-                    }
-                };
-
-                let z = match args[2].parse::<f32>() {
-                    Ok(z_num) => z_num,
-                    Err(_) => {
-                        error(
-                            "set_position model object error - wrong args(3st arg is not number)",
-                        );
-                        return None;
-                    }
-                };
-
-                let _ = self.set_position(Vec3::new(x, y, z), true);
-
-                return None;
-            } else {
-                error("set_position model object error - wrong args(args.len should be = 3 and all of them should be numbers)");
-                return None;
-            }
-        }
-
-        if name == "set_looping" && !args.is_empty() {
-            let looping = match args[0] {
-                "true" => true,
-                "false" => false,
-                _ => {
-                    error("set_looping model object call failed - wrong args(only 'true' and 'false' avaliable)");
-                    return None;
-                }
-            };
-
-            self.animation_settings.looping = looping;
-
-            return None;
-        }
-
-        return None;
     }
 }
 

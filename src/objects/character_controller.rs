@@ -181,6 +181,10 @@ impl Object for CharacterController {
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> {
         None
     }
+
+    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui, _ctx: &egui_glium::egui_winit::egui::Context) {
+        todo!()
+    }
 }
 
 impl CharacterController {

@@ -103,6 +103,8 @@ impl System for TestSystem {
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
 
+        let empty_obj = Box::new(EmptyObject::new("test_empty_obj"));
+
         let mut knife_model = Box::new(ModelObject::new(
             "knife_model",
             asset.unwrap(),
@@ -145,7 +147,7 @@ impl System for TestSystem {
         controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
         controller.add_to_group("player");
         self.add_object(controller);
-
+        self.add_object(empty_obj);
         self.add_object(knife_model);
         self.add_object(ground_collider);
         self.add_object(test_shadow_model);

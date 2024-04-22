@@ -88,7 +88,6 @@ pub fn reg_event(event: &WindowEvent) {
                         }
                     }
                     ElementState::Released => {
-                        println!("released");
                         if UP_EVENTS.contains(&input_ev_type) == false {
                             UP_EVENTS.push(input_ev_type);
                         }

@@ -104,6 +104,217 @@ impl Object for NavigationGround {
         }
         None
     }
+
+    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui, _ctx: &egui_glium::egui_winit::egui::Context) {
+        todo!()
+    }
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Object")
+            .field("name", &self.name())
+            .field("object_type", &self.object_type())
+            .field("children", &self.children_list())
+            .finish()
+    }
+
+    fn render(&mut self, _display: &glium::Display, _target: &mut glium::Frame, _cascades: &crate::managers::render::Cascades, _shadow_textures: &crate::managers::render::ShadowTextures) {}
+
+    fn shadow_render(
+        &mut self,
+        _view_proj: &glam::Mat4,
+        _display: &glium::Display,
+        _target: &mut glium::framebuffer::SimpleFrameBuffer,
+    ) {
+    }
+
+    fn global_transform(&self) -> Transform {
+        let base_transformations = self.local_transform();
+        match self.parent_transform() {
+            Some(transform) => Transform {
+                position: base_transformations.position + transform.position,
+                rotation: base_transformations.rotation + transform.rotation,
+                scale: base_transformations.scale + transform.scale,
+            },
+            None => base_transformations,
+        }
+    }
+
+    fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {
+        for object in self.children_list() {
+            if object.name() == object_name {
+                return Some(object);
+            }
+
+            match object.find_object(object_name) {
+                Some(found_obj) => return Some(found_obj),
+                None => (),
+            }
+        }
+
+        return None;
+    }
+
+    fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
+        for object in self.children_list_mut() {
+            if object.name() == object_name {
+                return Some(object);
+            }
+
+            match object.find_object_mut(object_name) {
+                Some(found_obj) => return Some(found_obj),
+                None => (),
+            }
+        }
+
+        return None;
+    }
+
+    fn update_transform(&mut self) {
+        if let Some(parameters) = self.body_parameters() {
+            if let None = parameters.rigid_body_handle {
+                return;
+            }
+
+            let position_and_rotation_option = crate::managers::physics::get_body_transformations(parameters);
+
+            if let Some((pos, rot)) = position_and_rotation_option {
+                self.set_position(pos, false);
+                self.set_rotation(rot, false);
+            }
+        }
+    }
+
+    fn update_children(&mut self) {
+        let global_transform = self.global_transform();
+
+        self.children_list_mut().iter_mut().for_each(|child| {
+            child.set_parent_transform(global_transform);
+            child.update();
+            child.update_children();
+        });
+    }
+
+    fn render_children(&mut self, display: &glium::Display, target: &mut glium::Frame, cascades: &crate::managers::render::Cascades, shadow_texture: &crate::managers::render::ShadowTextures) {
+        self.children_list_mut().iter_mut().for_each(|child| {
+            child.render(display, target, cascades, shadow_texture);
+            child.render_children(display, target, cascades, shadow_texture);
+        });
+    }
+
+    fn shadow_render_children(
+        &mut self,
+        view_proj: &glam::Mat4,
+        display: &glium::Display,
+        target: &mut glium::framebuffer::SimpleFrameBuffer,
+    ) {
+        self.children_list_mut().iter_mut().for_each(|child| {
+            child.shadow_render(&view_proj, display, target);
+            child.shadow_render_children(&view_proj, display, target);
+        });
+    }
+
+    fn debug_render(&self) {
+        // Adding collider to render manager's render colliders list if debug mode != None
+        match crate::framework::get_debug_mode() {
+            crate::framework::DebugMode::Full => {
+                if let Some(body) = self.body_parameters() {
+                    if let Some(mut render_collider) = body.render_collider_type {
+                        let transform = self.global_transform();
+                        render_collider.set_transform(transform.position, transform.rotation);
+                        crate::managers::render::add_collider_to_draw(render_collider);
+                    }
+                }
+
+                self.children_list()
+                    .iter()
+                    .for_each(|child| child.debug_render());
+            }
+            _ => (),
+        }
+    }
+
+    fn set_position(&mut self, position: glam::Vec3, set_rigid_body_position: bool) {
+        let mut transform = self.local_transform();
+        transform.position = position;
+        self.set_local_transform(transform);
+
+        if let Some(parameters) = self.body_parameters() {
+            if set_rigid_body_position == true {
+                crate::managers::physics::set_body_position(parameters, position);
+            }
+        }
+    }
+
+    fn set_rotation(&mut self, rotation: glam::Vec3, set_rigid_body_rotation: bool) {
+        let mut transform = self.local_transform();
+        transform.rotation = rotation;
+        self.set_local_transform(transform);
+
+        if let Some(parameters) = self.body_parameters() {
+            if set_rigid_body_rotation == true {
+                crate::managers::physics::set_body_rotation(parameters, rotation);
+            }
+        }
+    }
+
+    fn set_scale(&mut self, scale: glam::Vec3) {
+        let mut transform = self.local_transform();
+        transform.scale = scale;
+        self.set_local_transform(transform);
+    }
+
+    fn add_child(&mut self, mut object: Box<dyn Object>) {
+        object.set_parent_transform(self.global_transform());
+        dbg!(object.object_id());
+        self.children_list_mut().push(object);
+        self.children_list_mut().last_mut().unwrap().start();
+    }
+
+    fn build_object_rigid_body(
+        &mut self,
+        body_type: Option<crate::managers::physics::BodyType>,
+        custom_render_collider: Option<crate::managers::physics::RenderColliderType>,
+        mass: f32,
+        membership_groups: Option<crate::managers::physics::CollisionGroups>,
+        filter_groups: Option<crate::managers::physics::CollisionGroups>,
+    ) {
+        match body_type {
+            Some(body_type) => {
+                let mut body_parameters = crate::managers::physics::new_rigid_body(
+                    body_type,
+                    Some(self.global_transform()),
+                    mass,
+                    *self.object_id(),
+                    membership_groups,
+                    filter_groups,
+                );
+                if let Some(render_collider) = custom_render_collider {
+                    body_parameters.set_render_collider(Some(render_collider));
+                }
+                self.set_body_parameters(Some(body_parameters));
+            }
+            None => {
+                if let Some(mut body) = self.body_parameters() {
+                    crate::managers::physics::remove_rigid_body(&mut body);
+                }
+                if let Some(render_collider) = custom_render_collider {
+                    let mut params = ObjectBodyParameters::empty();
+                    params.set_render_collider(Some(render_collider));
+                    self.set_body_parameters(Some(params));
+                }
+            }
+        }
+    }
+
+    fn add_to_group(&mut self, group_name: &str) {
+        self.groups_list().push(ObjectGroup(group_name.into()));
+        crate::managers::systems::register_object_id_groups(*self.object_id(), self.groups_list());
+    }
+
+    fn remove_from_group(&mut self, group_name: &str) {
+        self.groups_list().retain(|group| group_name != group.0);
+        crate::managers::systems::register_object_id_groups(*self.object_id(), self.groups_list());
+    }
 }
 
 impl std::fmt::Debug for NavigationGround {
