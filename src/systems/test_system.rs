@@ -96,8 +96,8 @@ impl System for TestSystem {
     fn client_start(&mut self) {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         let asset = ModelAsset::from_file("models/knife_test.gltf");
-        let ground_asset = ModelAsset::from_file("models/ground_1.gltf").unwrap();
-        let ground_texture_asset = TextureAsset::from_file("textures/default_texture.png");
+        let ground_asset = ModelAsset::from_file("models/tile1_trees_rock.gltf").unwrap();
+        let ground_texture_asset = TextureAsset::from_file("textures/biome1_rock1.png");
         let shadow_model_asset = ModelAsset::from_file("models/test_model_for_shadows.gltf").unwrap();
         let mut test_shadow_model = Box::new(ModelObject::new("test_shadow_model", shadow_model_asset, None, ShaderAsset::load_default_shader().unwrap()));
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
@@ -119,7 +119,7 @@ impl System for TestSystem {
             Some(ground_texture_asset.unwrap()),
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        ground_collider.set_position(Vec3::new(100.0, 90.0, 30.0), true);
+        ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
         //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
         //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
 
@@ -240,7 +240,7 @@ impl System for TestSystem {
         );
     }
     fn client_update(&mut self) {
-        set_light_direction(Vec3::new(0.0, 0.0, 0.0));
+        set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
         if input::is_bind_down("cam_up") {
             let camera_position = get_camera_position();

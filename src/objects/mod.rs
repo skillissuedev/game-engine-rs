@@ -7,9 +7,9 @@ use crate::{
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
-use egui_glium::egui_winit::egui::{Context, Ui};
+use egui_glium::egui_winit::egui::Ui;
 use glam::{Mat4, Vec3};
-use glium::{framebuffer::SimpleFrameBuffer, texture::DepthTexture2d, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use serde::{Deserialize, Serialize};
 
 pub mod camera_position;

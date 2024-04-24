@@ -568,13 +568,13 @@ impl SunCamera {
         //dbg!(corners.min_z, corners.max_z);
 
         Mat4::orthographic_rh_gl(
-            corners.min_x,
-            corners.max_x,
-            corners.min_y,
-            corners.max_y,
-            corners.min_z,
+            corners.min_x - 5.0,
+            corners.max_x + 5.0,
+            corners.min_y - 5.0,
+            corners.max_y + 5.0,
+            corners.min_z - 5.0,
             //corners.min_z + corners.max_z / 2.0,
-            corners.max_z,
+            corners.max_z + 5.0,
         )
     }
 
@@ -584,7 +584,7 @@ impl SunCamera {
         let view_up = Vec3::new(0.0, 1.0, 0.0);
 
         //let main_camera_position = get_camera_position();
-        let sun_camera_position = get_light_direction() + view_center + Vec3::new(0.0, corners.max_y / 2.0, 0.0);
+        let sun_camera_position = get_light_direction() + view_center + Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
 
         let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
 

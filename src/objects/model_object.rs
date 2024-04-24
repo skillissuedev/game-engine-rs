@@ -14,7 +14,7 @@ use crate::{
 };
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer, uniform, uniforms::UniformBuffer, Display, IndexBuffer, Program, Surface, VertexBuffer
+    framebuffer::SimpleFrameBuffer, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer}, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -164,71 +164,6 @@ impl Object for ModelObject {
         &mut self.groups
     }
 
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        if name == "play_animation" && !args.is_empty() {
-            let _ = self.play_animation(args[0]);
-            return None;
-        }
-
-        if name == "set_position" {
-            if args.len() == 3 {
-                let x = match args[0].parse::<f32>() {
-                    Ok(x_num) => x_num,
-                    Err(_) => {
-                        error(
-                            "set_position model object error - wrong args(1st arg is not number)",
-                        );
-                        return None;
-                    }
-                };
-
-                let y = match args[1].parse::<f32>() {
-                    Ok(y_num) => y_num,
-                    Err(_) => {
-                        error(
-                            "set_position model object error - wrong args(2st arg is not number)",
-                        );
-                        return None;
-                    }
-                };
-
-                let z = match args[2].parse::<f32>() {
-                    Ok(z_num) => z_num,
-                    Err(_) => {
-                        error(
-                            "set_position model object error - wrong args(3st arg is not number)",
-                        );
-                        return None;
-                    }
-                };
-
-                let _ = self.set_position(Vec3::new(x, y, z), true);
-
-                return None;
-            } else {
-                error("set_position model object error - wrong args(args.len should be = 3 and all of them should be numbers)");
-                return None;
-            }
-        }
-
-        if name == "set_looping" && !args.is_empty() {
-            let looping = match args[0] {
-                "true" => true,
-                "false" => false,
-                _ => {
-                    error("set_looping model object call failed - wrong args(only 'true' and 'false' avaliable)");
-                    return None;
-                }
-            };
-
-            self.animation_settings.looping = looping;
-
-            return None;
-        }
-
-        return None;
-    }
-
     fn render(&mut self, display: &Display, target: &mut glium::Frame, cascades: &Cascades, shadow_texture: &ShadowTextures) {
         if self.error {
             return;
@@ -285,6 +220,13 @@ impl Object for ModelObject {
                 UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
             let camera_position: [f32; 3] = render::get_camera_position().into();
 
+            let sampler_behaviour = glium::uniforms::SamplerBehavior {
+                minify_filter: MinifySamplerFilter::Nearest,
+                magnify_filter: MagnifySamplerFilter::Nearest,
+                wrap_function: (SamplerWrapFunction::Repeat, SamplerWrapFunction::Repeat, SamplerWrapFunction::Repeat),
+                ..Default::default()
+            };
+
             let uniforms = uniform! {
                 jointsMats: &joints,
                 jointsInverseBindMats: &inverse_bind_mats,
@@ -301,7 +243,7 @@ impl Object for ModelObject {
                     model_cols[2],
                     model_cols[3],
                 ],
-                tex: texture,
+                tex: Sampler(texture, sampler_behaviour),
                 lightPos: render::get_light_direction().to_array(),
                 closestShadowTexture: &shadow_texture.closest,
                 furthestShadowTexture: &shadow_texture.furthest,
@@ -666,8 +608,8 @@ impl ModelObject {
 
         if self.texture_asset.is_some() {
             let asset = self.texture_asset.as_ref().unwrap();
-            let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
-                &asset.image_raw,
+            let image = glium::texture::RawImage2d::from_raw_rgba(
+                asset.image_raw.clone(),
                 asset.image_dimensions,
             );
             let texture = glium::texture::texture2d::Texture2d::new(display, image);
