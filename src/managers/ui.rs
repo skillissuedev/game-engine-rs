@@ -1,9 +1,9 @@
 use egui_glium::egui_winit::egui::{self, ComboBox, TextEdit, Ui};
 use glam::Vec3;
 
-use crate::{framework::{set_debug_mode, DebugMode}, objects::Object};
+use crate::framework::{set_debug_mode, DebugMode};
 
-use super::systems;
+use super::{physics::RenderColliderType, systems};
 
 
 // inspector
@@ -30,7 +30,11 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                             position: Vec3Inspector::default(),
                             rotation: Vec3Inspector::default(),
                             scale: Vec3Inspector::default(),
-                            render_collider: None
+                            render_collider: None,
+                            render_collider_size: Vec3Inspector {
+                                input_value: Some(["".into(), "".into(), "".into()]),
+                            },
+                            cancel_collider: false,
                         });
                 }
             }
@@ -51,30 +55,30 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                         ui.label(format!("type: {}", object.object_type()));
 
                         ui.label("local position:");
-                        if let Some(pos) = draw_vec3_editor_inspector(ui, &mut selected_object.position, &object.local_transform().position) {
+                        if let Some(pos) = draw_vec3_editor_inspector(ui, &mut selected_object.position, &object.local_transform().position, true) {
                             object.set_position(pos, true);
                         }
                         ui.label("local rotation:");
-                        if let Some(rot) = draw_vec3_editor_inspector(ui, &mut selected_object.rotation, &object.local_transform().rotation) {
+                        if let Some(rot) = draw_vec3_editor_inspector(ui, &mut selected_object.rotation, &object.local_transform().rotation, true) {
                             object.set_rotation(rot, true);
                         }
                         ui.label("local scale:");
-                        if let Some(sc) = draw_vec3_editor_inspector(ui, &mut selected_object.scale, &object.local_transform().scale) {
+                        if let Some(sc) = draw_vec3_editor_inspector(ui, &mut selected_object.scale, &object.local_transform().scale, true) {
                             object.set_scale(sc);
                         }
-                        if ui.button("render collider settings").clicked() {
-                            match selected_object.render_collider {
-                                Some(_) => selected_object.render_collider = None,
-                                None => selected_object.render_collider = 
-                                    Some(InspectorRenderCollider {
-                                        collider_type: InspectorRenderColliderType::Cuboid
-                                    }),
-                            }
+
+
+                        // collider
+                        if selected_object.cancel_collider {
+                            selected_object.render_collider = None;
+                            selected_object.cancel_collider = false;
+                            return;
                         }
+                        dbg!(&selected_object.render_collider, &selected_object.cancel_collider);
                         if let Some(collider) = &mut selected_object.render_collider {
                             ui.separator();
                             ui.label("render collider settings:");
-                            ComboBox::from_label("select type of the collider")
+                            ComboBox::from_label("collider type")
                                 .selected_text(format!("{:?}", collider.collider_type).to_lowercase())
                                 .show_ui(ui, |ui| {
                                     ui.selectable_value(&mut collider.collider_type, InspectorRenderColliderType::Cuboid, "cuboid");
@@ -83,6 +87,104 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                     ui.selectable_value(&mut collider.collider_type, InspectorRenderColliderType::Cylinder, "cylinder");
                                 }
                             );
+                            if let Some(ref mut input_value) = &mut selected_object.render_collider_size.input_value {
+                                match &collider.collider_type {
+                                    InspectorRenderColliderType::Ball => {
+                                        ui.horizontal(|ui| {
+                                            ui.label("radius:");
+                                            ui.text_edit_singleline(&mut input_value[0]);
+                                        });
+                                    },
+                                    InspectorRenderColliderType::Cuboid => {
+                                        draw_vec3_editor_inspector(ui, &mut selected_object.render_collider_size, &Vec3::new(1.0, 1.0, 1.0), false);
+                                    },
+                                    InspectorRenderColliderType::Capsule => {
+                                        ui.horizontal(|ui| {
+                                            ui.label("radius:");
+                                            ui.text_edit_singleline(&mut input_value[0]);
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label("height:");
+                                            ui.text_edit_singleline(&mut input_value[1]);
+                                        });
+                                    },
+                                    InspectorRenderColliderType::Cylinder => {
+                                        ui.horizontal(|ui| {
+                                            ui.label("radius:");
+                                            ui.text_edit_singleline(&mut input_value[0]);
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label("height:");
+                                            ui.text_edit_singleline(&mut input_value[1]);
+                                        });
+                                    },
+                                }
+                            }
+                            let render_collider_size = &mut selected_object.render_collider_size;
+                            ui.horizontal(|ui| {
+                                if ui.button("cancel").clicked() {
+                                    selected_object.cancel_collider = true;
+                                }
+
+                                if ui.button("done").clicked() {
+                                    let mut trigger = false;
+                                    if object.object_type() == "Trigger" {
+                                        trigger = true;
+                                    };
+
+                                    if let Some(ref input_value) = render_collider_size.input_value {
+                                        let x = input_value[0].parse::<f32>();
+                                        if let Ok(x) = x {
+                                            let y = input_value[1].parse::<f32>();
+                                            if let Ok(y) = y {
+                                                let z = input_value[2].parse::<f32>();
+                                                if let Ok(z) = z {
+                                                    match collider.clone().collider_type {
+                                                        InspectorRenderColliderType::Ball => {
+                                                            object.build_object_rigid_body(
+                                                                None, 
+                                                                Some(RenderColliderType::Ball(None, None, x, trigger)),
+                                                                1.0, None, None
+                                                            );
+                                                        },
+                                                        InspectorRenderColliderType::Cuboid => {
+                                                            object.build_object_rigid_body(
+                                                                None, 
+                                                                Some(RenderColliderType::Cuboid(None, None, x, y, z, trigger)),
+                                                                1.0, None, None
+                                                            );
+                                                        },
+                                                        InspectorRenderColliderType::Capsule => {
+                                                            object.build_object_rigid_body(
+                                                                None, 
+                                                                Some(RenderColliderType::Capsule(None, None, x, y, trigger)),
+                                                                1.0, None, None
+                                                            );
+                                                        },
+                                                        InspectorRenderColliderType::Cylinder => {
+                                                            object.build_object_rigid_body(
+                                                                None, 
+                                                                Some(RenderColliderType::Cylinder(None, None, x, y, trigger)),
+                                                                1.0, None, None
+                                                            );
+                                                        },
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            if ui.button("render collider settings").clicked() {
+                                match selected_object.render_collider {
+                                    Some(_) => selected_object.render_collider = None,
+                                    None => selected_object.render_collider = 
+                                        Some(InspectorRenderCollider {
+                                            collider_type: InspectorRenderColliderType::Cuboid,
+                                        }),
+                                }
+                            }
                         }
 
                         ui.separator();
@@ -115,7 +217,9 @@ pub struct SelectedInspectorObject {
     position: Vec3Inspector,
     rotation: Vec3Inspector,
     scale: Vec3Inspector,
-    render_collider: Option<InspectorRenderCollider>
+    render_collider: Option<InspectorRenderCollider>,
+    render_collider_size: Vec3Inspector,
+    cancel_collider: bool
     //input_postition: Option<[String; 3]>,
 }
 
@@ -124,17 +228,21 @@ struct Vec3Inspector {
     input_value: Option<[String; 3]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct InspectorRenderCollider {
-    collider_type: InspectorRenderColliderType
+    collider_type: InspectorRenderColliderType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum InspectorRenderColliderType {
-    Ball,
-    Cuboid,
-    Capsule,
-    Cylinder,
+    /// radius
+    Ball,//(f32),
+    /// half-size
+    Cuboid,//(Vec3),
+    /// radius, height
+    Capsule,//(f32, f32),
+    /// radius, height
+    Cylinder,//(f32, f32),
 }
 
 fn handle_full_debug_checkbox_value(full_debug: bool) {
@@ -145,7 +253,7 @@ fn handle_full_debug_checkbox_value(full_debug: bool) {
     }
 }
 
-fn draw_vec3_editor_inspector(ui: &mut Ui, vec3: &mut Vec3Inspector, object_val: &Vec3) -> Option<Vec3> {
+fn draw_vec3_editor_inspector(ui: &mut Ui, vec3: &mut Vec3Inspector, object_val: &Vec3, show_default_buttons: bool) -> Option<Vec3> {
     let mut return_val: Option<Vec3> = None;
     ui.horizontal(|ui| {
         match vec3.input_value {
@@ -157,23 +265,25 @@ fn draw_vec3_editor_inspector(ui: &mut Ui, vec3: &mut Vec3Inspector, object_val:
                 ui.label("z:");
                 ui.add_sized(egui::vec2(70.0, 20.0), TextEdit::singleline(&mut input_val[2]));
 
-                if ui.button("done").clicked() {
-                    let x = input_val[0].parse::<f32>();
-                    if let Ok(x) = x {
-                        let y = input_val[1].parse::<f32>();
-                        if let Ok(y) = y {
-                            let z = input_val[2].parse::<f32>();
-                            if let Ok(z) = z {
-                                return_val = Some(Vec3::new(x, y, z));
-                                vec3.input_value = None;
-                                return;
+                if show_default_buttons {
+                    if ui.button("done").clicked() {
+                        let x = input_val[0].parse::<f32>();
+                        if let Ok(x) = x {
+                            let y = input_val[1].parse::<f32>();
+                            if let Ok(y) = y {
+                                let z = input_val[2].parse::<f32>();
+                                if let Ok(z) = z {
+                                    return_val = Some(Vec3::new(x, y, z));
+                                    vec3.input_value = None;
+                                    return;
+                                }
                             }
                         }
-                    }
-                };
-                if ui.button("cancel").clicked() {
-                    vec3.input_value = None;
-                };
+                    };
+                    if ui.button("cancel").clicked() {
+                        vec3.input_value = None;
+                    };
+                }
             },
             None => {
                 let val = object_val.clone();
@@ -185,7 +295,7 @@ fn draw_vec3_editor_inspector(ui: &mut Ui, vec3: &mut Vec3Inspector, object_val:
                 ui.label("z:");
                 ui.add_sized(egui::vec2(70.0, 20.0), TextEdit::singleline(&mut val_array[2]));
 
-                if ui.button("edit").clicked() {
+                if show_default_buttons && ui.button("edit").clicked() {
                     vec3.input_value = Some(val_array.clone());
                 };
             },
