@@ -94,6 +94,7 @@ impl Object for CharacterController {
 
     fn update(&mut self) {
         if let Some(movement) = &self.movement {
+            let pos = self.global_transform().position;
             //dbg!(self.local_transform());
             let speed = movement.speed;
             if let Some(next_pos) = self.last_path_point {
@@ -102,7 +103,6 @@ impl Object for CharacterController {
                 self.last_path_point = None;
             } else {
                 let target = movement.target;
-                let pos = self.global_transform().position;
                 let next_pos = navigation::find_next_path_point(
                     Vec2::new(pos.x, pos.z),
                     Vec2::new(target.x, target.z),
@@ -111,7 +111,7 @@ impl Object for CharacterController {
                 //dbg!(next_pos);
                 match next_pos {
                     Some(next_pos) => {
-                        let full_pos = Vec3::new(next_pos.x, 0.0, next_pos.y);
+                        let full_pos = Vec3::new(next_pos.x, pos.y, next_pos.y);
                         let direction = self.get_direction(full_pos);
                         self.move_controller(direction * speed);
                         self.last_path_point = Some(full_pos);

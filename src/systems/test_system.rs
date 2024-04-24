@@ -41,7 +41,8 @@ impl System for TestSystem {
             None,
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        ground_collider.set_position(Vec3::new(100.0, 90.0, 30.0), true);
+
+        ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
         //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
         //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
 
@@ -51,7 +52,7 @@ impl System for TestSystem {
                 0.4, 2.81, 0.2
             )))),
             None,
-            1.0,
+            0.5,
             None,
             None,
         );
@@ -143,7 +144,7 @@ impl System for TestSystem {
             None,
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        controller.set_position(Vec3::new(0.0, 1.0, 0.0), false);
+        controller.set_position(Vec3::new(0.0, -70.0, 0.0), false);
         controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
         controller.add_to_group("player");
         self.add_object(controller);
@@ -207,7 +208,7 @@ impl System for TestSystem {
         }
         let controller = self.find_object_mut("controller");
         let controller: &mut CharacterController = controller.unwrap().downcast_mut().unwrap();
-        controller.walk_to(Vec3::new(3.0, 0.0, 3.0), 0.5);
+        controller.walk_to(Vec3::new(20.0, 0.0, 20.0), 0.1);
 
         //println!("tick");
         /*{

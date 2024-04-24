@@ -307,7 +307,7 @@ pub fn get_light_direction() -> Vec3 {
 
 pub fn get_view_matrix() -> Mat4 {
     unsafe {
-        let mut camera_position = CAMERA_LOCATION.position;
+        let mut camera_position = CAMERA_LOCATION.position.clone();
         camera_position.x = -camera_position.x;
         Mat4::look_at_lh(
             camera_position,
@@ -552,8 +552,8 @@ pub struct Cascades {
 
 impl Cascades {
     pub fn new(view: Mat4) -> Cascades {
-        let closest = SunCamera::new(view, 0.0, Some(50.0));
-        let furthest = SunCamera::new(view, 50.0, None);
+        let closest = SunCamera::new(view, 0.0, Some(50.0), None);
+        let furthest = SunCamera::new(view, 50.0, None, None);//Some(100.0));
         let closest_view_proj = closest.as_mat4();
         let furthest_view_proj = furthest.as_mat4();
 
@@ -568,33 +568,40 @@ impl SunCamera {
         //dbg!(corners.min_z, corners.max_z);
 
         Mat4::orthographic_rh_gl(
-            corners.min_x - 5.0,
-            corners.max_x + 5.0,
-            corners.min_y - 5.0,
-            corners.max_y + 5.0,
-            corners.min_z - 5.0,
+            corners.min_x - 50.0,
+            corners.max_x + 20.0,
+            corners.min_y - 50.0,
+            corners.max_y + 50.0,
+            corners.min_z - 100.0,
             //corners.min_z + corners.max_z / 2.0,
-            corners.max_z + 5.0,
+            corners.max_z + 100.0,
         )
     }
 
-    fn get_sun_camera_view_matrix(corners: &CameraCorners) -> Mat4 {
+    fn get_sun_camera_view_matrix(corners: &CameraCorners, additional_y: Option<f32>) -> Mat4 {
         //let direction = get_light_direction().normalize();
         let view_center = corners.get_center();
         let view_up = Vec3::new(0.0, 1.0, 0.0);
 
         //let main_camera_position = get_camera_position();
-        let sun_camera_position = get_light_direction() + view_center + Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
+        let additional_y = if let Some(additional_y) = additional_y {
+            Vec3::new(0.0, additional_y, 0.0)
+        } else {
+            Vec3::ZERO
+        };
+
+        let sun_camera_position = get_light_direction() + view_center + Vec3::new(0.0, 20.0, 0.0) + additional_y;//Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
+        //dbg!(&sun_camera_position);
 
         let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
 
         view_matrix
     }
 
-    pub fn new(view: Mat4, start_distance: f32, end_distance: Option<f32>) -> SunCamera {
+    pub fn new(view: Mat4, start_distance: f32, end_distance: Option<f32>, additional_y: Option<f32>) -> SunCamera {
         let corners = CameraCorners::new(start_distance, end_distance, view);
         let proj = Self::get_sun_camera_projection_matrix(&corners);
-        let view = Self::get_sun_camera_view_matrix(&corners);
+        let view = Self::get_sun_camera_view_matrix(&corners, additional_y);
         SunCamera { view, proj }
     }
 

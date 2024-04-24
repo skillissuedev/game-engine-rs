@@ -388,9 +388,9 @@ impl ModelObject {
                     timer: Some(Instant::now()),
                 };
 
-                return Ok(());
+                Ok(())
             }
-            None => return Err(ModelObjectError::AnimationNotFound),
+            None => Err(ModelObjectError::AnimationNotFound)
         }
     }
 
@@ -462,7 +462,8 @@ impl ModelObject {
                     } else {
                         anim_settings.animation = None;
                         anim_settings.timer = None;
-                        return;
+                        //return;
+                        ()
                     }
                 }
             }

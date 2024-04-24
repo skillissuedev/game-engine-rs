@@ -1,4 +1,4 @@
-use egui_glium::egui_winit::egui::{self, TextEdit, Ui};
+use egui_glium::egui_winit::egui::{self, ComboBox, TextEdit, Ui};
 use glam::Vec3;
 
 use crate::{framework::{set_debug_mode, DebugMode}, objects::Object};
@@ -30,6 +30,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                             position: Vec3Inspector::default(),
                             rotation: Vec3Inspector::default(),
                             scale: Vec3Inspector::default(),
+                            render_collider: None
                         });
                 }
             }
@@ -61,6 +62,29 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                         if let Some(sc) = draw_vec3_editor_inspector(ui, &mut selected_object.scale, &object.local_transform().scale) {
                             object.set_scale(sc);
                         }
+                        if ui.button("render collider settings").clicked() {
+                            match selected_object.render_collider {
+                                Some(_) => selected_object.render_collider = None,
+                                None => selected_object.render_collider = 
+                                    Some(InspectorRenderCollider {
+                                        collider_type: InspectorRenderColliderType::Cuboid
+                                    }),
+                            }
+                        }
+                        if let Some(collider) = &mut selected_object.render_collider {
+                            ui.separator();
+                            ui.label("render collider settings:");
+                            ComboBox::from_label("select type of the collider")
+                                .selected_text(format!("{:?}", collider.collider_type).to_lowercase())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut collider.collider_type, InspectorRenderColliderType::Cuboid, "cuboid");
+                                    ui.selectable_value(&mut collider.collider_type, InspectorRenderColliderType::Ball, "ball");
+                                    ui.selectable_value(&mut collider.collider_type, InspectorRenderColliderType::Capsule, "capsule");
+                                    ui.selectable_value(&mut collider.collider_type, InspectorRenderColliderType::Cylinder, "cylinder");
+                                }
+                            );
+                        }
+
                         ui.separator();
                         object.inspector_ui(ui);
                     },
@@ -91,12 +115,26 @@ pub struct SelectedInspectorObject {
     position: Vec3Inspector,
     rotation: Vec3Inspector,
     scale: Vec3Inspector,
+    render_collider: Option<InspectorRenderCollider>
     //input_postition: Option<[String; 3]>,
 }
 
 #[derive(Debug, Default)]
 struct Vec3Inspector {
     input_value: Option<[String; 3]>,
+}
+
+#[derive(Debug)]
+struct InspectorRenderCollider {
+    collider_type: InspectorRenderColliderType
+}
+
+#[derive(Debug, PartialEq)]
+enum InspectorRenderColliderType {
+    Ball,
+    Cuboid,
+    Capsule,
+    Cylinder,
 }
 
 fn handle_full_debug_checkbox_value(full_debug: bool) {
