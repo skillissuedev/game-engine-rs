@@ -120,6 +120,8 @@ impl System for TestSystem {
             Some(ground_texture_asset.unwrap()),
             ShaderAsset::load_default_shader().unwrap(),
         ));
+        let test_child = Box::new(EmptyObject::new("test child objet"));
+        ground_collider.add_child(test_child);
         ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
         //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
         //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));

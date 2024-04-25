@@ -24,7 +24,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .with_title("projectbaldej")
         .with_inner_size(PhysicalSize::new(1280, 720))
         .with_transparent(false);
-    let cb = ContextBuilder::new().with_srgb(false);//.with_vsync(true);
+    let cb = ContextBuilder::new().with_srgb(true);//.with_vsync(true);
     let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
     let mut egui_glium =
         egui_glium::EguiGlium::new(&display, &event_loop);

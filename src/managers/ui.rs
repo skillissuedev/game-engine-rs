@@ -49,10 +49,17 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
             Some(system) => {
                 match system.find_object_mut(&selected_object.current_selected_object_name) {
                     Some(object) => {
-                        //let transform = object.local_transform();
-
                         ui.heading(format!("object '{}'", object.name()));
                         ui.label(format!("type: {}", object.object_type()));
+
+                        ui.collapsing("children", |ui| {
+                            for object in object.children_list() {
+                                if ui.button(object.name()).clicked() {
+                                    selected_object.current_selected_object_name = object.name().into();
+                                    return;
+                                }
+                            }
+                        });
 
                         ui.label("local position:");
                         if let Some(pos) = draw_vec3_editor_inspector(ui, &mut selected_object.position, &object.local_transform().position, true) {
