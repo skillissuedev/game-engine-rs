@@ -1,15 +1,16 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, texture_asset::TextureAsset},
+    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
     managers::{
         input::{self, InputEventType}, networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
-        }, physics::{BodyColliderType, BodyType, RenderColliderType}, render::{get_camera_position, set_camera_position, set_camera_rotation, set_light_direction}, systems::CallList
+        }, physics::{BodyColliderType, BodyType, RenderColliderType}, render::{get_camera_position, set_camera_position, set_light_direction}, systems::CallList
     },
     objects::{
-        character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, Object
+        character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
     },
 };
+use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
 
 pub struct TestSystem {
@@ -103,6 +104,12 @@ impl System for TestSystem {
         let shadow_model_asset = ModelAsset::from_file("models/test_model_for_shadows.gltf").unwrap();
         let mut test_shadow_model = Box::new(ModelObject::new("test_shadow_model", shadow_model_asset, None, ShaderAsset::load_default_shader().unwrap()));
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
+
+        let sound_asset = SoundAsset::from_wav("sounds/tone.wav").unwrap();
+        let emitter = SoundEmitter::new("sound_emitter", &sound_asset, SoundSourceType::Positional).unwrap();
+        let emitter2 = SoundEmitter::new("sound_emitter2", &sound_asset, SoundSourceType::Simple).unwrap();
+        self.add_object(Box::new(emitter));
+        self.add_object(Box::new(emitter2));
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
 
         let test_anim = Box::new(ModelObject::new("test_anim", test_anim_asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));

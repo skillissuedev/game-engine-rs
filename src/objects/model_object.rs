@@ -183,6 +183,7 @@ impl Object for ModelObject {
             ui.checkbox(&mut self.animation_settings.looping, "loop");
             if ui.button("stop").clicked() {
                 self.animation_settings.animation = None;
+                self.animation_settings.timer = None;
             }
             if let Some(timer) = &self.animation_settings.timer {
                 ui.label("time:");

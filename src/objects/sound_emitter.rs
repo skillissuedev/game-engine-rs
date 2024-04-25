@@ -5,6 +5,7 @@ use crate::{
 };
 use ez_al::{SoundError, SoundSource, SoundSourceType};
 use glam::Vec3;
+use core::f32;
 use std::fmt::Debug;
 
 pub struct SoundEmitter {
@@ -17,6 +18,7 @@ pub struct SoundEmitter {
     groups: Vec<ObjectGroup>,
     pub source_type: SoundSourceType,
     pub source: SoundSource,
+    max_distance_inspector: Option<String>
 }
 
 impl SoundEmitter {
@@ -28,7 +30,7 @@ impl SoundEmitter {
         let source = SoundSource::new(&asset.wav, emitter_type.clone());
         match source {
             Ok(source) => {
-                return Ok(SoundEmitter {
+                Ok(SoundEmitter {
                     name: name.to_string(),
                     transform: Transform::default(),
                     parent_transform: None,
@@ -38,10 +40,11 @@ impl SoundEmitter {
                     groups: vec![],
                     source_type: emitter_type,
                     source,
-                });
+                    max_distance_inspector: None,
+                })
             }
             Err(err) => {
-                return Err(err);
+                Err(err)
             }
         }
     }
@@ -62,11 +65,11 @@ impl SoundEmitter {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to set max distance when emitter type is simple");
-                return Err(SoundError::WrongSoundSourceType);
+                Err(SoundError::WrongSoundSourceType)
             }
             SoundSourceType::Positional => {
                 let _ = self.source.set_max_distance(distance);
-                return Ok(());
+                Ok(())
             }
         }
     }
@@ -75,9 +78,9 @@ impl SoundEmitter {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to get max distance when emitter type is simple");
-                return Err(SoundError::WrongSoundSourceType);
+                Err(SoundError::WrongSoundSourceType)
             }
-            SoundSourceType::Positional => return Ok(self.source.get_max_distance().unwrap()),
+            SoundSourceType::Positional => Ok(self.source.get_max_distance().unwrap()),
         }
     }
 
@@ -141,7 +144,55 @@ impl Object for SoundEmitter {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        todo!()
+        ui.heading("SoundEmitter parameters");
+
+        let mut looping = self.source.is_looping();
+        ui.checkbox(&mut looping, "looping");
+        self.source.set_looping(looping);
+
+        let mut set_distance_string: Option<String> = None;
+        let mut cancel = false;
+        ui.label(format!("source type is {:?}", self.source_type));
+        if let SoundSourceType::Positional = self.source_type {
+            match &mut self.max_distance_inspector {
+                Some(distance) => {
+                    ui.label("max distance:");
+                    ui.horizontal(|ui| {
+                        ui.text_edit_singleline(distance);
+                        if ui.button("done").clicked() {
+                            set_distance_string = Some(distance.to_string());
+                        }
+                        if ui.button("cancel").clicked() {
+                            cancel = true;
+                        }
+                    });
+                },
+                None => {
+                    ui.horizontal(|ui| {
+                        let distance_str = self.get_max_distance().unwrap().to_string();
+
+                        ui.label("max distance:");
+                        ui.label(&distance_str);
+                        if ui.button("change").clicked() {
+                            self.max_distance_inspector = Some(distance_str);
+                        }
+                    });
+                },
+            }
+        }
+        if let Some(distance) = set_distance_string {
+            if let Ok(distance) = distance.parse::<f32>() {
+                let _ = self.set_max_distance(distance);
+                self.max_distance_inspector = None;
+            }
+        }
+        if cancel {
+            self.max_distance_inspector = None;
+        }
+
+        if ui.button("play").clicked() {
+            self.play_sound();
+        }
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {

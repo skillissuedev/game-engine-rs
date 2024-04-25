@@ -183,7 +183,8 @@ impl Object for CharacterController {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        todo!()
+        ui.heading("CameraPosition parameters");
+        ui.label("this object type is made specifically for servers so there's noting to change here ._.");
     }
 }
 

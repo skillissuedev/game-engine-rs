@@ -86,22 +86,11 @@ impl Object for CameraPosition {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        ui.label("Position:");
-        ui.horizontal(|ui| {
-            ui.label("x: ");
-            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "123"));
-            ui.label("y: ");
-            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "420"));
-            ui.label("z: ");
-            ui.add_sized(egui::vec2(20.0, 10.0), TextEdit::singleline(&mut "69"));
-        });
+        ui.heading("CameraPosition parameters");
+        ui.label("there is noting to view/change in this type of object ,_,");
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         &mut self.groups
-    }
-
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        None
     }
 }

@@ -24,7 +24,6 @@ pub struct Trigger {
     collider_handle: ColliderHandle,
     render_collider: Option<RenderColliderType>,
     current_events: Vec<CollisionEvent>,
-    inspector: Vec3Inspector 
 }
 
 impl Trigger {
@@ -84,7 +83,6 @@ impl Trigger {
             collider_handle,
             render_collider,
             current_events: Vec::new(),
-            inspector: Default::default()
         }
     }
 }
@@ -144,22 +142,11 @@ impl Object for Trigger {
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("Inspector parameters");
-        ui.label("there's nothing here ._.");
+        ui.label("this object type is made specifically for servers so there's noting to change here ._.");
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         todo!()
-    }
-
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<std::string::String> {
-        if name == "is_colliding" {
-            return match self.is_colliding() {
-                true => Some("true".into()),
-                false => Some("false".into()),
-            };
-        }
-
-        None
     }
 
     fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {
@@ -235,7 +222,7 @@ impl Object for Trigger {
         }
     }
 
-    fn set_position(&mut self, position: Vec3, set_rigid_body_position: bool) {
+    fn set_position(&mut self, position: Vec3, _set_rigid_body_position: bool) {
         let mut transform = self.local_transform();
         transform.position = position;
         self.set_local_transform(transform);
