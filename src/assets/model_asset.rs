@@ -34,6 +34,7 @@ pub struct Joint {
 
 #[derive(Debug, Clone)]
 pub struct ModelAsset {
+    pub path: String,
     pub objects: Vec<Object>,
     pub joints: Vec<Joint>,
     pub nodes: Vec<Node>,
@@ -319,6 +320,7 @@ impl ModelAsset {
         }
 
         Ok(ModelAsset {
+            path: path.into(),
             objects,
             animations,
             joints: joints.clone(),

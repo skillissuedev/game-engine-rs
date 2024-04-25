@@ -59,11 +59,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         let time_since_last_frame = last_frame.elapsed();
         update_game(time_since_last_frame);
         egui_glium.run(&display, |ctx| {
-            SidePanel::left("side panel test").show(ctx, |ui| {
-                if ui.button("cool test button").clicked() {
-                    println!("pressed a button!");
-                }
-            });
             match get_debug_mode() {
                 DebugMode::None => (),
                 _ => {

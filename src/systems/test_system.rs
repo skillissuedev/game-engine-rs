@@ -7,7 +7,7 @@ use crate::{
         }, physics::{BodyColliderType, BodyType, RenderColliderType}, render::{get_camera_position, set_camera_position, set_camera_rotation, set_light_direction}, systems::CallList
     },
     objects::{
-        character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, Object
+        character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, Object
     },
 };
 use glam::{Vec2, Vec3};
@@ -97,6 +97,7 @@ impl System for TestSystem {
     fn client_start(&mut self) {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         let asset = ModelAsset::from_file("models/knife_test.gltf");
+        let test_anim_asset = ModelAsset::from_file("models/test_anim.gltf");
         let ground_asset = ModelAsset::from_file("models/tile1_trees_rock.gltf").unwrap();
         let ground_texture_asset = TextureAsset::from_file("textures/biome1_rock1.png");
         let shadow_model_asset = ModelAsset::from_file("models/test_model_for_shadows.gltf").unwrap();
@@ -104,7 +105,9 @@ impl System for TestSystem {
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
 
-        let empty_obj = Box::new(EmptyObject::new("test_empty_obj"));
+        let test_anim = Box::new(ModelObject::new("test_anim", test_anim_asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
+        let ray = Box::new(Ray::new("ray", Vec3::Z, None));
+        self.add_object(ray);
 
         let mut knife_model = Box::new(ModelObject::new(
             "knife_model",
@@ -120,8 +123,6 @@ impl System for TestSystem {
             Some(ground_texture_asset.unwrap()),
             ShaderAsset::load_default_shader().unwrap(),
         ));
-        let test_child = Box::new(EmptyObject::new("test child objet"));
-        ground_collider.add_child(test_child);
         ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
         //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
         //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
@@ -150,7 +151,7 @@ impl System for TestSystem {
         controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
         controller.add_to_group("player");
         self.add_object(controller);
-        self.add_object(empty_obj);
+        self.add_object(test_anim);
         self.add_object(knife_model);
         self.add_object(ground_collider);
         self.add_object(test_shadow_model);

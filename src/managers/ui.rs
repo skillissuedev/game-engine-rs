@@ -252,7 +252,7 @@ pub struct SelectedInspectorObject {
 }
 
 #[derive(Debug, Default)]
-struct Vec3Inspector {
+pub struct Vec3Inspector {
     input_value: Option<[String; 3]>,
 }
 
@@ -281,7 +281,7 @@ fn handle_full_debug_checkbox_value(full_debug: bool) {
     }
 }
 
-fn draw_vec3_editor_inspector(ui: &mut Ui, vec3: &mut Vec3Inspector, object_val: &Vec3, show_default_buttons: bool) -> Option<Vec3> {
+pub fn draw_vec3_editor_inspector(ui: &mut Ui, vec3: &mut Vec3Inspector, object_val: &Vec3, show_default_buttons: bool) -> Option<Vec3> {
     let mut return_val: Option<Vec3> = None;
     ui.horizontal(|ui| {
         match vec3.input_value {

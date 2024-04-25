@@ -1,7 +1,7 @@
 use crate::managers::{
     debugger,
     physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-    render, systems,
+    render, systems, ui::{draw_vec3_editor_inspector, Vec3Inspector},
 };
 use glam::Vec3;
 use rapier3d::{
@@ -23,7 +23,8 @@ pub struct Trigger {
     body_handle: RigidBodyHandle,
     collider_handle: ColliderHandle,
     render_collider: Option<RenderColliderType>,
-    current_events: Vec<CollisionEvent>, // collider,  mask(CollisionGroups)
+    current_events: Vec<CollisionEvent>,
+    inspector: Vec3Inspector 
 }
 
 impl Trigger {
@@ -83,6 +84,7 @@ impl Trigger {
             collider_handle,
             render_collider,
             current_events: Vec::new(),
+            inspector: Default::default()
         }
     }
 }
@@ -141,7 +143,8 @@ impl Object for Trigger {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        todo!()
+        ui.heading("Inspector parameters");
+        ui.label("there's nothing here ._.");
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
@@ -171,7 +174,7 @@ impl Object for Trigger {
             }
         }
 
-        return None;
+        None
     }
 
     fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
@@ -186,7 +189,7 @@ impl Object for Trigger {
             }
         }
 
-        return None;
+        None
     }
 
     fn update_transform(&mut self) {
@@ -314,7 +317,7 @@ impl Trigger {
             }
         }
 
-        return false;
+        false
     }
 
     pub fn mask(&self) -> &CollisionGroups {
@@ -354,7 +357,7 @@ fn is_collider_in_group(
                 return true;
             }
         }
-    };
+    }
 
-    return false;
+    false
 }

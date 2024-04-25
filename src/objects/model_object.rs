@@ -12,6 +12,7 @@ use crate::{
     },
     math_utils::deg_to_rad,
 };
+use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
     framebuffer::SimpleFrameBuffer, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer}, Display, IndexBuffer, Program, Surface, VertexBuffer
@@ -38,6 +39,7 @@ pub struct ModelObject {
     shadow_program: Vec<Program>,
     started: bool,
     error: bool,
+    inspector_anim_name: String
 }
 
 impl ModelObject {
@@ -89,6 +91,7 @@ impl ModelObject {
             },
             body: None,
             id: gen_object_id(),
+            inspector_anim_name: "None".into()
         }
     }
 }
@@ -157,7 +160,35 @@ impl Object for ModelObject {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        ui.heading("inspector_ui function's not ready rn for ModelObject ,_,");
+        ui.heading("ModelObject parameters");
+        ui.label(&format!("error: {}", self.error));
+        ui.label(&format!("model asset: {}", self.model_asset.path));
+        ui.label(&format!("texture asset: {}", self.texture_asset.is_some()));
+
+        let anim_name = self.inspector_anim_name.clone();
+        ComboBox::from_label("animation")
+            .selected_text(&anim_name)
+            .show_ui(ui, |ui| {
+                for anim in self.model_asset.animations.clone() {
+                    if ui.selectable_label(false, &anim.name).clicked() {
+                        self.inspector_anim_name = anim.name;
+                    }
+                }
+            });
+
+        ui.horizontal(|ui| {
+            if ui.button("play animation").clicked() {
+                let _ = self.play_animation(&anim_name);
+            }
+            ui.checkbox(&mut self.animation_settings.looping, "loop");
+            if ui.button("stop").clicked() {
+                self.animation_settings.animation = None;
+            }
+            if let Some(timer) = &self.animation_settings.timer {
+                ui.label("time:");
+                ui.label(format!("{} s", timer.elapsed().as_secs_f32()));
+            }
+        });
     }
 
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {

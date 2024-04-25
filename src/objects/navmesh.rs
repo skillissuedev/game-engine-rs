@@ -106,7 +106,8 @@ impl Object for NavigationGround {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        todo!()
+        ui.heading("NavigationGround parameters");
+        ui.label("this object type is made specifically for servers so there's noting to change here ._.");
     }
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

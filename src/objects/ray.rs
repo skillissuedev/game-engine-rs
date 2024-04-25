@@ -1,12 +1,10 @@
 use crate::{
     framework::{self, DebugMode},
     managers::{
-        debugger,
-        physics::{
+        self, debugger, physics::{
             get_ray_intersaction_position, is_ray_intersecting, CollisionGroups,
             ObjectBodyParameters, RenderRay,
-        },
-        render,
+        }, render, ui::Vec3Inspector
     },
     math_utils::deg_vec_to_rad,
 };
@@ -24,7 +22,8 @@ pub struct Ray {
     id: u128,
     groups: Vec<ObjectGroup>,
     direction: Vec3,
-    mask: CollisionGroups, // TODO: direction, point(using object's position), mask(CollisionGroups)
+    mask: CollisionGroups,
+    inspector: Vec3Inspector
 }
 
 impl Ray {
@@ -43,6 +42,7 @@ impl Ray {
             groups: vec![],
             direction,
             mask,
+            inspector: Vec3Inspector::default()
         }
     }
 }
@@ -101,34 +101,16 @@ impl Object for Ray {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        todo!()
+        ui.heading("Ray parameters");
+        ui.label("direction:");
+        if let Some(new_dir) = managers::ui::draw_vec3_editor_inspector(ui, &mut self.inspector, &self.direction, true) {
+            self.direction = new_dir;
+        }
+        ui.label(format!("which is {} if we take object rotation into account", self.rotated_direction()));
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         &mut self.groups
-    }
-
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<std::string::String> {
-        if name == "is_intersecting" {
-            if self.is_intersecting() == true {
-                return Some("true".into());
-            } else {
-                return Some("false".into());
-            }
-        }
-        if name == "get_intersection_position" {
-            match self.intersection_position() {
-                Some(pos) => {
-                    let x_string = pos.x.to_string();
-                    let y_string = &pos.y.to_string();
-                    let z_string = &pos.z.to_string();
-                    let array_string = x_string + ";" + y_string + ";" + z_string;
-                    return Some(array_string);
-                }
-                None => return None,
-            }
-        }
-        None
     }
 
     fn debug_render(&self) {
