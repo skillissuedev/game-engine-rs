@@ -35,6 +35,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                 input_value: Some(["".into(), "".into(), "".into()]),
                             },
                             cancel_collider: false,
+                            new_group_name: String::new(),
                         });
                 }
             }
@@ -51,7 +52,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                     Some(object) => {
                         ui.heading(format!("object '{}'", object.name()));
                         ui.label(format!("type: {}", object.object_type()));
-
+                        ui.separator();
                         ui.collapsing("children", |ui| {
                             for object in object.children_list() {
                                 if ui.button(object.name()).clicked() {
@@ -60,6 +61,25 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                 }
                             }
                         });
+
+                        ui.collapsing("groups", |ui| {
+                            for group in object.groups_list().clone() {
+                                ui.horizontal(|ui| {
+                                    ui.label(group.as_raw());
+                                    if ui.button("remove").clicked() {
+                                        object.remove_from_group(group.as_raw());
+                                    }
+                                });
+                            }
+                            ui.horizontal(|ui| {
+                                ui.label("group name:");
+                                ui.text_edit_singleline(&mut selected_object.new_group_name);
+                                if ui.button("add group").clicked() {
+                                    object.add_to_group(&selected_object.new_group_name);
+                                }
+                            });
+                        });
+
 
                         ui.label("local position:");
                         if let Some(pos) = draw_vec3_editor_inspector(ui, &mut selected_object.position, &object.local_transform().position, true) {
@@ -226,7 +246,8 @@ pub struct SelectedInspectorObject {
     scale: Vec3Inspector,
     render_collider: Option<InspectorRenderCollider>,
     render_collider_size: Vec3Inspector,
-    cancel_collider: bool
+    cancel_collider: bool,
+    new_group_name: String
     //input_postition: Option<[String; 3]>,
 }
 

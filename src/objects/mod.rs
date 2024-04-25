@@ -287,7 +287,7 @@ impl Default for Transform {
 pub struct ObjectGroup(pub String);
 
 impl ObjectGroup {
-    pub fn as_raw(&self) -> &String {
+    pub fn as_raw(&self) -> &str {
         &self.0
     }
 }
