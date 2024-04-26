@@ -1,10 +1,13 @@
 use crate::{
     framework::{self, DebugMode},
     managers::{
-        self, debugger, physics::{
+        self, debugger,
+        physics::{
             get_ray_intersaction_position, is_ray_intersecting, CollisionGroups,
             ObjectBodyParameters, RenderRay,
-        }, render, ui::Vec3Inspector
+        },
+        render,
+        ui::Vec3Inspector,
     },
     math_utils::deg_vec_to_rad,
 };
@@ -23,7 +26,7 @@ pub struct Ray {
     groups: Vec<ObjectGroup>,
     direction: Vec3,
     mask: CollisionGroups,
-    inspector: Vec3Inspector
+    inspector: Vec3Inspector,
 }
 
 impl Ray {
@@ -42,7 +45,7 @@ impl Ray {
             groups: vec![],
             direction,
             mask,
-            inspector: Vec3Inspector::default()
+            inspector: Vec3Inspector::default(),
         }
     }
 }
@@ -103,10 +106,15 @@ impl Object for Ray {
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("Ray parameters");
         ui.label("direction:");
-        if let Some(new_dir) = managers::ui::draw_vec3_editor_inspector(ui, &mut self.inspector, &self.direction, true) {
+        if let Some(new_dir) =
+            managers::ui::draw_vec3_editor_inspector(ui, &mut self.inspector, &self.direction, true)
+        {
             self.direction = new_dir;
         }
-        ui.label(format!("which is {} if we take object rotation into account", self.rotated_direction()));
+        ui.label(format!(
+            "which is {} if we take object rotation into account",
+            self.rotated_direction()
+        ));
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {

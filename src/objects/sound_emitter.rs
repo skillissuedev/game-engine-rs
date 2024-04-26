@@ -3,9 +3,9 @@ use crate::{
     assets::sound_asset::SoundAsset,
     managers::{debugger::warn, physics::ObjectBodyParameters},
 };
+use core::f32;
 use ez_al::{SoundError, SoundSource, SoundSourceType};
 use glam::Vec3;
-use core::f32;
 use std::fmt::Debug;
 
 pub struct SoundEmitter {
@@ -18,7 +18,7 @@ pub struct SoundEmitter {
     groups: Vec<ObjectGroup>,
     pub source_type: SoundSourceType,
     pub source: SoundSource,
-    max_distance_inspector: Option<String>
+    max_distance_inspector: Option<String>,
 }
 
 impl SoundEmitter {
@@ -29,23 +29,19 @@ impl SoundEmitter {
     ) -> Result<SoundEmitter, SoundError> {
         let source = SoundSource::new(&asset.wav, emitter_type.clone());
         match source {
-            Ok(source) => {
-                Ok(SoundEmitter {
-                    name: name.to_string(),
-                    transform: Transform::default(),
-                    parent_transform: None,
-                    children: vec![],
-                    body: None,
-                    id: gen_object_id(),
-                    groups: vec![],
-                    source_type: emitter_type,
-                    source,
-                    max_distance_inspector: None,
-                })
-            }
-            Err(err) => {
-                Err(err)
-            }
+            Ok(source) => Ok(SoundEmitter {
+                name: name.to_string(),
+                transform: Transform::default(),
+                parent_transform: None,
+                children: vec![],
+                body: None,
+                id: gen_object_id(),
+                groups: vec![],
+                source_type: emitter_type,
+                source,
+                max_distance_inspector: None,
+            }),
+            Err(err) => Err(err),
         }
     }
 
@@ -166,7 +162,7 @@ impl Object for SoundEmitter {
                             cancel = true;
                         }
                     });
-                },
+                }
                 None => {
                     ui.horizontal(|ui| {
                         let distance_str = self.get_max_distance().unwrap().to_string();
@@ -177,7 +173,7 @@ impl Object for SoundEmitter {
                             self.max_distance_inspector = Some(distance_str);
                         }
                     });
-                },
+                }
             }
         }
         if let Some(distance) = set_distance_string {

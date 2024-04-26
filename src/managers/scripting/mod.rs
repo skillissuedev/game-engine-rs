@@ -1,3 +1,3 @@
-pub mod wren;
 pub mod dyon;
 pub mod lua;
+pub mod wren;

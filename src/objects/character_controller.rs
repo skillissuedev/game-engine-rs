@@ -39,7 +39,7 @@ impl CharacterController {
         shape: BodyColliderType,
         membership_groups: Option<CollisionGroups>,
         mask: Option<CollisionGroups>,
-    ) -> Option<Self> {
+    ) -> Self {
         let mut controller = KinematicCharacterController::default();
         controller.max_slope_climb_angle = deg_to_rad(45.0);
         controller.up = nalgebra::Vector::y_axis();
@@ -74,7 +74,7 @@ impl CharacterController {
 
         let collider_handle = unsafe { physics::COLLIDER_SET.insert(collider) };
 
-        Some(CharacterController {
+        CharacterController {
             transform: Transform::default(),
             children: vec![],
             name: name.to_string(),
@@ -85,7 +85,7 @@ impl CharacterController {
             id,
             movement: None,
             last_path_point: None,
-        })
+        }
     }
 }
 

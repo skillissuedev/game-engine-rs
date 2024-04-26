@@ -1,21 +1,39 @@
 use crate::{
     game::game_main,
     managers::{
-        self, assets::get_full_asset_path, input, navigation, networking::{self, NetworkingMode}, physics, render::{self, ShadowTextures}, sound::{self, set_listener_transform}, systems
+        self,
+        assets::get_full_asset_path,
+        input, navigation,
+        networking::{self, NetworkingMode},
+        physics,
+        render::{self, ShadowTextures},
+        sound::{self, set_listener_transform},
+        systems,
     },
 };
 use egui_glium::egui_winit::egui::{FontData, FontDefinitions, FontFamily, SidePanel, Window};
 use glium::{
-    backend::glutin, glutin::{dpi::PhysicalSize, event::WindowEvent, event_loop::{ControlFlow, EventLoop}, window::WindowBuilder, ContextBuilder}, Display
+    backend::glutin,
+    glutin::{
+        dpi::PhysicalSize,
+        event::WindowEvent,
+        event_loop::{ControlFlow, EventLoop},
+        window::WindowBuilder,
+        ContextBuilder,
+    },
+    Display,
 };
 use once_cell::sync::Lazy;
 use std::{
-    fs, num::NonZeroU32, time::{Duration, Instant}
+    fs,
+    num::NonZeroU32,
+    time::{Duration, Instant},
 };
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
 static mut DELTA_TIME: Duration = Duration::new(0, 0);
-static FONT: Lazy<Vec<u8>> = Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
+static FONT: Lazy<Vec<u8>> =
+    Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode }
@@ -24,17 +42,21 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .with_title("projectbaldej")
         .with_inner_size(PhysicalSize::new(1280, 720))
         .with_transparent(false);
-    let cb = ContextBuilder::new().with_multisampling(8).with_srgb(true);//.with_vsync(true);
+    let cb = ContextBuilder::new().with_multisampling(8).with_srgb(true); //.with_vsync(true);
     let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
-    let mut egui_glium =
-        egui_glium::EguiGlium::new(&display, &event_loop);
+    let mut egui_glium = egui_glium::EguiGlium::new(&display, &event_loop);
 
     let mut fps = 0;
-    
 
     let mut fonts = FontDefinitions::default();
-    fonts.font_data.insert("JetBrains Mono".into(), FontData::from_static(&FONT));
-    fonts.families.get_mut(&FontFamily::Proportional).unwrap().insert(0, "JetBrains Mono".into());
+    fonts
+        .font_data
+        .insert("JetBrains Mono".into(), FontData::from_static(&FONT));
+    fonts
+        .families
+        .get_mut(&FontFamily::Proportional)
+        .unwrap()
+        .insert(0, "JetBrains Mono".into());
     egui_glium.egui_ctx.set_fonts(fonts);
     let mut ui_state = managers::ui::UiState::default();
 
@@ -58,14 +80,12 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     event_loop.run(move |ev, _, control_flow| {
         let time_since_last_frame = last_frame.elapsed();
         update_game(time_since_last_frame);
-        egui_glium.run(&display, |ctx| {
-            match get_debug_mode() {
-                DebugMode::None => (),
-                _ => {
-                    Window::new("inspector").show(ctx, |ui| {
-                        managers::ui::draw_inspector(ui, &fps, &mut ui_state);
-                    });
-                }
+        egui_glium.run(&display, |ctx| match get_debug_mode() {
+            DebugMode::None => (),
+            _ => {
+                Window::new("inspector").show(ctx, |ui| {
+                    managers::ui::draw_inspector(ui, &fps, &mut ui_state);
+                });
             }
         });
 
@@ -109,7 +129,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         WindowEvent::CloseRequested => {
                             *control_flow = ControlFlow::Exit;
                             networking::disconnect();
-                        }, 
+                        }
                         WindowEvent::Resized(size) => {
                             win_w = size.width;
                             win_h = size.height;
@@ -117,7 +137,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             unsafe {
                                 render::ASPECT_RATIO = win_w as f32 / win_h as f32;
                             }
-                        },
+                        }
                         _ => (),
                     }
                 }

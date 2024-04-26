@@ -68,7 +68,7 @@ pub enum AnimationChannelType {
 }
 
 impl ModelAsset {
-    pub fn from_file(path: &str) -> Result<ModelAsset, ModelAssetError> {
+    pub fn from_gltf(path: &str) -> Result<ModelAsset, ModelAssetError> {
         let full_path = assets::get_full_asset_path(path);
         let gltf_result = Gltf::open(&full_path);
         let gltf: Gltf;

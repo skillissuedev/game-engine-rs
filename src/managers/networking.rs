@@ -215,7 +215,7 @@ impl ServerHandle {
             }
         };
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn update(&mut self, delta_time: Duration) {
@@ -296,7 +296,7 @@ impl ClientHandle {
 
         self.client
             .send_message(renet_message_reliability, message_bytes_vec);
-        return Ok(());
+        Ok(())
     }
 
     pub fn update(&mut self, delta_time: Duration) {

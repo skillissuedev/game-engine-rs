@@ -1,13 +1,22 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
+    assets::{
+        model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset,
+        texture_asset::TextureAsset,
+    },
     managers::{
-        input::{self, InputEventType}, networking::{
+        input::{self, InputEventType},
+        networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
-        }, physics::{BodyColliderType, BodyType, RenderColliderType}, render::{get_camera_position, set_camera_position, set_light_direction}, systems::CallList
+        },
+        physics::{BodyColliderType, BodyType, RenderColliderType},
+        render::{get_camera_position, set_camera_position, set_light_direction},
+        systems::CallList,
     },
     objects::{
-        character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
+        character_controller::CharacterController, empty_object::EmptyObject,
+        model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray,
+        sound_emitter::SoundEmitter, Object,
     },
 };
 use ez_al::SoundSourceType;
@@ -32,7 +41,7 @@ impl System for TestSystem {
     fn call_mut(&mut self, _call_id: &str) {}
 
     fn server_start(&mut self) {
-        let ground_asset = ModelAsset::from_file("models/ground_1.gltf").unwrap();
+        let ground_asset = ModelAsset::from_gltf("models/ground_1.gltf").unwrap();
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = Box::new(EmptyObject::new("knife_model"));
 
@@ -50,7 +59,7 @@ impl System for TestSystem {
         knife_model.set_position(Vec3::new(0.0, 105.0, 15.0), true);
         knife_model.build_object_rigid_body(
             Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(
-                0.4, 2.81, 0.2
+                0.4, 2.81, 0.2,
             )))),
             None,
             0.5,
@@ -58,15 +67,17 @@ impl System for TestSystem {
             None,
         );
         ground_collider.build_object_rigid_body(
-            Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(ground_asset)))),
+            Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(
+                ground_asset,
+            )))),
             None,
             1.0,
             None,
             None,
         );
         /*ground_collider.build_object_rigid_body(
-            Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(103.0, 1.0, 102.0)))), 
-            None, 1.0, None, None);*/
+        Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(103.0, 1.0, 102.0)))),
+        None, 1.0, None, None);*/
 
         let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(100.0, 100.0));
         navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
@@ -77,15 +88,12 @@ impl System for TestSystem {
         //dbg!(unsafe { navigation::MAP.clone() });
 
         //dbg!(ground_collider.object_id());
-        let mut controller = Box::new(
-            CharacterController::new(
-                "controller",
-                BodyColliderType::Capsule(1.0, 4.0),
-                None,
-                None,
-            )
-            .unwrap(),
-        );
+        let mut controller = Box::new(CharacterController::new(
+            "controller",
+            BodyColliderType::Capsule(1.0, 4.0),
+            None,
+            None,
+        ));
         controller.set_position(Vec3::new(45.0, 10.0, 30.0), false);
         controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
         controller.add_to_group("player");
@@ -97,22 +105,35 @@ impl System for TestSystem {
 
     fn client_start(&mut self) {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
-        let asset = ModelAsset::from_file("models/knife_test.gltf");
-        let test_anim_asset = ModelAsset::from_file("models/test_anim.gltf");
-        let ground_asset = ModelAsset::from_file("models/tile1_trees_rock.gltf").unwrap();
+        let asset = ModelAsset::from_gltf("models/knife_test.gltf");
+        let test_anim_asset = ModelAsset::from_gltf("models/test_anim.gltf");
+        let ground_asset = ModelAsset::from_gltf("models/tile1_trees_rock.gltf").unwrap();
         let ground_texture_asset = TextureAsset::from_file("textures/biome1_rock1.png");
-        let shadow_model_asset = ModelAsset::from_file("models/test_model_for_shadows.gltf").unwrap();
-        let mut test_shadow_model = Box::new(ModelObject::new("test_shadow_model", shadow_model_asset, None, ShaderAsset::load_default_shader().unwrap()));
+        let shadow_model_asset =
+            ModelAsset::from_gltf("models/test_model_for_shadows.gltf").unwrap();
+        let mut test_shadow_model = Box::new(ModelObject::new(
+            "test_shadow_model",
+            shadow_model_asset,
+            None,
+            ShaderAsset::load_default_shader().unwrap(),
+        ));
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
 
         let sound_asset = SoundAsset::from_wav("sounds/tone.wav").unwrap();
-        let emitter = SoundEmitter::new("sound_emitter", &sound_asset, SoundSourceType::Positional).unwrap();
-        let emitter2 = SoundEmitter::new("sound_emitter2", &sound_asset, SoundSourceType::Simple).unwrap();
+        let emitter =
+            SoundEmitter::new("sound_emitter", &sound_asset, SoundSourceType::Positional).unwrap();
+        let emitter2 =
+            SoundEmitter::new("sound_emitter2", &sound_asset, SoundSourceType::Simple).unwrap();
         self.add_object(Box::new(emitter));
         self.add_object(Box::new(emitter2));
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
 
-        let test_anim = Box::new(ModelObject::new("test_anim", test_anim_asset.unwrap(), None, ShaderAsset::load_default_shader().unwrap()));
+        let test_anim = Box::new(ModelObject::new(
+            "test_anim",
+            test_anim_asset.unwrap(),
+            None,
+            ShaderAsset::load_default_shader().unwrap(),
+        ));
         let ray = Box::new(Ray::new("ray", Vec3::Z, None));
         self.add_object(ray);
 
@@ -136,7 +157,9 @@ impl System for TestSystem {
 
         knife_model.build_object_rigid_body(
             None,
-            Some(RenderColliderType::Cuboid(None, None, 0.4, 2.81, 0.2, false)),
+            Some(RenderColliderType::Cuboid(
+                None, None, 0.4, 2.81, 0.2, false,
+            )),
             1.0,
             None,
             None,
@@ -144,10 +167,15 @@ impl System for TestSystem {
 
         ground_collider.build_object_rigid_body(
             None,
-            Some(RenderColliderType::Cuboid(None, None, 20.0, 1.0, 20.0, false)), 
-            1.0, None, None);
+            Some(RenderColliderType::Cuboid(
+                None, None, 20.0, 1.0, 20.0, false,
+            )),
+            1.0,
+            None,
+            None,
+        );
 
-        let capsule_model_asset = ModelAsset::from_file("models/capsule.gltf").unwrap();
+        let capsule_model_asset = ModelAsset::from_gltf("models/capsule.gltf").unwrap();
         let mut controller = Box::new(ModelObject::new(
             "controller",
             capsule_model_asset,
@@ -255,31 +283,55 @@ impl System for TestSystem {
 
         if input::is_bind_down("cam_up") {
             let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(camera_position.x, camera_position.y + 0.05, camera_position.z));
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y + 0.05,
+                camera_position.z,
+            ));
         }
         if input::is_bind_down("cam_down") {
             let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(camera_position.x, camera_position.y - 0.05, camera_position.z));
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y - 0.05,
+                camera_position.z,
+            ));
         }
 
         if input::is_bind_down("forward") {
             let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(camera_position.x, camera_position.y, camera_position.z + 0.05));
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y,
+                camera_position.z + 0.05,
+            ));
         }
 
         if input::is_bind_down("backwards") {
             let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(camera_position.x, camera_position.y, camera_position.z - 0.05));
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y,
+                camera_position.z - 0.05,
+            ));
         }
 
         if input::is_bind_down("left") {
             let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(camera_position.x - 0.05, camera_position.y, camera_position.z));
-       }
+            set_camera_position(Vec3::new(
+                camera_position.x - 0.05,
+                camera_position.y,
+                camera_position.z,
+            ));
+        }
 
         if input::is_bind_down("right") {
             let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(camera_position.x + 0.05, camera_position.y, camera_position.z));
+            set_camera_position(Vec3::new(
+                camera_position.x + 0.05,
+                camera_position.y,
+                camera_position.z,
+            ));
         }
     }
 

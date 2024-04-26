@@ -1,7 +1,8 @@
 use crate::managers::{
     debugger,
     physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-    render, systems, ui::{draw_vec3_editor_inspector, Vec3Inspector},
+    render, systems,
+    ui::{draw_vec3_editor_inspector, Vec3Inspector},
 };
 use glam::Vec3;
 use rapier3d::{

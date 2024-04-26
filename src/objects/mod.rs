@@ -10,6 +10,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use egui_glium::egui_winit::egui::Ui;
 use glam::{Mat4, Vec3};
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use mlua::UserData;
 use serde::{Deserialize, Serialize};
 
 pub mod camera_position;
@@ -63,7 +64,14 @@ pub trait Object: std::fmt::Debug + Downcast {
         None
     }
 
-    fn render(&mut self, _display: &Display, _target: &mut Frame, _cascades: &Cascades, _shadow_textures: &ShadowTextures) {}
+    fn render(
+        &mut self,
+        _display: &Display,
+        _target: &mut Frame,
+        _cascades: &Cascades,
+        _shadow_textures: &ShadowTextures,
+    ) {
+    }
 
     fn shadow_render(
         &mut self,
@@ -141,7 +149,13 @@ pub trait Object: std::fmt::Debug + Downcast {
         });
     }
 
-    fn render_children(&mut self, display: &Display, target: &mut Frame, cascades: &Cascades, shadow_texture: &ShadowTextures) {
+    fn render_children(
+        &mut self,
+        display: &Display,
+        target: &mut Frame,
+        cascades: &Cascades,
+        shadow_texture: &ShadowTextures,
+    ) {
         self.children_list_mut().iter_mut().for_each(|child| {
             child.render(display, target, cascades, shadow_texture);
             child.render_children(display, target, cascades, shadow_texture);

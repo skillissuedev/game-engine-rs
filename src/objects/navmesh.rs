@@ -118,7 +118,14 @@ impl Object for NavigationGround {
             .finish()
     }
 
-    fn render(&mut self, _display: &glium::Display, _target: &mut glium::Frame, _cascades: &crate::managers::render::Cascades, _shadow_textures: &crate::managers::render::ShadowTextures) {}
+    fn render(
+        &mut self,
+        _display: &glium::Display,
+        _target: &mut glium::Frame,
+        _cascades: &crate::managers::render::Cascades,
+        _shadow_textures: &crate::managers::render::ShadowTextures,
+    ) {
+    }
 
     fn shadow_render(
         &mut self,
@@ -176,7 +183,8 @@ impl Object for NavigationGround {
                 return;
             }
 
-            let position_and_rotation_option = crate::managers::physics::get_body_transformations(parameters);
+            let position_and_rotation_option =
+                crate::managers::physics::get_body_transformations(parameters);
 
             if let Some((pos, rot)) = position_and_rotation_option {
                 self.set_position(pos, false);
@@ -195,7 +203,13 @@ impl Object for NavigationGround {
         });
     }
 
-    fn render_children(&mut self, display: &glium::Display, target: &mut glium::Frame, cascades: &crate::managers::render::Cascades, shadow_texture: &crate::managers::render::ShadowTextures) {
+    fn render_children(
+        &mut self,
+        display: &glium::Display,
+        target: &mut glium::Frame,
+        cascades: &crate::managers::render::Cascades,
+        shadow_texture: &crate::managers::render::ShadowTextures,
+    ) {
         self.children_list_mut().iter_mut().for_each(|child| {
             child.render(display, target, cascades, shadow_texture);
             child.render_children(display, target, cascades, shadow_texture);

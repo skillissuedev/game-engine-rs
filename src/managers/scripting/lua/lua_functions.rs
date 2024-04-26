@@ -1,24 +1,132 @@
+use super::{ObjectHandle, SYSTEMS_LUA_VMS};
+use crate::{
+    assets::{
+        self,
+        model_asset::ModelAsset,
+        shader_asset::{ShaderAsset, ShaderAssetPath},
+        sound_asset::SoundAsset,
+        texture_asset::TextureAsset,
+    },
+    managers::{
+        self, debugger,
+        physics::{BodyColliderType, CollisionGroups},
+        systems,
+    },
+    objects::{
+        camera_position::CameraPosition, character_controller::CharacterController,
+        empty_object::EmptyObject, model_object::ModelObject, sound_emitter::SoundEmitter,
+    },
+};
+use ez_al::SoundSourceType;
 use glam::Vec3;
 use mlua::Lua;
-use crate::{
-    managers::{systems, debugger, self}, 
-    assets::{texture_asset::get_default_texture_path, shader_asset::{get_default_vertex_shader_path, get_default_fragment_shader_path}}
-};
-use super::SYSTEMS_LUA_VMS;
 
 pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
     unsafe {
         SYSTEMS_LUA_VMS.insert(system_id.clone(), lua);
         let lua = SYSTEMS_LUA_VMS.get_mut(&system_id).unwrap();
+        let _ = lua.globals().set("current_parent", None::<String>);
 
-
-        // creating some functions 
+        // creating some functions
         let system_id_for_functions = system_id.clone();
-        let new_empty_object = lua.create_function_mut(move |_, name: String| {
+        let set_current_parent = lua.create_function(move |lua, name: String| {
+            if let Err(err) = lua.globals().set("current_parent", Some(name)) {
+                debugger::error(&format!(
+                    "lua error: failed to set current_parent! system: {}\nerr: {:?}",
+                    system_id_for_functions, err
+                ));
+            }
+            Ok(())
+        });
+
+        match set_current_parent {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("set_current_parent", func) {
+                    debugger::error(&format!("failed to add a function set_current_parent as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function set_current_parent in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        let clear_current_parent = lua.create_function(move |lua, _: ()| {
+            if let Err(err) = lua.globals().set("current_parent", None::<String>) {
+                debugger::error(&format!(
+                    "lua error: failed to set current_parent! system: {}\nerr: {:?}",
+                    system_id_for_functions, err
+                ));
+            }
+            Ok(())
+        });
+
+        match clear_current_parent {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("clear_current_parent", func) {
+                    debugger::error(&format!("failed to add a function clear_current_parent as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function clear_current_parent in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        let find_object = lua.create_function(move |_, name: String| {
+            let system_option = systems::get_system_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => match system.find_object(&name) {
+                    Some(object) => Ok(Some(ObjectHandle {
+                        system_id: system.system_id().into(),
+                        name: object.name().into(),
+                    })),
+                    None => {
+                        debugger::error("failed to call find_object: object not found");
+                        Ok(None)
+                    }
+                },
+                None => {
+                    debugger::error("failed to call find_object: system not found");
+                    Ok(None)
+                }
+            }
+        });
+
+        match find_object {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("find_object", func) {
+                    debugger::error(&format!("failed to add a function find_object as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function find_object in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        let new_empty_object = lua.create_function_mut(move |lua, name: String| {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    system.call_with_args("new_empty_object", vec![name]);
+                    let empty_object = EmptyObject::new(&name);
+                    if let Ok(current_parent) = lua.globals().get::<&str, Option<String>>("current_parent") {
+                        if let Some(current_parent) = current_parent {
+                            match system.find_object_mut(&current_parent) {
+                                Some(object) => {
+                                    object.add_child(Box::new(empty_object));
+                                    return Ok(())
+                                },
+                                None => {
+                                    debugger::error("failed to call new_empty_object, failed to get the current_parent object!");
+                                }
+                            }
+                        }
+                    }
+                    system.add_object(Box::new(empty_object));
                 },
                 None => debugger::error("failed to call new_empty_object, system not found"),
             }
@@ -31,16 +139,41 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("new_empty_object", func) {
                     debugger::error(&format!("failed to add a function new_empty_object as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function new_empty_object in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_empty_object in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
         let system_id_for_functions = system_id.clone();
-        let new_sound_emitter_object = lua.create_function_mut(move |_, (name, wav_sound_path, is_positional): (String, String, bool)| {
+        let new_sound_emitter_object = lua.create_function_mut(move |_, (name, wav_sound_path, should_loop, is_positional, max_distance): (String, String, bool, bool, f32)| {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    system.call_with_args("new_sound_emitter_object", vec![name, wav_sound_path, is_positional.to_string()]);
+                    let sound_asset = SoundAsset::from_wav(&wav_sound_path);
+                    match sound_asset {
+                        Ok(asset) => {
+                            let emitter_type = match is_positional {
+                                true => SoundSourceType::Positional,
+                                false => SoundSourceType::Simple,
+                            };
+
+                            let object = SoundEmitter::new(&name, &asset, emitter_type);
+                            match object {
+                                Ok(mut object) => {
+                                    if is_positional {
+                                        let _ = object.set_max_distance(max_distance);
+                                    }
+                                    object.set_looping(should_loop);
+                                    system.add_object(Box::new(object));
+                                },
+                                Err(err) => 
+                                    debugger::error(&format!("failed to call new_sound_emitter_object: got an error when creating SoundEmitter! err: {:?}", err)),
+                            }
+                        },
+                        Err(err) => debugger::error(&format!("failed to call new_sound_emitter_object: got an error when creating SoundAsset! err: {:?}", err)),
+                    }
                 },
                 None => debugger::error("failed to call new_sound_emitter_object, system not found"),
             }
@@ -53,8 +186,11 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("new_sound_emitter_object", func) {
                     debugger::error(&format!("failed to add a function new_sound_emitter_object as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function new_sound_emitter_object in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_sound_emitter_object in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
         let system_id_for_functions = system_id.clone();
@@ -62,11 +198,14 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    system.call_with_args("new_camera_position_object", vec![name]);
-                },
-                None => debugger::error("failed to call new_camera_position_object, system not found"),
+                    let camera_position_object = CameraPosition::new(&name);
+                    system.add_object(Box::new(camera_position_object));
+                }
+                None => {
+                    debugger::error("failed to call new_camera_position_object, system not found")
+                }
             }
-            
+
             Ok(())
         });
 
@@ -75,11 +214,13 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("new_camera_position_object", func) {
                     debugger::error(&format!("failed to add a function new_camera_position_object as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function new_camera_position_object in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_camera_position_object in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
-        
         let system_id_for_functions = system_id.clone();
         let new_model_object = lua.create_function_mut(
             move |_, (name, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
@@ -87,22 +228,46 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    let texture_asset_path_str: String;
+                    let texture_asset;
                     match texture_asset_path {
-                        Some(path) => texture_asset_path_str = path,
-                        None => texture_asset_path_str = get_default_texture_path()
+                        Some(path) => {
+                            let asset = TextureAsset::from_file(&path);
+                            match asset {
+                                Ok(asset) => texture_asset = Some(asset),
+                                Err(err) => {
+                                    debugger::warn(&format!("lua warning: error when calling new_model_object, failed to load texture asset!\nerr: {:?}", err));
+                                    texture_asset = None;
+                                },
+                            }
+                        },
+                        None => texture_asset = None,
                     }
-                    let vert_shader_path_str: String;
-                    let frag_shader_path_str: String;
-                    match vertex_shader_asset_path {
-                        Some(path) => vert_shader_path_str = path,
-                        None => vert_shader_path_str = get_default_vertex_shader_path()
+                    let mut shader_asset_path = ShaderAssetPath {
+                        vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
+                        fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
+                    };
+                    if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
+                        shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
                     }
-                    match fragment_shader_asset_path {
-                        Some(path) => frag_shader_path_str = path,
-                        None => frag_shader_path_str = get_default_fragment_shader_path()
+                    if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
+                        shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
                     }
-                    system.call_with_args("new_model_object", vec![name, model_asset_path, texture_asset_path_str, vert_shader_path_str, frag_shader_path_str]);
+                    let shader_asset = ShaderAsset::load_from_file(shader_asset_path);
+                    match shader_asset {
+                        Ok(shader_asset) => {
+                            let model_asset = ModelAsset::from_gltf(&model_asset_path);
+                            match model_asset {
+                                Ok(model_asset) => {
+                                    let object = ModelObject::new(&name, model_asset, texture_asset, shader_asset);
+                                    system.add_object(Box::new(object));
+                                },
+                                Err(err) => 
+                                    debugger::error(&format!("lua error: error when calling new_model_object, failed to load a model asset!\nerr: {:?}", err)),
+                            }
+                        },
+                        Err(err) => 
+                            debugger::error(&format!("lua error: error when calling new_model_object, failed to load a shader asset!\nerr: {:?}", err)),
+                    }
                 },
                 None => debugger::error("failed to call new_empty_object, system not found"),
             }
@@ -115,89 +280,166 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("new_model_object", func) {
                     debugger::error(&format!("failed to add a function new_model_object as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function new_model_object in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_model_object in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
+        let system_id_for_functions = system_id.clone();
+        let new_character_controller = lua.create_function_mut(
+            move |_,
+                  (name, collider_type, size_x, size_y, size_z, membership_bits, mask_bits): (
+                String,
+                String,
+                f32,
+                f32,
+                f32,
+                Option<u32>,
+                Option<u32>,
+            )| {
+                let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                match system_option {
+                    Some(system) => {
+                        let collider = match collider_type.as_str() {
+                            "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
+                            "Capsule" => BodyColliderType::Capsule(size_x, size_y),
+                            "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
+                            "Ball" => BodyColliderType::Ball(size_x),
+                            _ => {
+                                // error here
+                                BodyColliderType::Capsule(size_x, size_y)
+                            }
+                        };
+                        let membership = match membership_bits {
+                            Some(bits) => Some(CollisionGroups::from(bits)),
+                            None => None,
+                        };
+                        let mask = match mask_bits {
+                            Some(bits) => Some(CollisionGroups::from(bits)),
+                            None => None,
+                        };
+                        let object = CharacterController::new(&name, collider, membership, mask);
+                        system.add_object(Box::new(object));
+                    }
+                    None => debugger::error("failed to call new_empty_object, system not found"),
+                }
+
+                Ok(())
+            },
+        );
+
+        match new_character_controller {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_character_controller_object", func) {
+                    debugger::error(&format!("failed to add a function new_character_controller as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_empty_object in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
 
         let system_id_for_functions = system_id.clone();
-        let set_object_position = lua.create_function_mut(move |_, 
-            (name, pos_x, pos_y, pos_z): (String, f32, f32, f32)| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let object_option = system.find_object_mut(&name);
-                    match object_option {
-                        Some(object) => object.set_position(Vec3::new(pos_x, pos_y, pos_z), true),
-                        None => debugger::error("failed to call set_object_position, object not found"),
+        let set_object_position = lua.create_function_mut(
+            move |_, (name, pos_x, pos_y, pos_z): (String, f32, f32, f32)| {
+                match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
+                    Some(system) => {
+                        let object_option = system.find_object_mut(&name);
+                        match object_option {
+                            Some(object) => {
+                                object.set_position(Vec3::new(pos_x, pos_y, pos_z), true)
+                            }
+                            None => debugger::error(
+                                "failed to call set_object_position, object not found",
+                            ),
+                        }
                     }
-                },
-                None =>  debugger::error("failed to call set_object_position, system not found"),
-            }
+                    None => debugger::error("failed to call set_object_position, system not found"),
+                }
 
-            Ok(())
-        });
+                Ok(())
+            },
+        );
 
         match set_object_position {
             Ok(func) => {
                 if let Err(err) = lua.globals().set("set_object_position", func) {
                     debugger::error(&format!("failed to add a function set_object_position as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function set_object_position in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function set_object_position in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
-
         let system_id_for_functions = system_id.clone();
-        let set_object_rotation = lua.create_function_mut(move |_, 
-            (name, rot_x, rot_y, rot_z): (String, f32, f32, f32)| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let object_option = system.find_object_mut(&name);
-                    match object_option {
-                        Some(object) => object.set_rotation(Vec3::new(rot_x, rot_y, rot_z), true),
-                        None => debugger::error("failed to call set_object_rotation, object not found"),
+        let set_object_rotation = lua.create_function_mut(
+            move |_, (name, rot_x, rot_y, rot_z): (String, f32, f32, f32)| {
+                match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
+                    Some(system) => {
+                        let object_option = system.find_object_mut(&name);
+                        match object_option {
+                            Some(object) => {
+                                object.set_rotation(Vec3::new(rot_x, rot_y, rot_z), true)
+                            }
+                            None => debugger::error(
+                                "failed to call set_object_rotation, object not found",
+                            ),
+                        }
                     }
-                },
-                None =>  debugger::error("failed to call set_object_rotation, system not found"),
-            }
+                    None => debugger::error("failed to call set_object_rotation, system not found"),
+                }
 
-            Ok(())
-        });
+                Ok(())
+            },
+        );
 
         match set_object_rotation {
             Ok(func) => {
                 if let Err(err) = lua.globals().set("set_object_rotation", func) {
                     debugger::error(&format!("failed to add a function set_object_rotation as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function set_object_rotation in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function set_object_rotation in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
-
         let system_id_for_functions = system_id.clone();
-        let set_object_scale = lua.create_function_mut(move |_, 
-            (name, sc_x, sc_y, sc_z): (String, f32, f32, f32)| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let object_option = system.find_object_mut(&name);
-                    match object_option {
-                        Some(object) => object.set_scale(Vec3::new(sc_x, sc_y, sc_z)),
-                        None => debugger::error("failed to call set_object_scale, object not found"),
+        let set_object_scale = lua.create_function_mut(
+            move |_, (name, sc_x, sc_y, sc_z): (String, f32, f32, f32)| {
+                match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
+                    Some(system) => {
+                        let object_option = system.find_object_mut(&name);
+                        match object_option {
+                            Some(object) => object.set_scale(Vec3::new(sc_x, sc_y, sc_z)),
+                            None => {
+                                debugger::error("failed to call set_object_scale, object not found")
+                            }
+                        }
                     }
-                },
-                None =>  debugger::error("failed to call set_object_scale, system not found"),
-            }
+                    None => debugger::error("failed to call set_object_scale, system not found"),
+                }
 
-            Ok(())
-        });
+                Ok(())
+            },
+        );
 
         match set_object_scale {
             Ok(func) => {
                 if let Err(err) = lua.globals().set("set_object_scale", func) {
                     debugger::error(&format!("failed to add a function set_object_scale as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function set_object_scale in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function set_object_scale in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
         let system_id_for_functions = system_id.clone();
@@ -206,12 +448,19 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Some(system) => {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
-                        Some(object) => return 
-                            Ok(vec![object.global_transform().position.x, object.global_transform().position.y, object.global_transform().position.z]),
-                        None => debugger::error("failed to call get_object_position, object not found"),
+                        Some(object) => {
+                            return Ok(vec![
+                                object.global_transform().position.x,
+                                object.global_transform().position.y,
+                                object.global_transform().position.z,
+                            ])
+                        }
+                        None => {
+                            debugger::error("failed to call get_object_position, object not found")
+                        }
                     }
-                },
-                None =>  debugger::error("failed to call get_object_position, system not found"),
+                }
+                None => debugger::error("failed to call get_object_position, system not found"),
             }
 
             Ok(vec![])
@@ -222,22 +471,32 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("get_object_position", func) {
                     debugger::error(&format!("failed to add a function get_object_position as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function get_object_position in system {}\nerror: {}", system_id, err)),
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function get_object_position in system {}\nerror: {}",
+                system_id, err
+            )),
         }
 
         let system_id_for_functions = system_id.clone();
         let get_object_rotation = lua.create_function_mut(move |_, name: String| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
+            match managers::systems::get_system_with_id(&system_id_for_functions) {
                 Some(system) => {
-                    let object_option = system.find_object_mut(&name);
+                    let object_option = system.find_object(&name);
                     match object_option {
-                        Some(object) => return 
-                            Ok(vec![object.global_transform().rotation.x, object.global_transform().rotation.y, object.global_transform().rotation.z]),
-                        None => debugger::error("failed to call get_object_rotation, object not found"),
+                        Some(object) => {
+                            return Ok(vec![
+                                object.global_transform().rotation.x,
+                                object.global_transform().rotation.y,
+                                object.global_transform().rotation.z,
+                            ])
+                        }
+                        None => {
+                            debugger::error("failed to call get_object_rotation, object not found")
+                        }
                     }
-                },
-                None =>  debugger::error("failed to call get_object_rotation, system not found"),
+                }
+                None => debugger::error("failed to call get_object_rotation, system not found"),
             }
 
             Ok(vec![])
@@ -248,9 +507,12 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("get_object_rotation", func) {
                     debugger::error(&format!("failed to add a function get_object_rotation as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function get_object_rotation in system {}\nerror: {}", system_id, err)),
-        } 
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function get_object_rotation in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
 
         let system_id_for_functions = system_id.clone();
         let get_object_scale = lua.create_function_mut(move |_, name: String| {
@@ -258,12 +520,19 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Some(system) => {
                     let object_option = system.find_object_mut(&name);
                     match object_option {
-                        Some(object) => return 
-                            Ok(vec![object.global_transform().scale.x, object.global_transform().scale.y, object.global_transform().scale.z]),
-                        None => debugger::error("failed to call get_object_scale, object not found"),
+                        Some(object) => {
+                            return Ok(vec![
+                                object.global_transform().scale.x,
+                                object.global_transform().scale.y,
+                                object.global_transform().scale.z,
+                            ])
+                        }
+                        None => {
+                            debugger::error("failed to call get_object_scale, object not found")
+                        }
                     }
-                },
-                None =>  debugger::error("failed to call get_object_scale, system not found"),
+                }
+                None => debugger::error("failed to call get_object_scale, system not found"),
             }
 
             Ok(vec![])
@@ -274,13 +543,14 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("get_object_scale", func) {
                     debugger::error(&format!("failed to add a function get_object_scale as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
-            Err(err) => debugger::error(&format!("failed to create a function get_object_scale in system {}\nerror: {}", system_id, err)),
-        } 
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function get_object_scale in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
 
-
-        let system_id_for_functions = system_id.clone();
-        let call_in_object = lua.create_function_mut(move |_, (name, call_id, args): (String, String, Vec<String>)| {
+        /*let call_in_object = lua.create_function_mut(move |_, (name, call_id, args): (String, String, Vec<String>)| {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
@@ -292,7 +562,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 },
                 None => debugger::error("failed to call call_in_object, system not found"),
             }
-            
+
             Ok(())
         });
 
@@ -301,8 +571,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 if let Err(err) = lua.globals().set("call_in_object", func) {
                     debugger::error(&format!("failed to add a function new call_in_object as a lua global in system {}\nerror: {}", system_id, err));
                 }
-            }, 
+            },
             Err(err) => debugger::error(&format!("failed to create a function call_in_object in system {}\nerror: {}", system_id, err)),
-        }
+        }*/
     }
 }

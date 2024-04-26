@@ -1,6 +1,8 @@
 use super::debugger;
 use crate::{
-    assets::model_asset::ModelAsset, math_utils::{deg_to_rad, rad_vec_to_deg}, objects::Transform
+    assets::model_asset::ModelAsset,
+    math_utils::{deg_to_rad, rad_vec_to_deg},
+    objects::Transform,
 };
 use bitmask_enum::bitmask;
 use glam::{Quat, Vec3};
@@ -13,7 +15,7 @@ use rapier3d::{
     },
     geometry::{
         ActiveCollisionTypes, BroadPhase, ColliderBuilder, ColliderHandle, ColliderSet,
-        ColliderShape, InteractionGroups, NarrowPhase, Ray
+        ColliderShape, InteractionGroups, NarrowPhase, Ray,
     },
     math::{Point, Real},
     na::vector,
@@ -23,13 +25,12 @@ use rapier3d::{
 const GRAVITY: Vector3<f32> = vector![0.0, -9.81, 0.0];
 pub static mut RIGID_BODY_SET: Lazy<RigidBodySet> = Lazy::new(|| RigidBodySet::new());
 pub static mut COLLIDER_SET: Lazy<ColliderSet> = Lazy::new(|| ColliderSet::new());
-pub static INTEGRATION_PARAMETERS: Lazy<IntegrationParameters> =
-    Lazy::new(|| { 
-        /*let mut params = IntegrationParameters::default(); 
-        params.max_ccd_substeps = 2;
-        params*/
-        IntegrationParameters::default()
-    });
+pub static INTEGRATION_PARAMETERS: Lazy<IntegrationParameters> = Lazy::new(|| {
+    /*let mut params = IntegrationParameters::default();
+    params.max_ccd_substeps = 2;
+    params*/
+    IntegrationParameters::default()
+});
 pub static mut PHYSICS_PIPELINE: Lazy<PhysicsPipeline> = Lazy::new(|| PhysicsPipeline::new());
 pub static mut ISLAND_MANAGER: Lazy<IslandManager> = Lazy::new(|| IslandManager::new());
 pub static mut BROAD_PHASE: Lazy<BroadPhase> = Lazy::new(|| BroadPhase::new());
@@ -319,21 +320,26 @@ pub fn collider_type_to_collider_builder(
             let mut positions_nalgebra: Vec<Point<Real>> = Vec::new();
             match asset.objects.get(0) {
                 Some(object) => {
-                    object.vertices
-                        .iter()
-                        .for_each(|vert| positions_nalgebra.push(Vec3::new(vert.position[0] * 2.0, vert.position[1] * 2.0, vert.position[2] * 2.0).into()));
-                    object.indices
-                        .iter()
-                        .for_each(|ind| {
-                            if temp_indices.len() < 3 {
-                                temp_indices.push(*ind as u32);
-                            } else {
-                                indices.push([temp_indices[0], temp_indices[1], temp_indices[2]]);
-                                temp_indices.clear();
-                                temp_indices.push(*ind as u32);
-                            }
-                        });
-                },
+                    object.vertices.iter().for_each(|vert| {
+                        positions_nalgebra.push(
+                            Vec3::new(
+                                vert.position[0] * 2.0,
+                                vert.position[1] * 2.0,
+                                vert.position[2] * 2.0,
+                            )
+                            .into(),
+                        )
+                    });
+                    object.indices.iter().for_each(|ind| {
+                        if temp_indices.len() < 3 {
+                            temp_indices.push(*ind as u32);
+                        } else {
+                            indices.push([temp_indices[0], temp_indices[1], temp_indices[2]]);
+                            temp_indices.clear();
+                            temp_indices.push(*ind as u32);
+                        }
+                    });
+                }
                 None => (),
             }
             dbg!(&positions_nalgebra, &indices);

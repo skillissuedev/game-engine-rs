@@ -45,12 +45,12 @@ impl WrenSystem {
                     Err(err) => debugger::error(&format!("wren system creation error({})\nerror when trying to interpret wren script\nerror: {}", config.script_path, err))
                 }
 
-                return 
-                    Ok(WrenSystem { 
+                return
+                    Ok(WrenSystem {
                         objects: Vec::new(),
                         is_destroyed: false,
-                        wren_vm: vm, 
-                        system_config: config, 
+                        wren_vm: vm,
+                        system_config: config,
                         id: id.to_str().unwrap().into(),
                     });
             },
@@ -189,7 +189,7 @@ impl EngineSystem {
                                     }
                                 }
 
-                            }, 
+                            },
                             None => {
                                 let object = ModelObject::new(&name, asset, None, shader);
                                 self.objects.push(Box::new(object));
@@ -204,7 +204,7 @@ impl EngineSystem {
                 }
 
 
-                
+
             },
             Err(asset_err) => {
                 debugger::error(&format!("got an error in wren system {} when tried to call new_model_object()\nModelAsset error: {}", self.id, asset_err));
@@ -214,7 +214,7 @@ impl EngineSystem {
 
         return Ok(());
     }*/
-    
+
     fn new_empty_object(vm: &ruwren::VM) {
         let name = get_slot_checked!(vm => string 1);
 
@@ -257,7 +257,7 @@ impl Class for Box<dyn Object> {
 
 create_module! {
     class("EngineSystem") crate::managers::scripting::wren::EngineSystem => system {
-        static(fn "new_empty_object", 1) new_empty_object 
+        static(fn "new_empty_object", 1) new_empty_object
     }
 
     class("Obj") Box<dyn crate::objects::Object> => object { }

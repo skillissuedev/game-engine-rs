@@ -5,7 +5,10 @@ use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use once_cell::sync::Lazy;
 
-use super::{networking, render::{Cascades, ShadowTextures}};
+use super::{
+    networking,
+    render::{Cascades, ShadowTextures},
+};
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
@@ -51,12 +54,15 @@ pub fn update() {
 }
 
 pub fn get_systems_iter<'a>() -> std::slice::Iter<'a, Box<dyn System>> {
-    unsafe {
-        SYSTEMS.iter()
-    }
+    unsafe { SYSTEMS.iter() }
 }
 
-pub fn render(display: &Display, target: &mut Frame, cascades: &Cascades, shadow_textures: &ShadowTextures) {
+pub fn render(
+    display: &Display,
+    target: &mut Frame,
+    cascades: &Cascades,
+    shadow_textures: &ShadowTextures,
+) {
     unsafe {
         if networking::is_server() {
             for system in &mut SYSTEMS {
@@ -153,4 +159,3 @@ pub struct CallList {
     pub immut_call: Vec<String>,
     pub mut_call: Vec<String>,
 }
-

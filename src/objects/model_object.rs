@@ -15,7 +15,12 @@ use crate::{
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer}, Display, IndexBuffer, Program, Surface, VertexBuffer
+    framebuffer::SimpleFrameBuffer,
+    uniform,
+    uniforms::{
+        MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
+    },
+    Display, IndexBuffer, Program, Surface, VertexBuffer,
 };
 use std::time::Instant;
 
@@ -39,7 +44,7 @@ pub struct ModelObject {
     shadow_program: Vec<Program>,
     started: bool,
     error: bool,
-    inspector_anim_name: String
+    inspector_anim_name: String,
 }
 
 impl ModelObject {
@@ -91,7 +96,7 @@ impl ModelObject {
             },
             body: None,
             id: gen_object_id(),
-            inspector_anim_name: "None".into()
+            inspector_anim_name: "None".into(),
         }
     }
 }
@@ -196,7 +201,13 @@ impl Object for ModelObject {
         &mut self.groups
     }
 
-    fn render(&mut self, display: &Display, target: &mut glium::Frame, cascades: &Cascades, shadow_texture: &ShadowTextures) {
+    fn render(
+        &mut self,
+        display: &Display,
+        target: &mut glium::Frame,
+        cascades: &Cascades,
+        shadow_texture: &ShadowTextures,
+    ) {
         if self.error {
             return;
         }
@@ -255,7 +266,11 @@ impl Object for ModelObject {
             let sampler_behaviour = glium::uniforms::SamplerBehavior {
                 minify_filter: MinifySamplerFilter::Nearest,
                 magnify_filter: MagnifySamplerFilter::Nearest,
-                wrap_function: (SamplerWrapFunction::Repeat, SamplerWrapFunction::Repeat, SamplerWrapFunction::Repeat),
+                wrap_function: (
+                    SamplerWrapFunction::Repeat,
+                    SamplerWrapFunction::Repeat,
+                    SamplerWrapFunction::Repeat,
+                ),
                 ..Default::default()
             };
 
@@ -422,7 +437,7 @@ impl ModelObject {
 
                 Ok(())
             }
-            None => Err(ModelObjectError::AnimationNotFound)
+            None => Err(ModelObjectError::AnimationNotFound),
         }
     }
 
@@ -503,10 +518,7 @@ impl ModelObject {
         }
     }
 
-    fn setup_mat(
-        &self,
-        node_transform: &NodeTransform,
-    ) -> SetupMatrixResult {
+    fn setup_mat(&self, node_transform: &NodeTransform) -> SetupMatrixResult {
         match node_transform.global_transform {
             Some(_) => (),
             None => {

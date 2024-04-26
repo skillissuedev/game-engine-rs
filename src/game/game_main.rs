@@ -1,11 +1,25 @@
 use glium::glutin::event::VirtualKeyCode;
 
-use crate::{framework::{get_debug_mode, set_debug_mode, DebugMode}, managers::{input::{self, InputEventType}, systems::add_system}, systems::test_system::TestSystem};
+use crate::{
+    framework::{get_debug_mode, set_debug_mode, DebugMode},
+    managers::{
+        input::{self, InputEventType},
+        scripting::lua::LuaSystem,
+        systems::add_system,
+    },
+    systems::test_system::TestSystem,
+};
 
 pub fn start() {
-    input::new_bind("debug_toggle", vec![InputEventType::Key(VirtualKeyCode::Grave)]);
+    input::new_bind(
+        "debug_toggle",
+        vec![InputEventType::Key(VirtualKeyCode::Grave)],
+    );
 
     add_system(Box::new(TestSystem::new()));
+    add_system(Box::new(
+        LuaSystem::new("LuaSystem", "scripts/lua/test.lua").unwrap(),
+    ));
 }
 
 pub fn update() {

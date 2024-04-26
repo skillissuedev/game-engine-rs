@@ -26,7 +26,7 @@ impl System for DyonSystem {
         }
     }
 
-    fn start(&mut self) { 
+    fn start(&mut self) {
         let call = Call::new("start");
         let call_result = call.run(&mut Runtime::new(), &self.module);
 
@@ -132,7 +132,7 @@ impl DyonSystem {
                         return Err(DyonSystemErr::DyonErr);
                     },
                 }
-            }, 
+            },
             Err(error) => {
                 debugger::error(&format!("got an error when trying to create a dyon system '{}'!\nfile loading error: {:?}", system_id, error));
                 return Err(DyonSystemErr::FileLoadingError);
@@ -157,7 +157,7 @@ dyon_fn! {
 
 dyon_obj! {
     CallList {
-        immut_call, 
+        immut_call,
         mut_call
     }
 }
