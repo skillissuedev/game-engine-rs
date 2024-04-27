@@ -11,7 +11,7 @@ use crate::{
         systems,
     },
 };
-use egui_glium::egui_winit::egui::{FontData, FontDefinitions, FontFamily, SidePanel, Window};
+use egui_glium::egui_winit::egui::{FontData, FontDefinitions, FontFamily, Window};
 use glium::{
     backend::glutin,
     glutin::{

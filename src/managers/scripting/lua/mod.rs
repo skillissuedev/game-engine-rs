@@ -239,6 +239,7 @@ impl UserData for ObjectHandle {
     fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {}
 
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        // methods that work for all objects:
         methods.add_method("children_list", |_, this, (): ()| {
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => {
@@ -530,8 +531,8 @@ impl UserData for ObjectHandle {
                             "Ball" => Some(BodyColliderType::Ball(collider_size_x)),
                             _ => {
                                 debugger::error(&format!(
-                                        "lua error: build_object_rigid_body failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
-                                        this.name, this.system_id
+                                    "lua error: build_object_rigid_body failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
+                                    this.name, this.system_id
                                 ));
                                 None
                             },
@@ -740,6 +741,10 @@ impl UserData for ObjectHandle {
                 Ok(())
             },
         );
+
+
+        // ah shit, here we go again
+        // object-specific methods:
     }
 }
 

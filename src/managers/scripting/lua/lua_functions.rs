@@ -13,12 +13,11 @@ use crate::{
         systems,
     },
     objects::{
-        camera_position::CameraPosition, character_controller::CharacterController,
-        empty_object::EmptyObject, model_object::ModelObject, sound_emitter::SoundEmitter, Object,
+        camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object
     }, systems::System,
 };
 use ez_al::SoundSourceType;
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use mlua::Lua;
 
 pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
@@ -310,7 +309,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         let object = CharacterController::new(&name, collider, membership, mask);
                         add_to_system_or_parent(lua, system, Box::new(object));
                     }
-                    None => debugger::error("failed to call new_empty_object, system not found"),
+                    None => debugger::error("failed to call new_character_controller, system not found"),
                 }
 
                 Ok(())
@@ -328,6 +327,147 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 system_id, err
             )),
         }
+
+
+
+        let system_id_for_functions = system_id.clone();
+        let new_navigation_ground = lua.create_function_mut(move |lua, (name, size_x, size_z): (String, f32, f32)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let object = NavigationGround::new(&name, Vec2::new(size_x, size_z));
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_navigation_ground, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_navigation_ground {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_navigation_ground", func) {
+                    debugger::error(&format!("failed to add a function new_navigation_ground as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_navigation_ground in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+
+
+        let system_id_for_functions = system_id.clone();
+        let new_ray = lua.create_function_mut(move |lua, (name, direction_x, direction_y, direction_z, mask_bits): (String, f32, f32, f32, Option<u32>)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let mask = match mask_bits {
+                        Some(mask_bits) => Some(CollisionGroups::from(mask_bits)),
+                        None => None,
+                    };
+
+                    let object = Ray::new(&name, Vec3::new(direction_x, direction_y, direction_z), mask);
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_ray, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_ray {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_ray", func) {
+                    debugger::error(&format!("failed to add a function new_ray as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_ray in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+
+
+        let system_id_for_functions = system_id.clone();
+        let new_trigger = lua.create_function_mut(move |lua, (name, collider_type, size_x, size_y, size_z, membership_bits, mask_bits): (String, String, f32, f32, f32, Option<u32>, Option<u32>)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let membership = match membership_bits {
+                        Some(membership_bits) => Some(CollisionGroups::from(membership_bits)),
+                        None => None,
+                    };
+                    let mask = match mask_bits {
+                        Some(mask_bits) => Some(CollisionGroups::from(mask_bits)),
+                        None => None,
+                    };
+
+                    let collider = match collider_type.as_str() {
+                        "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
+                        "Capsule" => BodyColliderType::Capsule(size_x, size_y),
+                        "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
+                        "Ball" => BodyColliderType::Ball(size_x),
+                        _ => {
+                            debugger::error(
+                                "lua error: new_trigger failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'"
+                            );
+                            BodyColliderType::Cuboid(size_x, size_y, size_z)
+                        },
+                    };
+
+                    let object = Trigger::new(&name, membership, mask, collider);
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_trigger, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_trigger {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_trigger", func) {
+                    debugger::error(&format!("failed to add a function new_trigger as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_trigger in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+
+
+        let system_id_for_functions = system_id.clone();
+        let new_nav_obstacle = lua.create_function_mut(move |lua, (name, size_x, size_z): (String, f32, f32)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let object = NavObstacle::new(&name, Vec3::new(size_x, 1.0, size_z));
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_nav_obstacle, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_nav_obstacle {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_nav_obstacle", func) {
+                    debugger::error(&format!("failed to add a function new_nav_obstacle as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_nav_obstacle in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+
 
         let system_id_for_functions = system_id.clone();
         let set_object_position = lua.create_function_mut(
@@ -536,31 +676,6 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 system_id, err
             )),
         }
-
-        /*let call_in_object = lua.create_function_mut(move |_, (name, call_id, args): (String, String, Vec<String>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let mut full_args_vector: Vec<String> = Vec::new();
-                    full_args_vector.push(name);
-                    full_args_vector.push(call_id);
-                    args.iter().for_each(|arg| full_args_vector.push(arg.into()));
-                    system.call_with_args("call_in_object", full_args_vector);
-                },
-                None => debugger::error("failed to call call_in_object, system not found"),
-            }
-
-            Ok(())
-        });
-
-        match call_in_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("call_in_object", func) {
-                    debugger::error(&format!("failed to add a function new call_in_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            },
-            Err(err) => debugger::error(&format!("failed to create a function call_in_object in system {}\nerror: {}", system_id, err)),
-        }*/
     }
 }
 
@@ -573,7 +688,7 @@ fn add_to_system_or_parent(lua: &Lua, system: &mut Box<dyn System>, object: Box<
                     return; 
                 },
                 None => {
-                    debugger::error("failed to call new_empty_object, failed to get the current_parent object!");
+                    debugger::error("lua error: failed to add object! failed to get the current_parent object!");
                 }
             }
         }
