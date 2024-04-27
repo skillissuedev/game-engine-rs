@@ -424,6 +424,21 @@ impl ModelObject {
         &self.model_asset
     }
 
+    pub fn set_looping(&mut self, should_loop: bool) {
+        self.animation_settings.looping = should_loop;
+    }
+
+    pub fn is_looping(&self) -> bool {
+        self.animation_settings.looping
+    }
+
+    pub fn current_animation(&self) -> Option<&str> {
+        match &self.animation_settings.animation {
+            Some(animation) => Some(&animation.name),
+            None => None,
+        }
+    }
+
     pub fn play_animation(&mut self, anim_name: &str) -> Result<(), ModelObjectError> {
         let anim_option = self.model_asset.find_animation(anim_name);
 

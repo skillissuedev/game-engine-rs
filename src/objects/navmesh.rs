@@ -159,7 +159,7 @@ impl Object for NavigationGround {
             }
         }
 
-        return None;
+        None
     }
 
     fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
@@ -174,7 +174,7 @@ impl Object for NavigationGround {
             }
         }
 
-        return None;
+        None
     }
 
     fn update_transform(&mut self) {

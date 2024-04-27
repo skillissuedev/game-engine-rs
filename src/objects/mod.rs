@@ -304,6 +304,13 @@ impl Into<String> for ObjectGroup {
     }
 }
 
+impl From<String> for ObjectGroup {
+    fn from(value: String) -> Self {
+        ObjectGroup(value)
+    }
+}
+
+
 impl ObjectGroup {
     pub fn as_raw(&self) -> &str {
         &self.0

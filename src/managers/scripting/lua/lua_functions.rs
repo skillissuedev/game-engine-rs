@@ -73,6 +73,35 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             )),
         }
 
+
+
+        let system_id_for_functions = system_id.clone();
+        let delete_object = lua.create_function(move |_, name: String| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) =>
+                    Ok(system.delete_object(&name)),
+                None => {
+                    debugger::error("failed to call delete_object: system not found");
+                    Ok(())
+                }
+            }
+        });
+
+        match delete_object {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("delete_object", func) {
+                    debugger::error(&format!("failed to add a function delete_object as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function delete_object in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+
+
         let system_id_for_functions = system_id.clone();
         let find_object = lua.create_function(move |_, name: String| {
             let system_option = systems::get_system_with_id(&system_id_for_functions);

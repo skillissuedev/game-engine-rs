@@ -260,7 +260,7 @@ impl std::fmt::Debug for Trigger {
 }
 
 impl Trigger {
-    pub fn is_colliding(&self) -> bool {
+    pub fn is_intersecting(&self) -> bool {
         let intersections_count = unsafe {
             physics::NARROW_PHASE
                 .intersection_pairs_with(self.collider_handle)

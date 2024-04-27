@@ -2,7 +2,7 @@ pub mod lua_functions;
 use crate::{
     assets::model_asset::{self, ModelAsset}, managers::{
         assets, debugger, networking::Message, physics::{BodyColliderType, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList}
-    }, systems::System
+    }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use egui_glium::egui_winit::egui::TextBuffer;
@@ -745,6 +745,378 @@ impl UserData for ObjectHandle {
 
         // ah shit, here we go again
         // object-specific methods:
+        methods.add_method("play_animation", |_, this, anim_name: String| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<ModelObject>() {
+                            Some(object) => {
+                                if let Err(err) = object.play_animation(&anim_name) {
+                                    debugger::error(
+                                        &format!("lua error(system {}): play_animation failed! error in ModelObject '{}': {:?}", 
+                                           this.system_id, this.name, err));
+                                }
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): play_animation failed in object: {}. this object is not ModelObject!", 
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: play_animation failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: play_animation failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("intersection_position", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<Ray>() {
+                            Some(object) => {
+                                return match object.intersection_position() {
+                                    Some(pos) => Ok(Some([pos.x, pos.y, pos.z])),
+                                    None => Ok(None),
+                                }
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): intersection_position failed in object: {}. this object is not Ray!", 
+                                        this.system_id, this.name));
+                                Ok(None)
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: intersection_position failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: intersection_position failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(None)
+        });
+
+        methods.add_method("is_intersecting", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<Ray>() {
+                            Some(object) => {
+                                Ok(object.is_intersecting())
+                            },
+                            None => {
+                                match object.downcast_mut::<Trigger>() {
+                                    Some(object) => Ok(object.is_intersecting()),
+                                    None => {
+                                        debugger::error(
+                                            &format!("lua error(system {}): is_intersecting failed in object: {}. this object is neither Ray nor Trigger!",
+                                                this.system_id, this.name));
+                                        Ok(false)
+                                    },
+                                }
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: is_intersecting failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: is_intersecting failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(false)
+        });
+
+        methods.add_method("is_intersecting_with_group", |_, this, group: String| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<Trigger>() {
+                            Some(object) => {
+                                Ok(object.is_intersecting_with_group(group.into()))
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): is_intersecting_with_group failed in object: {}. this object is not Trigger!", 
+                                        this.system_id, this.name));
+                                Ok(false)
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: is_intersecting_with_group failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: is_intersecting_with_group failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(false)
+        });
+
+        methods.add_method("set_looping", |_, this, should_loop: bool| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<SoundEmitter>() {
+                            Some(object) => Ok(object.set_looping(should_loop)),
+                            None => {
+                                match object.downcast_mut::<ModelObject>() {
+                                    Some(object) => Ok(object.set_looping(should_loop)),
+                                    None => {
+                                        debugger::error(
+                                            &format!("lua error(system {}): set_looping failed in object: {}. this object is neiter SoundEmitter nor ModelObject!",
+                                            this.system_id, this.name));
+                                        Ok(())
+                                    },
+                                }
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: set_looping failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: set_looping failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("looping", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<SoundEmitter>() {
+                            Some(object) => Ok(object.is_looping()),
+                            None => {
+                                match object.downcast_mut::<ModelObject>() {
+                                    Some(object) => Ok(object.is_looping()),
+                                    None => {
+                                        debugger::error(
+                                            &format!("lua error(system {}): is_looping failed in object: {}. this object is neiter SoundEmitter nor ModelObject!",
+                                            this.system_id, this.name));
+                                        Ok(false)
+                                    },
+                                }
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: is_looping failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: is_looping failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(false)
+        });
+
+        methods.add_method("current_animation", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<ModelObject>() {
+                            Some(object) => {
+                                return match object.current_animation() {
+                                    Some(animation) => Ok(Some(animation.to_string())),
+                                    None => Ok(None),
+                                }
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): current_animation failed in object: {}. this object is not ModelObject!",
+                                    this.system_id, this.name));
+                                Ok(None)
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: current_animation failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: current_animation failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(None)
+        });
+
+        methods.add_method("play_sound", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<SoundEmitter>() {
+                            Some(object) => Ok(object.play_sound()),
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): play_sound failed in object: {}. this object is not SoundEmitter!", 
+                                        this.system_id, this.name));
+                                Ok(())
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: play_sound failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: play_sound failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("set_max_distance", |_, this, distance: f32| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<SoundEmitter>() {
+                            Some(object) => {
+                                let _ = object.set_max_distance(distance);
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): set_max_distance failed in object: {}. this object is not SoundEmitter!",
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: set_max_distance failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: set_max_distance failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("get_max_distance", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<SoundEmitter>() {
+                            Some(object) => {
+                                match object.get_max_distance() {
+                                    Ok(distance) => return Ok(Some(distance)),
+                                    Err(_) => (),
+                                }
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): get_max_distance failed in object: {}. this object is not SoundEmitter!",
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: get_max_distance failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: get_max_distance failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(None)
+        });
+
+        methods.add_method("move_controller", |_, this, (x, y, z): (f32, f32, f32)| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<CharacterController>() {
+                            Some(object) => object.move_controller(Vec3::new(x, y, z)),
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): move_controller failed in object: {}. this object is not CharacterController!",
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: move_controller failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: move_controller failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("walk_to", |_, this, (x, y, z, speed): (f32, f32, f32, f32)| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<CharacterController>() {
+                            Some(object) => object.walk_to(Vec3::new(x, y, z), speed),
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): walk_to failed in object: {}. this object is not CharacterController!",
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: walk_to failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: walk_to failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
     }
 }
 

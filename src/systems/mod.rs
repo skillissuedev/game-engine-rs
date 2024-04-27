@@ -115,6 +115,15 @@ pub trait System {
         self.set_destroyed(true);
     }
 
+    fn delete_object(&mut self, name: &str) {
+        for (idx, object) in self.objects_list().iter().enumerate() {
+            if object.name() == name {
+                self.objects_list_mut().remove(idx);
+                return;
+            }
+        }
+    }
+
     fn add_object(&mut self, object: Box<dyn Object>) {
         register_object_id_system(*object.object_id(), self.system_id());
         register_object_id_name(*object.object_id(), object.name());
