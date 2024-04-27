@@ -10,7 +10,6 @@ use downcast_rs::{impl_downcast, Downcast};
 use egui_glium::egui_winit::egui::Ui;
 use glam::{Mat4, Vec3};
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
-use mlua::UserData;
 use serde::{Deserialize, Serialize};
 
 pub mod camera_position;
@@ -56,7 +55,6 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn body_parameters(&self) -> Option<ObjectBodyParameters>;
     fn object_id(&self) -> &u128;
     fn inspector_ui(&mut self, ui: &mut Ui);
-
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup>;
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> {
@@ -106,7 +104,7 @@ pub trait Object: std::fmt::Debug + Downcast {
             }
         }
 
-        return None;
+        None
     }
 
     fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
@@ -121,7 +119,7 @@ pub trait Object: std::fmt::Debug + Downcast {
             }
         }
 
-        return None;
+        None
     }
 
     fn update_transform(&mut self) {
@@ -299,6 +297,12 @@ impl Default for Transform {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectGroup(pub String);
+
+impl Into<String> for ObjectGroup {
+    fn into(self) -> String {
+        self.0
+    }
+}
 
 impl ObjectGroup {
     pub fn as_raw(&self) -> &str {

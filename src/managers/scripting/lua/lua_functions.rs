@@ -14,8 +14,8 @@ use crate::{
     },
     objects::{
         camera_position::CameraPosition, character_controller::CharacterController,
-        empty_object::EmptyObject, model_object::ModelObject, sound_emitter::SoundEmitter,
-    },
+        empty_object::EmptyObject, model_object::ModelObject, sound_emitter::SoundEmitter, Object,
+    }, systems::System,
 };
 use ez_al::SoundSourceType;
 use glam::Vec3;
@@ -112,21 +112,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    let empty_object = EmptyObject::new(&name);
-                    if let Ok(current_parent) = lua.globals().get::<&str, Option<String>>("current_parent") {
-                        if let Some(current_parent) = current_parent {
-                            match system.find_object_mut(&current_parent) {
-                                Some(object) => {
-                                    object.add_child(Box::new(empty_object));
-                                    return Ok(())
-                                },
-                                None => {
-                                    debugger::error("failed to call new_empty_object, failed to get the current_parent object!");
-                                }
-                            }
-                        }
-                    }
-                    system.add_object(Box::new(empty_object));
+                    let object = EmptyObject::new(&name);
+                    add_to_system_or_parent(lua, system, Box::new(object));
                 },
                 None => debugger::error("failed to call new_empty_object, system not found"),
             }
@@ -147,7 +134,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         }
 
         let system_id_for_functions = system_id.clone();
-        let new_sound_emitter_object = lua.create_function_mut(move |_, (name, wav_sound_path, should_loop, is_positional, max_distance): (String, String, bool, bool, f32)| {
+        let new_sound_emitter_object = lua.create_function_mut(move |lua, (name, wav_sound_path, should_loop, is_positional, max_distance): (String, String, bool, bool, f32)| {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
@@ -166,7 +153,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                         let _ = object.set_max_distance(max_distance);
                                     }
                                     object.set_looping(should_loop);
-                                    system.add_object(Box::new(object));
+                                    add_to_system_or_parent(lua, system, Box::new(object));
                                 },
                                 Err(err) => 
                                     debugger::error(&format!("failed to call new_sound_emitter_object: got an error when creating SoundEmitter! err: {:?}", err)),
@@ -194,12 +181,12 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         }
 
         let system_id_for_functions = system_id.clone();
-        let new_camera_position_object = lua.create_function_mut(move |_, name: String| {
+        let new_camera_position_object = lua.create_function_mut(move |lua, name: String| {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    let camera_position_object = CameraPosition::new(&name);
-                    system.add_object(Box::new(camera_position_object));
+                    let object = CameraPosition::new(&name);
+                    add_to_system_or_parent(lua, system, Box::new(object));
                 }
                 None => {
                     debugger::error("failed to call new_camera_position_object, system not found")
@@ -223,7 +210,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
         let system_id_for_functions = system_id.clone();
         let new_model_object = lua.create_function_mut(
-            move |_, (name, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
+            move |lua, (name, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
             (String, String, Option<String>, Option<String>, Option<String>)| {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
@@ -259,7 +246,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             match model_asset {
                                 Ok(model_asset) => {
                                     let object = ModelObject::new(&name, model_asset, texture_asset, shader_asset);
-                                    system.add_object(Box::new(object));
+                                    add_to_system_or_parent(lua, system, Box::new(object));
                                 },
                                 Err(err) => 
                                     debugger::error(&format!("lua error: error when calling new_model_object, failed to load a model asset!\nerr: {:?}", err)),
@@ -269,7 +256,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             debugger::error(&format!("lua error: error when calling new_model_object, failed to load a shader asset!\nerr: {:?}", err)),
                     }
                 },
-                None => debugger::error("failed to call new_empty_object, system not found"),
+                None => debugger::error("failed to call new_model_object, system not found"),
             }
             
             Ok(())
@@ -289,7 +276,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
         let system_id_for_functions = system_id.clone();
         let new_character_controller = lua.create_function_mut(
-            move |_,
+            move |lua,
                   (name, collider_type, size_x, size_y, size_z, membership_bits, mask_bits): (
                 String,
                 String,
@@ -321,7 +308,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             None => None,
                         };
                         let object = CharacterController::new(&name, collider, membership, mask);
-                        system.add_object(Box::new(object));
+                        add_to_system_or_parent(lua, system, Box::new(object));
                     }
                     None => debugger::error("failed to call new_empty_object, system not found"),
                 }
@@ -337,7 +324,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 }
             }
             Err(err) => debugger::error(&format!(
-                "failed to create a function new_empty_object in system {}\nerror: {}",
+                "failed to create a function new_character_controller in system {}\nerror: {}",
                 system_id, err
             )),
         }
@@ -575,4 +562,21 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             Err(err) => debugger::error(&format!("failed to create a function call_in_object in system {}\nerror: {}", system_id, err)),
         }*/
     }
+}
+
+fn add_to_system_or_parent(lua: &Lua, system: &mut Box<dyn System>, object: Box<dyn Object>) {
+    if let Ok(current_parent) = lua.globals().get::<&str, Option<String>>("current_parent") {
+        if let Some(current_parent) = current_parent {
+            match system.find_object_mut(&current_parent) {
+                Some(parent_object) => {
+                    parent_object.add_child(object);
+                    return; 
+                },
+                None => {
+                    debugger::error("failed to call new_empty_object, failed to get the current_parent object!");
+                }
+            }
+        }
+    }
+    system.add_object(object);
 }
