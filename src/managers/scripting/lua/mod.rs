@@ -1,7 +1,7 @@
 pub mod lua_functions;
 use crate::{
     assets::model_asset::{self, ModelAsset}, managers::{
-        assets, debugger, networking::Message, physics::{BodyColliderType, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList}
+        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList}
     }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
@@ -74,7 +74,7 @@ impl System for LuaSystem {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "client_update");
             }
-            None => debugger::error("lua system update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system client_update function error\ncan't get lua vm reference"),
         }
     }
 
@@ -84,7 +84,7 @@ impl System for LuaSystem {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "client_start");
             }
-            None => debugger::error("lua system update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system client_start function error\ncan't get lua vm reference"),
         }
     }
 
@@ -139,7 +139,25 @@ impl System for LuaSystem {
     }
 
     fn reg_message(&mut self, message: Message) {
-        todo!()
+        let lua_option = lua_vm_ref(self.system_id().into());
+        match lua_option {
+            Some(lua) => {
+                let function_result: Result<Function, mlua::Error> = lua.globals().get("reg_message");
+
+                match function_result {
+                    Ok(func) => {
+                        let call_result: Result<(), mlua::Error> = Function::call(&func, message);
+                        if let Err(err) = call_result {
+                            debugger::error(&format!(
+                                "lua error when calling reg_message in system {}\nerror: {}", self.system_id(), err
+                            ));
+                        }
+                    }
+                    Err(err) => debugger::error(&format!("can't get function reg_message in lua system {}\nerror: {}", self.system_id(), err)),
+                }
+            }
+            None => debugger::error("lua system reg_message function error\ncan't get lua vm reference"),
+        }
     }
 
     fn server_start(&mut self) {
@@ -148,7 +166,7 @@ impl System for LuaSystem {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "server_start");
             }
-            None => debugger::error("lua system update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system server_start function error\ncan't get lua vm reference"),
         }
     }
 
@@ -158,7 +176,7 @@ impl System for LuaSystem {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "server_update");
             }
-            None => debugger::error("lua system update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
         }
     }
 
@@ -168,7 +186,7 @@ impl System for LuaSystem {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "server_render");
             }
-            None => debugger::error("lua system update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
         }
     }
 
@@ -178,7 +196,7 @@ impl System for LuaSystem {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "client_render");
             }
-            None => debugger::error("lua system update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system client_render function error\ncan't get lua vm reference"),
         }
     }
 }
@@ -1137,8 +1155,8 @@ fn lua_body_render_colliders_and_groups_to_rust(object_name: String, object_syst
         "Ball" => Some(RenderColliderType::Ball(None, None, collider_size_x, false)),
         _ => {
             debugger::error(&format!(
-                    "lua error: build_object_rigid_body failed! the render_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
-                    object_name, object_system_id
+                "lua error: build_object_rigid_body failed! the render_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
+                object_name, object_system_id
             ));
             None
         },
@@ -1169,4 +1187,64 @@ fn lua_body_render_colliders_and_groups_to_rust(object_name: String, object_syst
     };
 
     (render_collider_type, body_type, membership, filter)
+}
+impl UserData for Message {
+    fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("contents_type", |_, this, _: ()| {
+            match this.message {
+                MessageContents::SyncObject(_) => Ok("SyncObject"),
+                MessageContents::Custom(_) => Ok("Custom"),
+            }
+        });
+
+        methods.add_method("sync_object_name", |_, this, _: ()| {
+            match &this.message {
+                MessageContents::SyncObject(message) => {
+                    Ok(Some(message.object_name.to_string()))
+                },
+                MessageContents::Custom(_) => {
+                    debugger::error(&"lua error: get_sync_object_name in Message failed! the contents_type != 'SyncObject'");
+                    Ok(None)
+                },
+            }
+        });
+
+        // returns [[x, y, z], [x, y, z], [x, y, z]]
+        // [position_xyz, rotation_xyz, scale_xyz]
+        methods.add_method("sync_object_pos_rot_scale", |_, this, _: ()| {
+            match &this.message {
+                MessageContents::SyncObject(message) => {
+                    let transform = message.transform;
+                    let position = transform.position;
+                    let position = [position.x, position.y, position.z];
+                    let rotation = transform.rotation;
+                    let rotation = [rotation.x, rotation.y, rotation.z];
+                    let scale = transform.scale;
+                    let scale = [scale.x, scale.y, scale.z];
+                    let pos_rot_scale = [position, rotation, scale];
+                    Ok(Some(pos_rot_scale))
+                },
+                MessageContents::Custom(_) => {
+                    debugger::error(&"lua error: get_sync_object_name in Message failed! the contents_type != 'SyncObject'");
+                    Ok(None)
+                },
+            }
+        });
+
+        methods.add_method("custom_contents", |_, this, _: ()| {
+            match &this.message {
+                MessageContents::SyncObject(_) => {
+                    debugger::error(&"lua error: get_custom_contents in Message failed! the contents_type != 'Custom'");
+                    Ok(None)
+                },
+                MessageContents::Custom(contents) => {
+                    Ok(Some(contents.to_owned()))
+                },
+            }
+        });
+
+        methods.add_method("message_id", |_, this, _: ()| {
+            Ok(this.message_id.to_owned())
+        });
+    }
 }
