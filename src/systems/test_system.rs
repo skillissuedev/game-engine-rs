@@ -11,7 +11,7 @@ use crate::{
         },
         physics::{BodyColliderType, BodyType, RenderColliderType},
         render::{get_camera_position, set_camera_position, set_light_direction},
-        systems::CallList,
+        systems::{self, CallList, SystemValue},
     },
     objects::{
         character_controller::CharacterController, empty_object::EmptyObject,
@@ -37,72 +37,6 @@ impl TestSystem {
 }
 
 impl System for TestSystem {
-    fn call(&self, _call_id: &str) {}
-    fn call_mut(&mut self, _call_id: &str) {}
-
-    fn server_start(&mut self) {
-        let ground_asset = ModelAsset::from_gltf("models/ground_1.gltf").unwrap();
-        //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
-        let mut knife_model = Box::new(EmptyObject::new("knife_model"));
-
-        let mut ground_collider = Box::new(ModelObject::new(
-            "ground_collider",
-            ground_asset.clone(),
-            None,
-            ShaderAsset::load_default_shader().unwrap(),
-        ));
-
-        ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
-        //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
-        //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
-
-        knife_model.set_position(Vec3::new(0.0, 105.0, 15.0), true);
-        knife_model.build_object_rigid_body(
-            Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(
-                0.4, 2.81, 0.2,
-            )))),
-            None,
-            0.5,
-            None,
-            None,
-        );
-        ground_collider.build_object_rigid_body(
-            Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(
-                ground_asset,
-            )))),
-            None,
-            1.0,
-            None,
-            None,
-        );
-        /*ground_collider.build_object_rigid_body(
-        Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(103.0, 1.0, 102.0)))),
-        None, 1.0, None, None);*/
-
-        let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(100.0, 100.0));
-        navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
-        ground_collider.add_child(Box::new(navmesh));
-        let obstacle = NavObstacle::new("obstacle", Vec3::new(4.0, 4.0, 4.0));
-        //obstacle.set_position(Vec3::new(2.0, 0.0, 4.0), false);
-        knife_model.add_child(Box::new(obstacle));
-        //dbg!(unsafe { navigation::MAP.clone() });
-
-        //dbg!(ground_collider.object_id());
-        let mut controller = Box::new(CharacterController::new(
-            "controller",
-            BodyColliderType::Capsule(1.0, 4.0),
-            None,
-            None,
-        ));
-        controller.set_position(Vec3::new(45.0, 10.0, 30.0), false);
-        controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
-        controller.add_to_group("player");
-
-        self.add_object(controller);
-        self.add_object(knife_model);
-        self.add_object(ground_collider);
-    }
-
     fn client_start(&mut self) {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         let asset = ModelAsset::from_gltf("models/knife_test.gltf");
@@ -216,6 +150,125 @@ impl System for TestSystem {
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
         );
     }
+    fn server_start(&mut self) {
+        let ground_asset = ModelAsset::from_gltf("models/ground_1.gltf").unwrap();
+        //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
+        let mut knife_model = Box::new(EmptyObject::new("knife_model"));
+
+        let mut ground_collider = Box::new(ModelObject::new(
+            "ground_collider",
+            ground_asset.clone(),
+            None,
+            ShaderAsset::load_default_shader().unwrap(),
+        ));
+
+        ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
+        //ground_collider.set_rotation(Vec3::new(0.0, 180.0, 0.0), true);
+        //ground_collider.set_scale(Vec3::new(1.0, 1.0, 1.0));
+
+        knife_model.set_position(Vec3::new(0.0, 105.0, 15.0), true);
+        knife_model.build_object_rigid_body(
+            Some(BodyType::Dynamic(Some(BodyColliderType::Cuboid(
+                0.4, 2.81, 0.2,
+            )))),
+            None,
+            0.5,
+            None,
+            None,
+        );
+        ground_collider.build_object_rigid_body(
+            Some(BodyType::Fixed(Some(BodyColliderType::TriangleMesh(
+                ground_asset,
+            )))),
+            None,
+            1.0,
+            None,
+            None,
+        );
+        /*ground_collider.build_object_rigid_body(
+        Some(BodyType::Fixed(Some(BodyColliderType::Cuboid(103.0, 1.0, 102.0)))),
+        None, 1.0, None, None);*/
+
+        let mut navmesh = NavigationGround::new("ground_navmesh", Vec2::new(100.0, 100.0));
+        navmesh.set_position(Vec3::new(0.0, 0.0, 0.0), false);
+        ground_collider.add_child(Box::new(navmesh));
+        let obstacle = NavObstacle::new("obstacle", Vec3::new(4.0, 4.0, 4.0));
+        //obstacle.set_position(Vec3::new(2.0, 0.0, 4.0), false);
+        knife_model.add_child(Box::new(obstacle));
+        //dbg!(unsafe { navigation::MAP.clone() });
+
+        //dbg!(ground_collider.object_id());
+        let mut controller = Box::new(CharacterController::new(
+            "controller",
+            BodyColliderType::Capsule(1.0, 4.0),
+            None,
+            None,
+        ));
+        controller.set_position(Vec3::new(45.0, 10.0, 30.0), false);
+        controller.set_scale(Vec3::new(0.25, 1.0, 0.25));
+        controller.add_to_group("player");
+
+        self.add_object(controller);
+        self.add_object(knife_model);
+        self.add_object(ground_collider);
+    }
+
+    fn client_update(&mut self) {
+        set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
+
+        if input::is_bind_down("cam_up") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y + 0.05,
+                camera_position.z,
+            ));
+        }
+        if input::is_bind_down("cam_down") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y - 0.05,
+                camera_position.z,
+            ));
+        }
+
+        if input::is_bind_down("forward") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y,
+                camera_position.z + 0.05,
+            ));
+        }
+
+        if input::is_bind_down("backwards") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y,
+                camera_position.z - 0.05,
+            ));
+        }
+
+        if input::is_bind_down("left") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(
+                camera_position.x - 0.05,
+                camera_position.y,
+                camera_position.z,
+            ));
+        }
+
+        if input::is_bind_down("right") {
+            let camera_position = get_camera_position();
+            set_camera_position(Vec3::new(
+                camera_position.x + 0.05,
+                camera_position.y,
+                camera_position.z,
+            ));
+        }
+    }
 
     fn server_update(&mut self) {
         {
@@ -278,76 +331,19 @@ impl System for TestSystem {
             },
         );
     }
-    fn client_update(&mut self) {
-        set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
-        if input::is_bind_down("cam_up") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y + 0.05,
-                camera_position.z,
-            ));
-        }
-        if input::is_bind_down("cam_down") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y - 0.05,
-                camera_position.z,
-            ));
-        }
-
-        if input::is_bind_down("forward") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y,
-                camera_position.z + 0.05,
-            ));
-        }
-
-        if input::is_bind_down("backwards") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y,
-                camera_position.z - 0.05,
-            ));
-        }
-
-        if input::is_bind_down("left") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x - 0.05,
-                camera_position.y,
-                camera_position.z,
-            ));
-        }
-
-        if input::is_bind_down("right") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x + 0.05,
-                camera_position.y,
-                camera_position.z,
-            ));
-        }
-    }
-
-    fn client_render(&mut self) {}
     fn server_render(&mut self) {}
+    fn client_render(&mut self) {}
 
-    fn system_id(&self) -> &str {
-        "TestSystem"
+    fn call(&self, _call_id: &str) {}
+    fn call_mut(&mut self, _call_id: &str) {}
+
+    fn objects_list(&self) -> &Vec<Box<dyn Object>> {
+        &self.objects
     }
 
-    fn is_destroyed(&self) -> bool {
-        self.is_destroyed
-    }
-
-    fn set_destroyed(&mut self, is_destroyed: bool) {
-        self.is_destroyed = is_destroyed;
+    fn objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
+        &mut self.objects
     }
 
     fn call_list(&self) -> CallList {
@@ -357,11 +353,15 @@ impl System for TestSystem {
         }
     }
 
-    fn objects_list(&self) -> &Vec<Box<dyn Object>> {
-        &self.objects
+    fn system_id(&self) -> &str {
+        "TestSystem"
     }
-    fn objects_list_mut(&mut self) -> &mut Vec<Box<dyn Object>> {
-        &mut self.objects
+
+    fn is_destroyed(&self) -> bool {
+        self.is_destroyed
+    }
+    fn set_destroyed(&mut self, is_destroyed: bool) {
+        self.is_destroyed = is_destroyed;
     }
 
     fn reg_message(&mut self, message: Message) {
@@ -404,6 +404,16 @@ impl System for TestSystem {
                     }
                 }
             }
+        }
+    }
+
+    fn get_value(&mut self, value_name: String) -> Option<SystemValue> {
+        if value_name == "AreYouATest" {
+            Some(SystemValue::String("yes".into()))
+        } else if value_name == "GimmieAVec3" {
+            Some(SystemValue::Vec3(42.0, 69.0, 69.0))
+        } else {
+            None
         }
     }
 }

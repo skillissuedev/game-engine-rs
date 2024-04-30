@@ -6,8 +6,7 @@ use crate::{
         input::{self, InputEventType},
         scripting::lua::LuaSystem,
         systems::add_system,
-    },
-    systems::test_system::TestSystem,
+    }, systems::test_system::TestSystem,
 };
 
 pub fn start() {
@@ -19,6 +18,14 @@ pub fn start() {
     add_system(Box::new(TestSystem::new()));
     add_system(Box::new(
         LuaSystem::new("LuaSystem", "scripts/lua/test.lua").unwrap(),
+    ));
+
+    add_system(Box::new(
+        LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap(),
+    ));
+
+    add_system(Box::new(
+        LuaSystem::new("world_generation", "scripts/lua/world_generation.lua").unwrap(),
     ));
 }
 

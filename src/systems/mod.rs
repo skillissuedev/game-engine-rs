@@ -4,7 +4,7 @@ use crate::{
     managers::{
         networking::{self, Message, MessageReliability, NetworkError},
         render::{Cascades, ShadowTextures},
-        systems::{register_object_id_name, register_object_id_system, CallList},
+        systems::{register_object_id_name, register_object_id_system, CallList, SystemValue},
     },
     objects::Object,
 };
@@ -27,6 +27,7 @@ pub trait System {
     fn is_destroyed(&self) -> bool;
     fn set_destroyed(&mut self, is_destroyed: bool);
     fn reg_message(&mut self, message: Message);
+    fn get_value(&mut self, value_name: String) -> Option<SystemValue>;
 
     fn send_message(
         &mut self,

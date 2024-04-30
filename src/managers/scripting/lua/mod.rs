@@ -1,13 +1,12 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::{self, ModelAsset}, managers::{
-        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList}
+    assets::model_asset::ModelAsset, managers::{
+        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
-use egui_glium::egui_winit::egui::TextBuffer;
 use glam::Vec3;
-use mlua::{Function, Lua, LuaOptions, StdLib, UserData};
+use mlua::{Error, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, fs};
 
@@ -68,6 +67,26 @@ impl LuaSystem {
 }
 
 impl System for LuaSystem {
+    fn client_start(&mut self) {
+        let lua_option = lua_vm_ref(self.system_id().into());
+        match lua_option {
+            Some(lua) => {
+                let _ = call_lua_function(self.system_id(), &lua, "client_start");
+            }
+            None => debugger::error("lua system client_start function error\ncan't get lua vm reference"),
+        }
+    }
+
+    fn server_start(&mut self) {
+        let lua_option = lua_vm_ref(self.system_id().into());
+        match lua_option {
+            Some(lua) => {
+                let _ = call_lua_function(self.system_id(), &lua, "server_start");
+            }
+            None => debugger::error("lua system server_start function error\ncan't get lua vm reference"),
+        }
+    }
+
     fn client_update(&mut self) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
@@ -78,13 +97,33 @@ impl System for LuaSystem {
         }
     }
 
-    fn client_start(&mut self) {
+    fn server_update(&mut self) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "client_start");
+                let _ = call_lua_function(self.system_id(), &lua, "server_update");
             }
-            None => debugger::error("lua system client_start function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
+        }
+    }
+
+    fn server_render(&mut self) {
+        let lua_option = lua_vm_ref(self.system_id().into());
+        match lua_option {
+            Some(lua) => {
+                let _ = call_lua_function(self.system_id(), &lua, "server_render");
+            }
+            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
+        }
+    }
+
+    fn client_render(&mut self) {
+        let lua_option = lua_vm_ref(self.system_id().into());
+        match lua_option {
+            Some(lua) => {
+                let _ = call_lua_function(self.system_id(), &lua, "client_render");
+            }
+            None => debugger::error("lua system client_render function error\ncan't get lua vm reference"),
         }
     }
 
@@ -160,44 +199,32 @@ impl System for LuaSystem {
         }
     }
 
-    fn server_start(&mut self) {
+    fn get_value(&mut self, value_name: String) -> Option<SystemValue> {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_start");
-            }
-            None => debugger::error("lua system server_start function error\ncan't get lua vm reference"),
-        }
-    }
+                let func: Result<Function, mlua::Error> = lua.globals().get("get_value");
 
-    fn server_update(&mut self) {
-        let lua_option = lua_vm_ref(self.system_id().into());
-        match lua_option {
-            Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_update");
-            }
-            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
-        }
-    }
+                match func {
+                    Ok(func) => {
+                        let call_result: Result<SystemValue, mlua::Error> = Function::call(&func, value_name);
+                        return match call_result {
+                            Ok(value) => Some(value),
+                            Err(err) => {
+                                debugger::error(
+                                    &format!("lua error when calling get_value in system {}\nerror: {}", self.system_id(), err)
+                                );
 
-    fn server_render(&mut self) {
-        let lua_option = lua_vm_ref(self.system_id().into());
-        match lua_option {
-            Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_render");
-            }
-            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
+                                None
+                            },
+                        }
+                    },
+                    Err(err) => debugger::error(&format!("can't get function get_value in lua system {}\nerror: {}", self.system_id(), err)),
+                }
+            },
+            None => debugger::error("lua system get_value function error\ncan't get lua vm reference"),
         }
-    }
-
-    fn client_render(&mut self) {
-        let lua_option = lua_vm_ref(self.system_id().into());
-        match lua_option {
-            Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "client_render");
-            }
-            None => debugger::error("lua system client_render function error\ncan't get lua vm reference"),
-        }
+        None
     }
 }
 
@@ -1246,5 +1273,56 @@ impl UserData for Message {
         methods.add_method("message_id", |_, this, _: ()| {
             Ok(this.message_id.to_owned())
         });
+    }
+}
+
+impl<'lua> FromLuaMulti<'lua> for SystemValue {
+    fn from_lua_multi(values: mlua::prelude::LuaMultiValue<'lua>, _lua: &'lua mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
+        if values.len() == 1 {
+            if let Some(value) = values.get(0) {
+                if let Some(value) = value.as_f32() {
+                    return Ok(SystemValue::Float(value));
+                } 
+                if let Some(value) = value.as_string() {
+                    return Ok(SystemValue::String(String::from(value.to_str().unwrap())));
+                } 
+                if let Some(value) = value.as_u32() {
+                    return Ok(SystemValue::UInt(value));
+                }
+                if let Some(value) = value.as_i32() {
+                    return Ok(SystemValue::Int(value));
+                }
+                if let Some(value) = value.as_boolean() {
+                    return Ok(SystemValue::Bool(value));
+                }
+                if let Some(value) = value.as_table() {
+                    let x: Result<f32, Error> = value.get(1);
+                    let y: Result<f32, Error> = value.get(2);
+                    let z: Result<f32, Error> = value.get(3);
+                    if let (Ok(x), Ok(y), Ok(z)) = (x.clone(), y, z) {
+                        return Ok(SystemValue::Vec3(x, y, z));
+                    } 
+                    if let Err(x) = x {
+                        println!("{}", x);
+                    }
+                }
+            }
+        } else {
+            debugger::error("FromLua for SystemValue failed! values.len != 1");
+        }
+        Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
+    }
+}
+
+impl<'lua> IntoLua<'lua> for SystemValue {
+    fn into_lua(self, lua: &'lua mlua::prelude::Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
+        match self {
+            SystemValue::String(value) => Ok(value.into_lua(lua)?),
+            SystemValue::Int(value) => Ok(value.into_lua(lua)?),
+            SystemValue::UInt(value) => Ok(value.into_lua(lua)?),
+            SystemValue::Float(value) => Ok(value.into_lua(lua)?),
+            SystemValue::Vec3(x, y, z) => Ok(vec![x, y, z].into_lua(lua)?),
+            SystemValue::Bool(value) => Ok(value.into_lua(lua)?),
+        }
     }
 }

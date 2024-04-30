@@ -1,4 +1,3 @@
-pub mod animator;
 pub mod assets;
 pub mod debugger;
 pub mod input;

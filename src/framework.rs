@@ -8,7 +8,7 @@ use crate::{
         physics,
         render::{self, ShadowTextures},
         sound::{self, set_listener_transform},
-        systems,
+        systems::{self, SystemValue},
     },
 };
 use egui_glium::egui_winit::egui::{FontData, FontDefinitions, FontFamily, Window};
@@ -25,15 +25,14 @@ use glium::{
 };
 use once_cell::sync::Lazy;
 use std::{
-    fs,
-    num::NonZeroU32,
-    time::{Duration, Instant},
+    collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
 
 static mut DEBUG_MODE: DebugMode = DebugMode::None;
 static mut DELTA_TIME: Duration = Duration::new(0, 0);
 static FONT: Lazy<Vec<u8>> =
     Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
+static mut SYSTEM_GLOBALS: Lazy<HashMap<String, SystemValue>> = Lazy::new(|| HashMap::new());
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode }
@@ -213,6 +212,25 @@ fn set_audio_listener_transformations() {
 fn set_delta_time(dt: Duration) {
     unsafe {
         DELTA_TIME = dt;
+    }
+}
+
+pub fn set_global_system_value(key: &str, value: SystemValue) {
+    unsafe {
+        if let Some(hashmap_val) = SYSTEM_GLOBALS.get_mut(key) {
+            *hashmap_val = value;
+        } else {
+            SYSTEM_GLOBALS.insert(key.into(), value);
+        }
+    }
+}
+
+pub fn get_global_system_value(key: &str) -> Option<SystemValue> {
+    unsafe {
+        match SYSTEM_GLOBALS.get(key) {
+            Some(value) => Some(value.clone()),
+            None => None
+        }
     }
 }
 

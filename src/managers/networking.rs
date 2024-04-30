@@ -89,7 +89,7 @@ pub enum NetworkError {
     WrongClientStatus,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NetworkEvent {
     ClientConnected(u64),
     ClientDisconnected(u64, String),
@@ -348,13 +348,13 @@ impl ClientHandle {
 
 pub fn update(delta_time: Duration) {
     unsafe {
+        CURRENT_NETWORK_EVENTS.clear();
+
         match &mut CURRENT_NETWORKING_MODE {
             NetworkingMode::Server(server) => server.update(delta_time),
             NetworkingMode::Client(client) => client.update(delta_time),
             NetworkingMode::Disconnected(_) => (),
         }
-
-        CURRENT_NETWORK_EVENTS.clear();
     }
 }
 
@@ -384,7 +384,7 @@ pub fn send_message_to_system(message_bytes: Vec<u8>) {
         Some(system) => system.reg_message(message),
         None => {
             debugger::error(&format!("networking manager error\ngot an error in update(client)!\nfailed to get system {}", &message.system_id));
-            return;
+            ()
         }
     }
 }
@@ -392,6 +392,12 @@ pub fn send_message_to_system(message_bytes: Vec<u8>) {
 fn set_network_event(event: NetworkEvent) {
     unsafe {
         CURRENT_NETWORK_EVENTS.push(event);
+    }
+}
+
+pub fn get_network_events() -> Vec<NetworkEvent> {
+    unsafe {
+        CURRENT_NETWORK_EVENTS.clone()
     }
 }
 

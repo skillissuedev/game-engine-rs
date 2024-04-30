@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{ObjectHandle, SYSTEMS_LUA_VMS};
 use crate::{
     assets::{
@@ -8,7 +10,7 @@ use crate::{
         texture_asset::TextureAsset,
     },
     managers::{
-        self, debugger, networking::{Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems
     },
     objects::{
         camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
@@ -719,7 +721,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         message: MessageContents::Custom(contents),
                     };
 
-                    system.send_message(reliability, message);
+                    let _ = system.send_message(reliability, message);
                 }
                 None => debugger::error("failed to call send_custom_message_to_everybody, system not found"),
             }
@@ -754,7 +756,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         message: MessageContents::Custom(contents),
                     };
 
-                    system.send_message(reliability, message);
+                    let _ = system.send_message(reliability, message);
                 }
                 None => debugger::error("failed to call send_custom_message_to_one_client, system not found"),
             }
@@ -789,7 +791,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         message: MessageContents::Custom(contents),
                     };
 
-                    system.send_message(reliability, message);
+                    let _ = system.send_message(reliability, message);
                 }
                 None => debugger::error("failed to call , system not found"),
             }
@@ -835,7 +837,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         }),
                     };
 
-                    system.send_message(reliability, message);
+                    let _ = system.send_message(reliability, message);
                 }
                 None => debugger::error("failed to call send_sync_object_message_to_everybody, system not found"),
             }
@@ -921,7 +923,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         }),
                     };
 
-                    system.send_message(reliability, message);
+                    let _ = system.send_message(reliability, message);
                 }
                 None => debugger::error("failed to call send_sync_object_message_to_everybody_except, system not found"),
             }
@@ -937,6 +939,71 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             }
             Err(err) => debugger::error(&format!(
                 "failed to create a function send_sync_object_message_to_everybody_except in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        //let system_id_for_functions = system_id.clone();
+        let get_network_events = lua.create_function_mut(
+            move |_, _: ()| {
+                let mut events: Vec<HashMap<&str, String>> = Vec::new();
+                for ev in networking::get_network_events() {
+                    match ev {
+                        networking::NetworkEvent::ClientConnected(id) => {
+                            let mut ev = HashMap::new();
+                            ev.insert("type", "ClientConnected".into());
+                            ev.insert("id", id.to_string());
+                            events.push(ev);
+                        },
+                        networking::NetworkEvent::ClientDisconnected(id, reason) => {
+                            let mut ev = HashMap::new();
+                            ev.insert("type", "ClientDisconnected".into());
+                            ev.insert("id", id.to_string());
+                            ev.insert("reason", reason.clone());
+                            events.push(ev);
+                        },
+                        networking::NetworkEvent::ConnectedSuccessfully => {
+                            let mut ev = HashMap::new();
+                            ev.insert("type", "ConnectedSuccessfully".into());
+                            events.push(ev);
+                        },
+                        networking::NetworkEvent::Disconnected(_) => {
+                            let mut ev = HashMap::new();
+                            ev.insert("type", "Disconnected".into());
+                            events.push(ev);
+                        },
+                    }
+                }
+                Ok(events)
+            }
+        );
+
+        match get_network_events {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("get_network_events", func) {
+                    debugger::error(&format!("failed to add a function get_network_events as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function get_network_events in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let get_value_in_system = lua.create_function_mut(
+            move |_, (system_id, value_name): (String, String)| {
+                Ok(managers::systems::get_value_in_system(&system_id, value_name))
+            }
+        );
+
+        match get_value_in_system {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("get_value_in_system", func) {
+                    debugger::error(&format!("failed to add a function get_value_in_system as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function get_value_in_system in system {}\nerror: {}",
                 system_id, err
             )),
         }

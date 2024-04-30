@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use crate::{objects::ObjectGroup, systems::System};
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use mlua::{Error, FromLuaMulti, IntoLua};
 use once_cell::sync::Lazy;
 
 use super::{
-    networking,
-    render::{Cascades, ShadowTextures},
+    debugger, networking, render::{Cascades, ShadowTextures}
 };
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
@@ -154,8 +154,30 @@ pub fn get_object_name_with_id(id: u128) -> Option<String> {
     unsafe { OBJECTS_ID_NAMES.get(&id).cloned() }
 }
 
+pub fn get_value_in_system(system_id: &str, value_name: String) -> Option<SystemValue> {
+    match get_system_mut_with_id(system_id) {
+        Some(system) => {
+            system.get_value(value_name)
+        },
+        None => {
+            debugger::error(&format!("failed to get the system '{}' to get the value '{}'", system_id, value_name));
+            None
+        },
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CallList {
     pub immut_call: Vec<String>,
     pub mut_call: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SystemValue {
+    String(String),
+    Int(i32),
+    UInt(u32),
+    Float(f32),
+    Vec3(f32, f32, f32),
+    Bool(bool)
 }
