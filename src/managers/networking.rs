@@ -63,16 +63,43 @@ pub enum ClientStatus {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
-    pub receiver: MessageReceiver,
+    //pub sender: Option<u64>,
+    //pub receiver: MessageReceiver,
+    pub message_type: MessageType,
     pub system_id: String,
     pub message_id: String,
-    pub message: MessageContents,
+    pub contents: MessageContents,
+}
+impl Message {
+    pub fn new_from_server(receiver: MessageReceiver, contents: MessageContents, system_id: String, message_id: String) -> Self {
+        Message {
+            message_type: MessageType::FromServer(receiver),
+            system_id,
+            message_id,
+            contents,
+        }
+    }
+
+    pub fn new_from_client(contents: MessageContents, system_id: String, message_id: String) -> Self {
+        Message {
+            message_type: MessageType::FromClient(unsafe { CLIENT_ID.to_string() }),
+            system_id,
+            message_id,
+            contents,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageContents {
     SyncObject(SyncObjectMessage),
     Custom(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum MessageType {
+    FromServer(MessageReceiver),
+    FromClient(String)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -91,8 +118,8 @@ pub enum NetworkError {
 
 #[derive(Debug, Clone)]
 pub enum NetworkEvent {
-    ClientConnected(u64),
-    ClientDisconnected(u64, String),
+    ClientConnected(String),
+    ClientDisconnected(String, String),
     ConnectedSuccessfully,
     Disconnected(Option<DisconnectReason>),
 }
@@ -199,20 +226,20 @@ impl ServerHandle {
             }
         };
 
-        match message.receiver {
-            MessageReceiver::Everybody => {
-                self.server
-                    .broadcast_message(renet_message_reliability, message_bytes_vec);
-            }
-            MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(
-                client_id,
-                renet_message_reliability,
-                message_bytes_vec,
-            ),
-            MessageReceiver::OneClient(client_id) => {
-                self.server
-                    .send_message(client_id, renet_message_reliability, message_bytes_vec)
-            }
+        match message.message_type {
+            MessageType::FromServer(receiver) => {
+                match receiver {
+                    MessageReceiver::Everybody => self.server.broadcast_message(renet_message_reliability, message_bytes_vec),
+                    MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(
+                        client_id,
+                        renet_message_reliability,
+                        message_bytes_vec,
+                    ),
+                    MessageReceiver::OneClient(client_id) => 
+                        self.server.send_message(client_id, renet_message_reliability, message_bytes_vec)
+                }
+            }, 
+            _ => ()
         };
 
         Ok(())
@@ -232,12 +259,12 @@ impl ServerHandle {
             match ev {
                 ServerEvent::ClientConnected { client_id } => {
                     println!("client connected! client_id: {}", client_id);
-                    set_network_event(NetworkEvent::ClientConnected(client_id));
+                    set_network_event(NetworkEvent::ClientConnected(client_id.to_string()));
                 }
                 ServerEvent::ClientDisconnected { client_id, reason } => {
                     println!("client disconnected! client_id: {}", client_id);
                     set_network_event(NetworkEvent::ClientDisconnected(
-                        client_id,
+                        client_id.to_string(),
                         reason.to_string(),
                     ));
                 }
@@ -443,6 +470,16 @@ pub fn is_server() -> bool {
         NetworkingMode::Server(_) => true,
         NetworkingMode::Client(_) => false,
         NetworkingMode::Disconnected(_) => false,
+    }
+}
+
+pub fn get_id() -> Option<String> {
+    unsafe {
+        match get_current_networking_mode() {
+            NetworkingMode::Server(_) => None,
+            NetworkingMode::Client(_) => Some(CLIENT_ID.to_string()),
+            NetworkingMode::Disconnected(_) => None,
+        }
     }
 }
 

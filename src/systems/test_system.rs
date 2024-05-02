@@ -3,8 +3,7 @@ use crate::{
     assets::{
         model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset,
         texture_asset::TextureAsset,
-    },
-    managers::{
+    }, framework::set_global_system_value, managers::{
         input::{self, InputEventType},
         networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
@@ -12,12 +11,11 @@ use crate::{
         physics::{BodyColliderType, BodyType, RenderColliderType},
         render::{get_camera_position, set_camera_position, set_light_direction},
         systems::{self, CallList, SystemValue},
-    },
-    objects::{
+    }, objects::{
         character_controller::CharacterController, empty_object::EmptyObject,
         model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray,
         sound_emitter::SoundEmitter, Object,
-    },
+    }
 };
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
@@ -215,6 +213,8 @@ impl System for TestSystem {
 
     fn client_update(&mut self) {
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
+        let camera_position = get_camera_position();
+        set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(camera_position.x, camera_position.y, camera_position.z)]);
 
         if input::is_bind_down("cam_up") {
             let camera_position = get_camera_position();
@@ -276,6 +276,7 @@ impl System for TestSystem {
             let obj_tr = obj.local_transform();
 
             //dbg!(obj_tr.position);
+            /*
             let _ = self.send_message(
                 MessageReliability::Reliable,
                 Message {
@@ -283,12 +284,12 @@ impl System for TestSystem {
                     system_id: self.system_id().into(),
                     message_id: "sync_knife".into(),
 
-                    message: MessageContents::SyncObject(SyncObjectMessage {
+                    contents: MessageContents::SyncObject(SyncObjectMessage {
                         object_name: "knife_model".into(),
                         transform: obj_tr,
                     }),
                 },
-            );
+            );*/
         }
 
         {
@@ -318,18 +319,18 @@ impl System for TestSystem {
             controller.move_controller(Vec3::new(0.0, -1.0, 0.0));
             transform = controller.local_transform();
         }
-        let _ = self.send_message(
+        /*let _ = self.send_message(
             MessageReliability::Unreliable,
             Message {
                 receiver: MessageReceiver::Everybody,
                 system_id: "TestSystem".into(),
                 message_id: "sync_controller".into(),
-                message: MessageContents::SyncObject(SyncObjectMessage {
+                contents: MessageContents::SyncObject(SyncObjectMessage {
                     object_name: "controller".into(),
                     transform,
                 }),
             },
-        );
+        );*/
     }
 
     fn server_render(&mut self) {}
@@ -365,7 +366,7 @@ impl System for TestSystem {
     }
 
     fn reg_message(&mut self, message: Message) {
-        match message.message {
+        match message.contents {
             networking::MessageContents::SyncObject(sync_msg) => {
                 dbg!(&sync_msg);
                 if &sync_msg.object_name == "knife_model" {

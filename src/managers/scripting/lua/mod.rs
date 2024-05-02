@@ -6,7 +6,7 @@ use crate::{
 };
 use crate::objects::Object;
 use glam::Vec3;
-use mlua::{Error, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
+use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, fs};
 
@@ -1218,14 +1218,14 @@ fn lua_body_render_colliders_and_groups_to_rust(object_name: String, object_syst
 impl UserData for Message {
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method("contents_type", |_, this, _: ()| {
-            match this.message {
+            match this.contents {
                 MessageContents::SyncObject(_) => Ok("SyncObject"),
                 MessageContents::Custom(_) => Ok("Custom"),
             }
         });
 
         methods.add_method("sync_object_name", |_, this, _: ()| {
-            match &this.message {
+            match &this.contents {
                 MessageContents::SyncObject(message) => {
                     Ok(Some(message.object_name.to_string()))
                 },
@@ -1239,7 +1239,7 @@ impl UserData for Message {
         // returns [[x, y, z], [x, y, z], [x, y, z]]
         // [position_xyz, rotation_xyz, scale_xyz]
         methods.add_method("sync_object_pos_rot_scale", |_, this, _: ()| {
-            match &this.message {
+            match &this.contents {
                 MessageContents::SyncObject(message) => {
                     let transform = message.transform;
                     let position = transform.position;
@@ -1259,9 +1259,9 @@ impl UserData for Message {
         });
 
         methods.add_method("custom_contents", |_, this, _: ()| {
-            match &this.message {
+            match &this.contents {
                 MessageContents::SyncObject(_) => {
-                    debugger::error(&"lua error: get_custom_contents in Message failed! the contents_type != 'Custom'");
+                    debugger::error(&"lua error: custom_contents in Message failed! the contents_type != 'Custom'");
                     Ok(None)
                 },
                 MessageContents::Custom(contents) => {
@@ -1273,9 +1273,30 @@ impl UserData for Message {
         methods.add_method("message_id", |_, this, _: ()| {
             Ok(this.message_id.to_owned())
         });
+
+        methods.add_method("message_sender", |_, this, _: ()| {
+            match &this.message_type {
+                crate::managers::networking::MessageType::FromServer(_) => {
+                    debugger::error(&"lua error: message_sender in Message failed! the message was sent from a server");
+                    Ok(None)
+                },
+                crate::managers::networking::MessageType::FromClient(sender) => {
+                    dbg!(&sender);
+                    Ok(Some(sender.to_string()))
+                },
+            }
+        });
+
+        methods.add_method("message_type", |_, this, _: ()| {
+            match this.message_type {
+                crate::managers::networking::MessageType::FromServer(_) => Ok("FromServer"),
+                crate::managers::networking::MessageType::FromClient(_) => Ok("FromClient"),
+            }
+        });
     }
 }
 
+/*
 impl<'lua> FromLuaMulti<'lua> for SystemValue {
     fn from_lua_multi(values: mlua::prelude::LuaMultiValue<'lua>, _lua: &'lua mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
         if values.len() == 1 {
@@ -1309,6 +1330,38 @@ impl<'lua> FromLuaMulti<'lua> for SystemValue {
             }
         } else {
             debugger::error("FromLua for SystemValue failed! values.len != 1");
+        }
+        Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
+    }
+}*/
+
+impl<'lua> FromLua<'lua> for SystemValue {
+    fn from_lua(value: mlua::prelude::LuaValue<'lua>, lua: &'lua Lua) -> mlua::prelude::LuaResult<Self> {
+        if let Some(value) = value.as_f32() {
+            return Ok(SystemValue::Float(value));
+        } 
+        if let Some(value) = value.as_string() {
+            return Ok(SystemValue::String(String::from(value.to_str().unwrap())));
+        } 
+        if let Some(value) = value.as_u32() {
+            return Ok(SystemValue::UInt(value));
+        }
+        if let Some(value) = value.as_i32() {
+            return Ok(SystemValue::Int(value));
+        }
+        if let Some(value) = value.as_boolean() {
+            return Ok(SystemValue::Bool(value));
+        }
+        if let Some(value) = value.as_table() {
+            let x: Result<f32, Error> = value.get(1);
+            let y: Result<f32, Error> = value.get(2);
+            let z: Result<f32, Error> = value.get(3);
+            if let (Ok(x), Ok(y), Ok(z)) = (x.clone(), y, z) {
+                return Ok(SystemValue::Vec3(x, y, z));
+            } 
+            if let Err(x) = x {
+                println!("{}", x);
+            }
         }
         Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
     }

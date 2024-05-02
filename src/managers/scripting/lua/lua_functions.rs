@@ -8,13 +8,11 @@ use crate::{
         shader_asset::{ShaderAsset, ShaderAssetPath},
         sound_asset::SoundAsset,
         texture_asset::TextureAsset,
-    },
-    managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems
-    },
-    objects::{
+    }, framework, managers::{
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems::{self, SystemValue}
+    }, objects::{
         camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
-    }, systems::System,
+    }, systems::System
 };
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
@@ -707,143 +705,155 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         }
 
         let system_id_for_functions = system_id.clone();
-        let send_custom_message_to_everybody = lua.create_function_mut(move |_, (is_reliable, message_id, contents): (bool, String, String)| {
+
+        let send_custom_message = lua.create_function_mut(move |_, (is_reliable, message_id, contents, receiver, client_id): (bool, String, String, Option<String>, Option<u64>)| {
             match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                 Some(system) => {
                     let reliability = match is_reliable {
                         true => MessageReliability::Reliable,
                         false => MessageReliability::Unreliable,
                     };
-                    let message = Message {
-                        receiver: MessageReceiver::Everybody,
-                        system_id: system.system_id().into(),
-                        message_id,
-                        message: MessageContents::Custom(contents),
-                    };
+                    if let networking::NetworkingMode::Server(_) = networking::get_current_networking_mode() {
+                        match receiver {
+                            Some(receiver) => {
+                                let receiver = match receiver.as_str() {
+                                    "Everybody" => MessageReceiver::Everybody,
+                                    "OneClient" => {
+                                        match client_id {
+                                            Some(id) => MessageReceiver::OneClient(id),
+                                            None => {
+                                                debugger::error("lua send_custom_message error: message receiver set to 'Client', but client id is 0");
+                                                MessageReceiver::OneClient(0)
+                                            },
+                                        }
+                                    }, 
+                                    "EverybodyExcept" => {
+                                        match client_id {
+                                            Some(id) => MessageReceiver::EverybodyExcept(id),
+                                            None => {
+                                                debugger::error("lua send_custom_message error: message receiver set to 'EverybodyExcept', but client id is 0");
+                                                MessageReceiver::OneClient(0)
+                                            },
+                                        }
+                                    },
+                                    _ => {
+                                        debugger::error("lua send_custom_message error: receiver arg is wrong! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
+                                        MessageReceiver::OneClient(0)
+                                    },
+                                };
+                                let message = Message::new_from_server(receiver, MessageContents::Custom(contents), system_id_for_functions.clone(), message_id);
+                                let _ = system.send_message(reliability, message);
+                            },
+                            None => {
+                                debugger::error("lua send_custom_message error: receiver arg is nil! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
+                            },
+                        };
 
-                    let _ = system.send_message(reliability, message);
+                    } else if let networking::NetworkingMode::Client(_) = networking::get_current_networking_mode() {
+                        dbg!(networking::get_id());
+                        let message = Message::new_from_client(MessageContents::Custom(contents), system_id_for_functions.clone(), message_id);
+                        let _ = system.send_message(reliability, message);
+                    }
                 }
-                None => debugger::error("failed to call send_custom_message_to_everybody, system not found"),
+                None => debugger::error("failed to call send_custom_message, system not found"),
             }
 
             Ok(())
         });
 
-        match send_custom_message_to_everybody {
+        match send_custom_message {
             Ok(func) => {
-                if let Err(err) = lua.globals().set("send_custom_message_to_everybody", func) {
-                    debugger::error(&format!("failed to add a function send_custom_message_to_everybody as a lua global in system {}\nerror: {}", system_id, err));
+                if let Err(err) = lua.globals().set("send_custom_message", func) {
+                    debugger::error(&format!("failed to add a function send_custom_message as a lua global in system {}\nerror: {}", system_id, err));
                 }
             }
             Err(err) => debugger::error(&format!(
-                "failed to create a function send_custom_message_to_everybody in system {}\nerror: {}",
+                "failed to create a function send_custom_message in system {}\nerror: {}",
                 system_id, err
             )),
         }
 
         let system_id_for_functions = system_id.clone();
-        let send_custom_message_to_one_client = lua.create_function_mut(move |_, (client_id, is_reliable, message_id, contents): (u64, bool, String, String)| {
+        let send_sync_object_message = lua.create_function_mut(move 
+            |_, (is_reliable, message_id, object_name, pos, rot, scale, receiver, client_id): 
+            (bool, String, String, [f32; 3], [f32; 3], [f32; 3], Option<String>, Option<u64>)| {
+            let contents = MessageContents::SyncObject(SyncObjectMessage {
+                object_name,
+                transform: Transform {
+                    position: pos.into(),
+                    rotation: rot.into(),
+                    scale: scale.into()
+                },
+            });
             match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                 Some(system) => {
                     let reliability = match is_reliable {
                         true => MessageReliability::Reliable,
                         false => MessageReliability::Unreliable,
                     };
-                    let message = Message {
-                        receiver: MessageReceiver::OneClient(client_id),
-                        system_id: system.system_id().into(),
-                        message_id,
-                        message: MessageContents::Custom(contents),
-                    };
+                    if let networking::NetworkingMode::Server(_) = networking::get_current_networking_mode() {
+                        match receiver {
+                            Some(receiver) => {
+                                let receiver = match receiver.as_str() {
+                                    "Everybody" => MessageReceiver::Everybody,
+                                    "OneClient" => {
+                                        match client_id {
+                                            Some(id) => MessageReceiver::OneClient(id),
+                                            None => {
+                                                debugger::error("lua send_sync_object_message error: message receiver set to 'Client', but client id is 0");
+                                                MessageReceiver::OneClient(0)
+                                            },
+                                        }
+                                    }, 
+                                    "EverybodyExcept" => {
+                                        match client_id {
+                                            Some(id) => MessageReceiver::EverybodyExcept(id),
+                                            None => {
+                                                debugger::error("lua send_sync_object_message error: message receiver set to 'EverybodyExcept', but client id is 0");
+                                                MessageReceiver::OneClient(0)
+                                            },
+                                        }
+                                    },
+                                    _ => {
+                                        debugger::error("lua send_sync_object_message error: receiver arg is wrong! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
+                                        MessageReceiver::OneClient(0)
+                                    },
+                                };
+                                let message = Message::new_from_server(receiver, contents, system_id_for_functions.clone(), message_id);
+                                let _ = system.send_message(reliability, message);
+                            },
+                            None => {
+                                debugger::error("lua send_sync_object_message error: receiver arg is nil! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
+                            },
+                        };
 
-                    let _ = system.send_message(reliability, message);
+                    } else if let networking::NetworkingMode::Client(_) = networking::get_current_networking_mode() {
+                        let message = Message::new_from_client(contents, system_id_for_functions.clone(), message_id);
+                        let _ = system.send_message(reliability, message);
+                    }
                 }
-                None => debugger::error("failed to call send_custom_message_to_one_client, system not found"),
+                None => debugger::error("failed to call send_sync_object_message, system not found"),
             }
 
             Ok(())
         });
 
-        match send_custom_message_to_one_client {
+        match send_sync_object_message {
             Ok(func) => {
-                if let Err(err) = lua.globals().set("send_custom_message_to_one_client", func) {
-                    debugger::error(&format!("failed to add a function send_custom_message_to_one_client as a lua global in system {}\nerror: {}", system_id, err));
+                if let Err(err) = lua.globals().set("send_sync_object_message", func) {
+                    debugger::error(&format!("failed to add a function send_sync_object_message as a lua global in system {}\nerror: {}", system_id, err));
                 }
             }
             Err(err) => debugger::error(&format!(
-                "failed to create a function send_custom_message_to_one_client in system {}\nerror: {}",
+                "failed to create a function send_sync_object_message in system {}\nerror: {}",
                 system_id, err
             )),
         }
 
-        let system_id_for_functions = system_id.clone();
-        let send_custom_message_to_everybody_except = lua.create_function_mut(move |_, (client_id, is_reliable, message_id, contents): (u64, bool, String, String)| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let reliability = match is_reliable {
-                        true => MessageReliability::Reliable,
-                        false => MessageReliability::Unreliable,
-                    };
-                    let message = Message {
-                        receiver: MessageReceiver::EverybodyExcept(client_id),
-                        system_id: system.system_id().into(),
-                        message_id,
-                        message: MessageContents::Custom(contents),
-                    };
-
-                    let _ = system.send_message(reliability, message);
-                }
-                None => debugger::error("failed to call , system not found"),
-            }
-
-            Ok(())
-        });
-
-        match send_custom_message_to_everybody_except {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("send_custom_message_to_everybody_except", func) {
-                    debugger::error(&format!("failed to add a function send_custom_message_to_everybody_except as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function send_custom_message_to_everybody_except in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
 
         
 
-
-        let system_id_for_functions = system_id.clone();
-        let send_sync_object_message_to_everybody = lua.create_function_mut(move 
-            |_, (is_reliable, message_id, object_name, pos, rot, scale): (bool, String, String, [f32; 3], [f32; 3], [f32; 3])| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let reliability = match is_reliable {
-                        true => MessageReliability::Reliable,
-                        false => MessageReliability::Unreliable,
-                    };
-                    let message = Message {
-                        receiver: MessageReceiver::Everybody,
-                        system_id: system.system_id().into(),
-                        message_id,
-                        message: MessageContents::SyncObject(SyncObjectMessage {
-                            object_name,
-                            transform: Transform {
-                                position: pos.into(),
-                                rotation: rot.into(),
-                                scale: scale.into()
-                            },
-                        }),
-                    };
-
-                    let _ = system.send_message(reliability, message);
-                }
-                None => debugger::error("failed to call send_sync_object_message_to_everybody, system not found"),
-            }
-
-            Ok(())
-        });
+/*
 
         match send_sync_object_message_to_everybody {
             Ok(func) => {
@@ -870,7 +880,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         receiver: MessageReceiver::OneClient(client_id),
                         system_id: system.system_id().into(),
                         message_id,
-                        message: MessageContents::SyncObject(SyncObjectMessage {
+                        contents: MessageContents::SyncObject(SyncObjectMessage {
                             object_name,
                             transform: Transform {
                                 position: pos.into(),
@@ -913,7 +923,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         receiver: MessageReceiver::EverybodyExcept(client_id),
                         system_id: system.system_id().into(),
                         message_id,
-                        message: MessageContents::SyncObject(SyncObjectMessage {
+                        contents: MessageContents::SyncObject(SyncObjectMessage {
                             object_name,
                             transform: Transform {
                                 position: pos.into(),
@@ -941,7 +951,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 "failed to create a function send_sync_object_message_to_everybody_except in system {}\nerror: {}",
                 system_id, err
             )),
-        }
+        }*/
 
         //let system_id_for_functions = system_id.clone();
         let get_network_events = lua.create_function_mut(
@@ -1004,6 +1014,42 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             }
             Err(err) => debugger::error(&format!(
                 "failed to create a function get_value_in_system in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let get_global_system_value = lua.create_function_mut(
+            move |_, name: String| {
+                Ok(framework::get_global_system_value(&name))
+            }
+        );
+
+        match get_global_system_value {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("get_global_system_value", func) {
+                    debugger::error(&format!("failed to add a function get_global_system_value as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function get_global_system_value in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let set_global_system_value = lua.create_function_mut(
+            move |_, (name, value): (String, Vec<SystemValue>)| {
+                Ok(framework::set_global_system_value(&name, value))
+            }
+        );
+
+        match set_global_system_value {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("set_global_system_value", func) {
+                    debugger::error(&format!("failed to add a function set_global_system_value as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function set_global_system_value in system {}\nerror: {}",
                 system_id, err
             )),
         }

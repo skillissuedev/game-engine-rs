@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use crate::{objects::ObjectGroup, systems::System};
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
-use mlua::{Error, FromLuaMulti, IntoLua};
 use once_cell::sync::Lazy;
 
 use super::{

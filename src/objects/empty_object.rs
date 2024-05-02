@@ -1,4 +1,4 @@
-use egui_glium::egui_winit::egui::{self, TextEdit};
+use egui_glium::egui_winit::egui;
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::managers::physics::ObjectBodyParameters;
