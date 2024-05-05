@@ -10,7 +10,6 @@ use crate::{
         physics::ObjectBodyParameters,
         render::{self, Cascades, ShadowTextures, Vertex},
     },
-    math_utils::deg_to_rad,
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
@@ -25,7 +24,7 @@ use glium::{
 use std::time::Instant;
 
 #[derive(Debug)]
-pub struct ModelObject {
+pub struct MasterInstancedModelObject {
     name: String,
     transform: Transform,
     parent_transform: Option<Transform>,
@@ -47,7 +46,7 @@ pub struct ModelObject {
     inspector_anim_name: String,
 }
 
-impl ModelObject {
+impl MasterInstancedModelObject {
     pub fn new(
         name: &str,
         asset: ModelAsset,
@@ -73,7 +72,7 @@ impl ModelObject {
             });
         }
 
-        ModelObject {
+        MasterInstancedModelObject {
             transform: Transform::default(),
             nodes_transforms,
             children: vec![],
@@ -101,7 +100,7 @@ impl ModelObject {
     }
 }
 
-impl Object for ModelObject {
+impl Object for MasterInstancedModelObject {
     fn start(&mut self) {}
 
     fn update(&mut self) {
@@ -129,7 +128,7 @@ impl Object for ModelObject {
     }
 
     fn object_type(&self) -> &str {
-        "ModelObject"
+        "MasterInstancedModelObject"
     }
 
     fn set_name(&mut self, name: &str) {
@@ -165,7 +164,7 @@ impl Object for ModelObject {
     }
 
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
-        ui.heading("ModelObject parameters");
+        ui.heading("MasterInstancedModelObject parameters");
         ui.label(&format!("error: {}", self.error));
         ui.label(&format!("model asset: {}", self.model_asset.path));
         ui.label(&format!("texture asset: {}", self.texture_asset.is_some()));
@@ -215,6 +214,17 @@ impl Object for ModelObject {
             self.start_mesh(display);
         }
 
+        let matrices = match render::get_instance_positions(&self.name) {
+            Some(matrices) => matrices,
+            None => return,
+        };
+        let mut model_matrices = Vec::new();
+        let mut mvp_matrices = Vec::new();
+        for matrix in matrices {
+            model_matrices.push(matrix.model);
+            mvp_matrices.push(matrix.mvp);
+        }
+
         let closest_shadow_view_proj_cols = cascades.closest_view_proj.to_cols_array_2d();
         let furthest_shadow_view_proj_cols = cascades.furthest_view_proj.to_cols_array_2d();
 
@@ -243,9 +253,9 @@ impl Object for ModelObject {
                 }
             }
 
-            let setup_mat_result = self.setup_mat(transform.unwrap());
-            let mvp: Mat4 = setup_mat_result.mvp;
-            let model: Mat4 = setup_mat_result.model;
+            //let setup_mat_result = self.setup_mat(transform.unwrap());
+            //let mvp: Mat4 = setup_mat_result.mvp;
+            //let model: Mat4 = setup_mat_result.model;
 
             let texture_option = self.texture.as_ref();
 
@@ -255,13 +265,28 @@ impl Object for ModelObject {
                 Some(tx) => texture = tx,
                 None => texture = &empty_texture,
             }
-            let mvp_cols = mvp.to_cols_array_2d();
-            let model_cols = model.to_cols_array_2d();
+            let mut mvp_cols = Vec::new();
+            for matrix in &mvp_matrices {
+                mvp_cols.push(matrix.to_cols_array_2d());
+            }
+            let mut model_cols = Vec::new();
+            for matrix in &model_matrices {
+                model_cols.push(matrix.to_cols_array_2d());
+            }
+            let model_cols: [[[f32; 4]; 4]; 4096] = model_cols.try_into().unwrap();
+            let mvp_cols: [[[f32; 4]; 4]; 4096] = mvp_cols.try_into().unwrap();
+
+            let model_cols =
+                UniformBuffer::new(display, model_cols).unwrap();
+            let mvp_cols =
+                UniformBuffer::new(display, mvp_cols).unwrap();
 
             let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
             let inverse_bind_mats =
                 UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
+
             let camera_position: [f32; 3] = render::get_camera_position().into();
+
 
             let sampler_behaviour = glium::uniforms::SamplerBehavior {
                 minify_filter: MinifySamplerFilter::Nearest,
@@ -275,22 +300,11 @@ impl Object for ModelObject {
             };
 
             let uniforms = uniform! {
-                is_instanced: false,
                 jointsMats: &joints,
                 jointsInverseBindMats: &inverse_bind_mats,
                 mesh: object.transform,
-                mvp: [
-                    mvp_cols[0],
-                    mvp_cols[1],
-                    mvp_cols[2],
-                    mvp_cols[3],
-                ],
-                model: [
-                    model_cols[0],
-                    model_cols[1],
-                    model_cols[2],
-                    model_cols[3],
-                ],
+                mvp: &mvp_cols,
+                model: &model_cols, 
                 tex: Sampler(texture, sampler_behaviour),
                 lightPos: render::get_light_direction().to_array(),
                 closestShadowTexture: &shadow_texture.closest,
@@ -334,93 +348,12 @@ impl Object for ModelObject {
         }
     }
 
-    fn shadow_render(
-        &mut self,
-        view_proj: &Mat4,
-        display: &Display,
-        target: &mut SimpleFrameBuffer,
-    ) {
-        if !self.started {
-            self.start_mesh(display);
-        }
-
-        if self.error {
-            return;
-        }
-
-        for i in 0..self.model_asset.objects.len() {
-            let object = &self.model_asset.objects[i];
-
-            let indices = IndexBuffer::new(
-                display,
-                glium::index::PrimitiveType::TrianglesList,
-                &object.indices,
-            );
-
-            let mut transform: Option<&NodeTransform> = None;
-            for tr in &self.nodes_transforms {
-                if tr.node_id == self.model_asset.objects[i].node_index {
-                    transform = Some(tr);
-                    break;
-                }
-            }
-
-            match transform {
-                Some(_) => (),
-                None => {
-                    error("no node transform found!");
-                    return;
-                }
-            }
-
-            let setup_mat_result = self.setup_mat(transform.unwrap());
-            let model: Mat4 = setup_mat_result.model;
-
-            let model_cols = model.to_cols_array_2d();
-            let view_proj_cols = view_proj.to_cols_array_2d();
-
-            let uniforms = uniform! {
-                model: [
-                    model_cols[0],
-                    model_cols[1],
-                    model_cols[2],
-                    model_cols[3],
-                ],
-                view_proj: [
-                    view_proj_cols[0],
-                    view_proj_cols[1],
-                    view_proj_cols[2],
-                    view_proj_cols[3],
-                ],
-                lightPos: render::get_light_direction().to_array(),
-            };
-
-            let draw_params = glium::DrawParameters {
-                depth: glium::Depth {
-                    test: glium::draw_parameters::DepthTest::IfLessOrEqual, // set to IfLess if it
-                    // won't work
-                    write: true,
-                    ..Default::default()
-                },
-                //blend: glium::draw_parameters::Blend::alpha_blending(),
-                backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
-                ..Default::default()
-            };
-
-            target
-                .draw(
-                    &self.vertex_buffer[i],
-                    &indices.unwrap(),
-                    &self.shadow_program[i],
-                    &uniforms,
-                    &draw_params,
-                )
-                .unwrap();
-        }
+    fn shadow_render(&mut self, _: &Mat4, _: &Display, _: &mut SimpleFrameBuffer) {
+        // no shadow rendering(for now?)
     }
 }
 
-impl ModelObject {
+impl MasterInstancedModelObject {
     pub fn get_asset(&self) -> &ModelAsset {
         &self.model_asset
     }
@@ -531,70 +464,6 @@ impl ModelObject {
                 }
             }
             None => (),
-        }
-    }
-
-    fn setup_mat(&self, node_transform: &NodeTransform) -> SetupMatrixResult {
-        match node_transform.global_transform {
-            Some(_) => (),
-            None => {
-                error("model object error\nerror in setup_mat()\nnode_transform's global_transform is None");
-                //return Mat4::IDENTITY;
-                return SetupMatrixResult {
-                    mvp: Mat4::IDENTITY,
-                    model: Mat4::IDENTITY,
-                };
-            }
-        }
-
-        let node_global_transform = node_transform.global_transform.unwrap();
-        let scale_rotation_translation = node_global_transform.to_scale_rotation_translation();
-        let rotation_vector = scale_rotation_translation.1.to_euler(glam::EulerRot::XYZ);
-        let translation_vector = scale_rotation_translation.2;
-        let scale_vector = scale_rotation_translation.0;
-
-        let model_object_translation: [f32; 3] = self.transform.position.into();
-        let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
-        let model_object_scale: [f32; 3] = self.transform.scale.into();
-        let model_object_rotation_vec = [
-            deg_to_rad(model_object_rotation_vec[0]),
-            deg_to_rad(model_object_rotation_vec[1]),
-            deg_to_rad(model_object_rotation_vec[2]),
-        ];
-
-        let full_translation = Vec3::new(
-            model_object_translation[0] + translation_vector.x,
-            model_object_translation[1] + translation_vector.y,
-            model_object_translation[2] + translation_vector.z,
-        );
-        let full_scale = Vec3::new(
-            model_object_scale[0] + scale_vector.x,
-            model_object_scale[1] + scale_vector.y,
-            model_object_scale[2] + scale_vector.z,
-        );
-        let full_rotation = [
-            model_object_rotation_vec[0] + rotation_vector.0,
-            model_object_rotation_vec[1] + rotation_vector.1,
-            model_object_rotation_vec[2] + rotation_vector.2,
-        ];
-        let rotation_quat = Quat::from_euler(
-            glam::EulerRot::XYZ,
-            full_rotation[0],
-            full_rotation[1],
-            full_rotation[2],
-        );
-
-        let transform =
-            Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
-
-        let view = render::get_view_matrix();
-        let proj = render::get_projection_matrix();
-
-        let mvp = proj * view * transform;
-
-        SetupMatrixResult {
-            mvp,
-            model: transform,
         }
     }
 
@@ -830,12 +699,6 @@ pub struct CurrentAnimationSettings {
     pub animation: Option<Animation>,
     pub looping: bool,
     pub timer: Option<Instant>,
-}
-
-#[derive(Debug)]
-struct SetupMatrixResult {
-    pub mvp: Mat4,
-    pub model: Mat4,
 }
 
 #[derive(Debug)]

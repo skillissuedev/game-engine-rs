@@ -1,9 +1,12 @@
-use crate::math_utils::deg_to_rad;
+use std::collections::HashMap;
+
+use crate::{math_utils::deg_to_rad, objects::instanced_model_object::SetupMatrixResult};
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
     framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,
     texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer,
 };
+use once_cell::sync::Lazy;
 
 use super::{
     physics::{RenderColliderType, RenderRay},
@@ -224,7 +227,8 @@ pub fn add_ray_to_draw(ray: RenderRay) {
 }
 
 pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextures) {
-    target.clear_color_and_depth((0.4, 0.4, 0.4, 1.0), 1.0);
+    //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
+    target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
 
     let mut closest_shadow_fbo =
         SimpleFrameBuffer::depth_only(display, &shadow_textures.closest).unwrap();
@@ -250,6 +254,9 @@ pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextu
     );
 
     update_camera_vectors();
+    unsafe {
+        INSTANCED_POSITIONS.clear();
+    }
 
     systems::render(&display, target, &cascades, shadow_textures);
 }
@@ -444,6 +451,28 @@ static mut RENDER_COLLIDERS: Vec<RenderColliderType> = vec![];
 static mut RENDER_RAYS: Vec<RenderRay> = vec![];
 static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
+
+static mut INSTANCED_POSITIONS: Lazy<HashMap<String, Vec<SetupMatrixResult>>> = Lazy::new(|| HashMap::new());
+
+pub fn add_instance_position(instance: &str, position: SetupMatrixResult) {
+    unsafe {
+        match INSTANCED_POSITIONS.get_mut(instance) {
+            Some(positions) => positions.push(position),
+            None => {
+                INSTANCED_POSITIONS.insert(instance.into(), vec![position]);
+            },
+        }
+    }
+}
+
+pub fn get_instance_positions(instance: &str) -> Option<&Vec<SetupMatrixResult>> {
+    unsafe {
+        match INSTANCED_POSITIONS.get(instance) {
+            Some(positions) => Some(positions),
+            None => None,
+        }
+    }
+}
 
 pub fn calculate_collider_mvp_and_sensor(collider: &RenderColliderType) -> ([[f32; 4]; 4], bool) {
     let view = get_view_matrix();

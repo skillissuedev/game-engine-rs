@@ -12,9 +12,7 @@ use crate::{
         render::{get_camera_position, set_camera_position, set_light_direction},
         systems::{self, CallList, SystemValue},
     }, objects::{
-        character_controller::CharacterController, empty_object::EmptyObject,
-        model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray,
-        sound_emitter::SoundEmitter, Object,
+        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, master_instanced_model_onbject::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
     }
 };
 use ez_al::SoundSourceType;
@@ -39,8 +37,8 @@ impl System for TestSystem {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         let asset = ModelAsset::from_gltf("models/knife_test.gltf");
         let test_anim_asset = ModelAsset::from_gltf("models/test_anim.gltf");
-        let ground_asset = ModelAsset::from_gltf("models/tile1_trees_rock.gltf").unwrap();
-        let ground_texture_asset = TextureAsset::from_file("textures/biome1_rock1.png");
+        let ground_asset = ModelAsset::from_gltf("models/test_tile.gltf").unwrap();
+        let ground_texture_asset = TextureAsset::from_file("textures/comfy52.png");
         let shadow_model_asset =
             ModelAsset::from_gltf("models/test_model_for_shadows.gltf").unwrap();
         let mut test_shadow_model = Box::new(ModelObject::new(
@@ -80,7 +78,7 @@ impl System for TestSystem {
         let mut ground_collider = Box::new(ModelObject::new(
             "ground_collider",
             ground_asset.clone(),
-            Some(ground_texture_asset.unwrap()),
+            Some(ground_texture_asset.clone().unwrap()),
             ShaderAsset::load_default_shader().unwrap(),
         ));
         ground_collider.set_position(Vec3::new(0.0, -100.0, 0.0), true);
@@ -147,9 +145,28 @@ impl System for TestSystem {
             "cam_down",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
         );
+
+        let grass_asset = ModelAsset::from_gltf("models/grass.gltf");
+        let grass_master_instance =
+            MasterInstancedModelObject::new("GrassMasterInstance", grass_asset.unwrap(), Some(ground_texture_asset.unwrap()), ShaderAsset::load_default_instanced_shader().unwrap());
+        self.add_object(Box::new(grass_master_instance));
+
+        let grass_instance =
+            InstancedModelObject::new("Grass1", "GrassMasterInstance");
+        self.add_object(Box::new(grass_instance));
+
+        let mut grass_instance =
+            InstancedModelObject::new("Grass2", "GrassMasterInstance");
+        grass_instance.set_position(Vec3::new(1.0, 0.0, 0.0), true);
+        self.add_object(Box::new(grass_instance));
+
+        let mut grass_instance =
+            InstancedModelObject::new("Grass3", "GrassMasterInstance");
+        grass_instance.set_position(Vec3::new(3.0, 0.0, 0.0), true);
+        self.add_object(Box::new(grass_instance));
     }
     fn server_start(&mut self) {
-        let ground_asset = ModelAsset::from_gltf("models/ground_1.gltf").unwrap();
+        let ground_asset = ModelAsset::from_gltf("models/test_tile.gltf").unwrap();
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = Box::new(EmptyObject::new("knife_model"));
 

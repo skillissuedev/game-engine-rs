@@ -2,13 +2,13 @@ use crate::managers::{assets::get_full_asset_path, debugger};
 
 pub static mut DEFAULT_TEXTURE_PATH: &str = "textures/default_texture.png";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TextureAsset {
     pub image_raw: Vec<u8>,
     pub image_dimensions: (u32, u32),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TextureAssetError {
     LoadError,
     TextureCreationError,

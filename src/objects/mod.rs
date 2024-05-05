@@ -16,6 +16,8 @@ pub mod camera_position;
 pub mod character_controller;
 pub mod empty_object;
 pub mod model_object;
+pub mod instanced_model_object;
+pub mod master_instanced_model_onbject;
 pub mod nav_obstacle;
 pub mod navmesh;
 pub mod ray;
