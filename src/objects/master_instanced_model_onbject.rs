@@ -14,12 +14,9 @@ use crate::{
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer,
-    uniform,
-    uniforms::{
+    framebuffer::SimpleFrameBuffer, implement_vertex, uniform, uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    },
-    Display, IndexBuffer, Program, Surface, VertexBuffer,
+    }, vertex::EmptyInstanceAttributes, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -204,30 +201,45 @@ impl Object for MasterInstancedModelObject {
         &mut self,
         display: &Display,
         target: &mut glium::Frame,
-        cascades: &Cascades,
-        shadow_texture: &ShadowTextures,
+        _: &Cascades,
+        _: &ShadowTextures,
     ) {
+        println!("MasterInstancedModelObject render!");
+        //dbg!(&self.model_asset.objects);
         if self.error {
+            dbg!("error!");
             return;
         }
         if !self.started {
+            dbg!("not started!");
             self.start_mesh(display);
         }
+        println!("MasterInstancedModelObject render! 1");
 
         let matrices = match render::get_instance_positions(&self.name) {
             Some(matrices) => matrices,
-            None => return,
+            None => {
+                println!("MasterInstancedModelObject render! 1.5");
+                return
+            },
         };
-        let mut model_matrices = Vec::new();
-        let mut mvp_matrices = Vec::new();
+        let instance_count = matrices.len();
+        
+        let mut per_instance_data = Vec::new();
+
+
         for matrix in matrices {
-            model_matrices.push(matrix.model);
-            mvp_matrices.push(matrix.mvp);
+            per_instance_data.push(Instance {
+                mvp: matrix.mvp.to_cols_array_2d(),
+                model: matrix.model.to_cols_array_2d(),
+            });
         }
+        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
 
-        let closest_shadow_view_proj_cols = cascades.closest_view_proj.to_cols_array_2d();
-        let furthest_shadow_view_proj_cols = cascades.furthest_view_proj.to_cols_array_2d();
 
+        println!("MasterInstancedModelObject render! 2");
+
+        //dbg!(&self.model_asset.objects);
         for i in 0..self.model_asset.objects.len() {
             let object = &self.model_asset.objects[i];
 
@@ -265,21 +277,6 @@ impl Object for MasterInstancedModelObject {
                 Some(tx) => texture = tx,
                 None => texture = &empty_texture,
             }
-            let mut mvp_cols = Vec::new();
-            for matrix in &mvp_matrices {
-                mvp_cols.push(matrix.to_cols_array_2d());
-            }
-            let mut model_cols = Vec::new();
-            for matrix in &model_matrices {
-                model_cols.push(matrix.to_cols_array_2d());
-            }
-            let model_cols: [[[f32; 4]; 4]; 4096] = model_cols.try_into().unwrap();
-            let mvp_cols: [[[f32; 4]; 4]; 4096] = mvp_cols.try_into().unwrap();
-
-            let model_cols =
-                UniformBuffer::new(display, model_cols).unwrap();
-            let mvp_cols =
-                UniformBuffer::new(display, mvp_cols).unwrap();
 
             let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
             let inverse_bind_mats =
@@ -303,24 +300,8 @@ impl Object for MasterInstancedModelObject {
                 jointsMats: &joints,
                 jointsInverseBindMats: &inverse_bind_mats,
                 mesh: object.transform,
-                mvp: &mvp_cols,
-                model: &model_cols, 
                 tex: Sampler(texture, sampler_behaviour),
                 lightPos: render::get_light_direction().to_array(),
-                closestShadowTexture: &shadow_texture.closest,
-                furthestShadowTexture: &shadow_texture.furthest,
-                closestShadowViewProj: [
-                    closest_shadow_view_proj_cols[0],
-                    closest_shadow_view_proj_cols[1],
-                    closest_shadow_view_proj_cols[2],
-                    closest_shadow_view_proj_cols[3],
-                ],
-                furthestShadowViewProj: [
-                    furthest_shadow_view_proj_cols[0],
-                    furthest_shadow_view_proj_cols[1],
-                    furthest_shadow_view_proj_cols[2],
-                    furthest_shadow_view_proj_cols[3],
-                ],
                 cameraPosition: camera_position,
             };
 
@@ -336,9 +317,10 @@ impl Object for MasterInstancedModelObject {
                 ..Default::default()
             };
 
+            dbg!("im rendering");
             target
                 .draw(
-                    &self.vertex_buffer[i],
+                    (&self.vertex_buffer[i], per_instance_buffer.per_instance().unwrap()),
                     &indices.unwrap(),
                     &self.program[i],
                     &uniforms,
@@ -468,14 +450,6 @@ impl MasterInstancedModelObject {
     }
 
     fn start_mesh(&mut self, display: &Display) {
-        let shadow_shader = ShaderAsset::load_shadow_shader();
-        let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
-            shadow_shader
-        } else {
-            error("failed to load shadow shader!");
-            return;
-        };
-
         for i in &self.model_asset.objects {
             let vertex_buffer = VertexBuffer::new(display, &i.vertices);
             match vertex_buffer {
@@ -486,6 +460,7 @@ impl MasterInstancedModelObject {
                         err
                     ));
                     self.error = true;
+                    //panic!();
                     return;
                 }
             }
@@ -493,9 +468,6 @@ impl MasterInstancedModelObject {
 
         let vertex_shader_source = &self.shader_asset.vertex_shader_source;
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
-
-        let vertex_shadow_shader_src = &shadow_shader.vertex_shader_source;
-        let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
 
         for _ in &self.model_asset.objects {
             let program = Program::from_source(
@@ -505,12 +477,6 @@ impl MasterInstancedModelObject {
                 None,
             );
 
-            let shadow_program = Program::from_source(
-                display,
-                &vertex_shadow_shader_src,
-                &fragment_shadow_shader_src,
-                None,
-            );
             match program {
                 Ok(prog) => self.program.push(prog),
                 Err(err) => {
@@ -519,18 +485,7 @@ impl MasterInstancedModelObject {
                         err
                     ));
                     self.error = true;
-                    return;
-                }
-            }
-
-            match shadow_program {
-                Ok(prog) => self.shadow_program.push(prog),
-                Err(err) => {
-                    error(&format!(
-                        "Mesh object error:\nprogram creation error(shadow)!\nErr: {}",
-                        err
-                    ));
-                    self.error = true;
+                    //panic!();
                     return;
                 }
             }
@@ -715,3 +670,11 @@ pub struct NodeTransform {
 pub enum ModelObjectError {
     AnimationNotFound,
 }
+
+#[derive(Clone, Copy)]
+pub struct Instance {
+    mvp: [[f32; 4]; 4],
+    model: [[f32; 4]; 4],
+}
+
+implement_vertex!(Instance, mvp, model);

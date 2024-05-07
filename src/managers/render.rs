@@ -254,11 +254,14 @@ pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextu
     );
 
     update_camera_vectors();
+
+    systems::render(&display, target, &cascades, shadow_textures);
+}
+
+pub fn update() {
     unsafe {
         INSTANCED_POSITIONS.clear();
     }
-
-    systems::render(&display, target, &cascades, shadow_textures);
 }
 
 /* some consts to make code cleaner */

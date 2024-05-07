@@ -175,6 +175,7 @@ pub fn start_game_without_render() {
 
 fn update_game(delta_time: Duration) {
     set_delta_time(delta_time);
+    render::update();
     physics::update();
     networking::update(delta_time);
     navigation::update();

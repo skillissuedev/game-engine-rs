@@ -3,7 +3,7 @@ use crate::{managers::{
     physics::ObjectBodyParameters,
     render::{self, Cascades, ShadowTextures},
 }, math_utils::deg_vec_to_rad};
-use glam::{Mat4, Quat, Vec3};
+use glam::{Mat4, Quat};
 use glium::{
     framebuffer::SimpleFrameBuffer, Display
 };
@@ -87,7 +87,7 @@ impl Object for InstancedModelObject {
     }
 
     fn object_type(&self) -> &str {
-        "ModelObject"
+        "InstancedModelObject"
     }
 
     fn set_name(&mut self, name: &str) {

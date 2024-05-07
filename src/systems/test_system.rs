@@ -165,6 +165,7 @@ impl System for TestSystem {
         grass_instance.set_position(Vec3::new(3.0, 0.0, 0.0), true);
         self.add_object(Box::new(grass_instance));
     }
+
     fn server_start(&mut self) {
         let ground_asset = ModelAsset::from_gltf("models/test_tile.gltf").unwrap();
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
