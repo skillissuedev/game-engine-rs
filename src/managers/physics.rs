@@ -82,6 +82,31 @@ pub fn remove_rigid_body(body_parameters: &mut ObjectBodyParameters) {
     }
 }
 
+pub fn remove_rigid_body_by_handle(handle: RigidBodyHandle) {
+    unsafe {
+        RIGID_BODY_SET.remove(
+            handle,
+            &mut ISLAND_MANAGER,
+            &mut COLLIDER_SET,
+            &mut IMPULSE_JOINT_SET,
+            &mut MULTIBODY_JOINT_SET,
+            true,
+        );
+    }
+}
+
+pub fn remove_collider_by_handle(handle: ColliderHandle) {
+    unsafe {
+        COLLIDER_SET.remove(
+            handle,
+            &mut ISLAND_MANAGER,
+            &mut RIGID_BODY_SET,
+            true
+        );
+    }
+}
+
+
 pub fn new_rigid_body(
     body_type: BodyType,
     transform: Option<Transform>,
@@ -255,7 +280,7 @@ pub fn collider_type_to_collider_builder(
                 }
                 None => (),
             }
-            dbg!(&positions_nalgebra, &indices);
+            //dbg!(&positions_nalgebra, &indices);
             collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
         }
     }

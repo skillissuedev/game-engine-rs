@@ -1,13 +1,13 @@
 pub mod test_system;
+pub mod main_system;
 
 use crate::{
     managers::{
-        networking::{self, Message, MessageReliability, NetworkError},
-        render::{Cascades, ShadowTextures},
-        systems::{register_object_id_name, register_object_id_system, CallList, SystemValue},
+        networking::{self, Message, MessageReliability, NetworkError}, physics, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
     },
     objects::Object,
 };
+use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 
@@ -117,11 +117,21 @@ pub trait System {
     }
 
     fn delete_object(&mut self, name: &str) {
-        for (idx, object) in self.objects_list().iter().enumerate() {
+        for (idx, object) in self.objects_list_mut().iter_mut().enumerate() {
             if object.name() == name {
+                if let Some(body_parameters) = object.body_parameters() {
+                    if let Some(handle) = body_parameters.rigid_body_handle {
+                        physics::remove_rigid_body_by_handle(handle);
+                    }
+                    if let Some(handle) = body_parameters.collider_handle {
+                        physics::remove_collider_by_handle(handle);
+                    }
+                }
+
                 self.objects_list_mut().remove(idx);
                 return;
             }
+            object.delete_child(name);
         }
     }
 
@@ -134,4 +144,6 @@ pub trait System {
             .expect("the last object does not exist(why?..)")
             .start();
     }
+
+    fn ui_render(&mut self, _ctx: &Context) {}
 }

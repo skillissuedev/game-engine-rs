@@ -1,5 +1,6 @@
 use super::debugger;
-use glium::glutin::event::{ElementState, MouseButton, VirtualKeyCode, WindowEvent};
+use glam::Vec2;
+use glium::glutin::event::{DeviceEvent, ElementState, MouseButton, VirtualKeyCode, WindowEvent};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -7,6 +8,11 @@ static mut BINDS: Lazy<HashMap<String, Vec<InputEventType>>> = Lazy::new(|| Hash
 static mut DOWN_EVENTS: Vec<InputEventType> = vec![];
 static mut JUST_PRESSED_EVENTS: Vec<InputEventType> = vec![];
 static mut UP_EVENTS: Vec<InputEventType> = vec![];
+
+static mut MOUSE_POSITION: Vec2 = Vec2::new(0.0, 0.0);
+static mut MOUSE_DELTA: Vec2 = Vec2::new(0.0, 0.0);
+static mut WINDOW_RESOLUTION: Vec2 = Vec2::new(0.0, 0.0);
+static mut IS_MOUSE_LOCKED: bool = false;
 
 pub fn new_bind(name: &str, input_events: Vec<InputEventType>) {
     unsafe {
@@ -27,6 +33,15 @@ pub fn get_bind_keys(name: String) -> Option<Vec<InputEventType>> {
         match BINDS.get(&name) {
             Some(bind) => Some(bind.to_owned()),
             None => None,
+        }
+    }
+}
+
+pub fn reg_device_event(event: &DeviceEvent) {
+    unsafe {
+        match event {
+            DeviceEvent::MouseMotion { delta } => MOUSE_DELTA = Vec2::new(delta.0 as f32, delta.1 as f32),
+            _ => ()
         }
     }
 }
@@ -99,6 +114,12 @@ pub fn reg_event(event: &WindowEvent) {
                     }
                 }
             }
+            WindowEvent::CursorMoved { device_id: _, position, modifiers: _ } => {
+                MOUSE_POSITION = Vec2::new(position.x as f32, position.y as f32);
+            }
+            WindowEvent::Resized(new_size) => {
+                WINDOW_RESOLUTION = Vec2::new(new_size.width as f32, new_size.height as f32)
+            }
             _ => (),
         }
     }
@@ -108,6 +129,7 @@ pub fn update() {
     unsafe {
         JUST_PRESSED_EVENTS.clear();
         UP_EVENTS.clear();
+        MOUSE_DELTA = Vec2::ZERO;
     }
 }
 
@@ -127,7 +149,7 @@ pub fn is_bind_pressed(requested_bind_name: &str) -> bool {
         }
     }
 
-    return false;
+    false
 }
 
 pub fn is_bind_down(requested_bind_name: &str) -> bool {
@@ -146,7 +168,7 @@ pub fn is_bind_down(requested_bind_name: &str) -> bool {
         }
     }
 
-    return false;
+    false
 }
 
 pub fn is_bind_up(requested_bind_name: &str) -> bool {
@@ -165,7 +187,40 @@ pub fn is_bind_up(requested_bind_name: &str) -> bool {
         }
     }
 
-    return false;
+    false
+}
+
+pub fn mouse_position() -> Vec2 {
+    unsafe {
+        let x = MOUSE_POSITION.x / WINDOW_RESOLUTION.x;
+        let y = -(MOUSE_POSITION.y / WINDOW_RESOLUTION.y);
+        Vec2::new(x, y)
+    }
+}
+
+pub fn mouse_delta() -> Vec2 {
+    unsafe {
+        MOUSE_DELTA
+    }
+}
+
+pub fn mouse_position_from_center() -> Vec2 {
+    unsafe {
+        let x = MOUSE_POSITION.x / WINDOW_RESOLUTION.x - 0.5;
+        let y = -(MOUSE_POSITION.y / WINDOW_RESOLUTION.y - 0.5);
+        Vec2::new(x, y)
+    }
+}
+
+pub fn is_mouse_locked() -> bool {
+    unsafe {
+        IS_MOUSE_LOCKED
+    }
+}
+pub fn set_mouse_locked(lock: bool) {
+    unsafe {
+        IS_MOUSE_LOCKED = lock
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

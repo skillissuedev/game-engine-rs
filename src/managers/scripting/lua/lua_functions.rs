@@ -11,7 +11,7 @@ use crate::{
     }, framework, managers::{
         self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems::{self, SystemValue}
     }, objects::{
-        camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
+        camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
     }, systems::System
 };
 use ez_al::SoundSourceType;
@@ -296,6 +296,132 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             }
             Err(err) => debugger::error(&format!(
                 "failed to create a function new_model_object in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        let new_master_instanced_model_object = lua.create_function_mut(
+            move |lua, (name, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
+            (String, String, Option<String>, Option<String>, Option<String>)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let texture_asset;
+                    match texture_asset_path {
+                        Some(path) => {
+                            let asset = TextureAsset::from_file(&path);
+                            match asset {
+                                Ok(asset) => texture_asset = Some(asset),
+                                Err(err) => {
+                                    debugger::warn(&format!("lua warning: error when calling new_master_instanced_model_object, failed to load texture asset!\nerr: {:?}", err));
+                                    texture_asset = None;
+                                },
+                            }
+                        },
+                        None => texture_asset = None,
+                    }
+                    let mut shader_asset_path = ShaderAssetPath {
+                        vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
+                        fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
+                    };
+                    if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
+                        shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
+                    }
+                    if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
+                        shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
+                    }
+                    let shader_asset = ShaderAsset::load_from_file(shader_asset_path);
+                    match shader_asset {
+                        Ok(shader_asset) => {
+                            let model_asset = ModelAsset::from_gltf(&model_asset_path);
+                            match model_asset {
+                                Ok(model_asset) => {
+                                    let object = MasterInstancedModelObject::new(&name, model_asset, texture_asset, shader_asset);
+                                    add_to_system_or_parent(lua, system, Box::new(object));
+                                },
+                                Err(err) => 
+                                    debugger::error(&format!("lua error: error when calling new_master_instanced_model_object, failed to load a model asset!\nerr: {:?}", err)),
+                            }
+                        },
+                        Err(err) => 
+                            debugger::error(&format!("lua error: error when calling new_master_instanced_model_object, failed to load a shader asset!\nerr: {:?}", err)),
+                    }
+                },
+                None => debugger::error("failed to call new_master_instanced_model_object, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_master_instanced_model_object {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_master_instanced_model_object", func) {
+                    debugger::error(&format!("failed to add a function new_master_instanced_model_object as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_master_instanced_model_object in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        let new_instanced_model_object = lua.create_function_mut(move |lua, (name, instance): (String, String)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let object = InstancedModelObject::new(&name, &instance);
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_instanced_model_object, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_instanced_model_object {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_instanced_model_object", func) {
+                    debugger::error(&format!("failed to add a function new_instanced_model_object as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_instanced_model_object in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        // transform = {{pos_x, pos_y, pos_z, rot_x, rot_y, rot_z, sc_x, sc_y, sc_z}, ...}
+        let new_instanced_model_transform_holder = lua.create_function_mut(move |lua, (name, instance, transforms): (String, String, Vec<[f32; 9]>)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let transforms = transforms.iter().map(|transform| {
+                        Transform {
+                            position: Vec3::new(transform[0], transform[1], transform[2]),
+                            rotation: Vec3::new(transform[3], transform[4], transform[5]),
+                            scale: Vec3::new(transform[6], transform[7], transform[8]),
+                        }
+                    }).collect();
+                    let object = InstancedModelTransformHolder::new(&name, &instance, transforms);
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_instanced_model_transform_holder, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match new_instanced_model_transform_holder {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_instanced_model_transform_holder", func) {
+                    debugger::error(&format!("failed to add a function new_instanced_model_transform_holder as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_instanced_model_transform_holder in system {}\nerror: {}",
                 system_id, err
             )),
         }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{math_utils::deg_to_rad, objects::instanced_model_object::SetupMatrixResult};
+use crate::math_utils::deg_to_rad;
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
     framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,
@@ -328,10 +328,13 @@ pub fn get_light_direction() -> Vec3 {
 pub fn get_view_matrix() -> Mat4 {
     unsafe {
         let mut camera_position = CAMERA_LOCATION.position.clone();
+        //camera_position.x = -camera_position.x;
+        //let old_x = camera_position.x;
         camera_position.x = -camera_position.x;
+        camera_position.z = -camera_position.z;
         Mat4::look_at_lh(
             camera_position,
-            camera_position - CAMERA_LOCATION.front,
+            camera_position + CAMERA_LOCATION.front,
             DEFAULT_UP_VECTOR,
         )
     }
@@ -344,15 +347,14 @@ pub fn get_projection_matrix() -> Mat4 {
 fn update_camera_vectors() {
     unsafe {
         let front = Vec3 {
-            x: CAMERA_LOCATION.rotation.y.to_radians().sin()
+            x: -CAMERA_LOCATION.rotation.y.to_radians().sin()
                 * CAMERA_LOCATION.rotation.x.to_radians().cos(),
-            y: CAMERA_LOCATION.rotation.y.to_radians().sin(),
-            z: CAMERA_LOCATION.rotation.x.to_radians().cos()
-                * CAMERA_LOCATION.rotation.y.to_radians().cos(),
+            y: -(CAMERA_LOCATION.rotation.x).to_radians().sin(),
+            z: -(CAMERA_LOCATION.rotation.y).to_radians().cos()
+                * -(CAMERA_LOCATION.rotation.x).to_radians().cos(),
         };
         CAMERA_LOCATION.front = front.normalize();
-        // Also re-calculate the Right and Up vector
-        CAMERA_LOCATION.right = CAMERA_LOCATION.front.cross(DEFAULT_UP_VECTOR).normalize(); // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
+        CAMERA_LOCATION.right = CAMERA_LOCATION.front.cross(DEFAULT_UP_VECTOR).normalize(); 
         CAMERA_LOCATION.up = CAMERA_LOCATION
             .right
             .cross(CAMERA_LOCATION.front)
@@ -365,7 +367,13 @@ pub fn get_camera_position() -> Vec3 {
 }
 
 pub fn get_camera_front() -> Vec3 {
-    unsafe { CAMERA_LOCATION.front }
+    let mut front = unsafe { CAMERA_LOCATION.front };
+    front.y = -front.y;
+    front
+}
+
+pub fn get_camera_right() -> Vec3 {
+    unsafe { CAMERA_LOCATION.right }
 }
 
 pub fn get_camera_rotation() -> Vec3 {
@@ -455,9 +463,9 @@ static mut RENDER_RAYS: Vec<RenderRay> = vec![];
 static mut RAY_SHADER: Option<Program> = None;
 static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
 
-static mut INSTANCED_POSITIONS: Lazy<HashMap<String, Vec<SetupMatrixResult>>> = Lazy::new(|| HashMap::new());
+static mut INSTANCED_POSITIONS: Lazy<HashMap<String, Vec<Mat4>>> = Lazy::new(|| HashMap::new());
 
-pub fn add_instance_position(instance: &str, position: SetupMatrixResult) {
+pub fn add_instance_position(instance: &str, position: Mat4) {
     unsafe {
         match INSTANCED_POSITIONS.get_mut(instance) {
             Some(positions) => positions.push(position),
@@ -468,7 +476,18 @@ pub fn add_instance_position(instance: &str, position: SetupMatrixResult) {
     }
 }
 
-pub fn get_instance_positions(instance: &str) -> Option<&Vec<SetupMatrixResult>> {
+pub fn add_instance_positions_vec(instance: &str, positions: &Vec<Mat4>) {
+    unsafe {
+        match INSTANCED_POSITIONS.get_mut(instance) {
+            Some(instanced_positions) => instanced_positions.extend(positions.iter()),
+            None => {
+                INSTANCED_POSITIONS.insert(instance.into(), positions.to_owned());
+            },
+        }
+    }
+}
+
+pub fn get_instance_positions(instance: &str) -> Option<&Vec<Mat4>> {
     unsafe {
         match INSTANCED_POSITIONS.get(instance) {
             Some(positions) => Some(positions),

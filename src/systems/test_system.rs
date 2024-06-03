@@ -3,20 +3,22 @@ use crate::{
     assets::{
         model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset,
         texture_asset::TextureAsset,
-    }, framework::set_global_system_value, managers::{
-        input::{self, InputEventType},
+    }, framework::{get_delta_time, set_global_system_value}, managers::{
+        input::{self, is_mouse_locked, set_mouse_locked, InputEventType},
         networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
         },
         physics::{BodyColliderType, BodyType, RenderColliderType},
-        render::{get_camera_position, set_camera_position, set_light_direction},
+        render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction},
         systems::{self, CallList, SystemValue},
     }, objects::{
-        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, master_instanced_model_onbject::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
+        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
     }
 };
+use egui_glium::egui_winit::egui::TextBuffer;
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
+use glium::glutin::event::VirtualKeyCode;
 
 pub struct TestSystem {
     pub is_destroyed: bool,
@@ -121,6 +123,10 @@ impl System for TestSystem {
         self.add_object(ground_collider);
         self.add_object(test_shadow_model);
 
+        input::new_bind(
+            "lock_mouse",
+            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::L)],
+        );
         input::new_bind(
             "forward",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)],
@@ -230,61 +236,75 @@ impl System for TestSystem {
     }
 
     fn client_update(&mut self) {
+        dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
         set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(camera_position.x, camera_position.y, camera_position.z)]);
 
-        if input::is_bind_down("cam_up") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y + 0.05,
-                camera_position.z,
-            ));
+        set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
+
+        //locking mouse
+        if input::is_bind_pressed("lock_mouse") {
+            set_mouse_locked(!is_mouse_locked());
         }
-        if input::is_bind_down("cam_down") {
-            let camera_position = get_camera_position();
+
+        // movement
+        let delta_time = get_delta_time().as_secs_f32();
+        let delta = input::mouse_delta();
+        let camera_rotation = get_camera_rotation();
+
+        set_camera_rotation(Vec3::new(camera_rotation.x - delta.y * 50.0 * delta_time, camera_rotation.y + delta.x * 50.0 * delta_time, camera_rotation.z));
+
+        let speed = 420.0 * delta_time;
+
+        let camera_front = get_camera_front();
+        let camera_right = get_camera_right();
+        let mut camera_position = get_camera_position();
+
+        if input::is_bind_down("cam_up") {
             set_camera_position(Vec3::new(
                 camera_position.x,
-                camera_position.y - 0.05,
+                camera_position.y + speed,
                 camera_position.z,
             ));
+            camera_position = get_camera_position();
+        }
+
+        if input::is_bind_down("cam_down") {
+            set_camera_position(Vec3::new(
+                camera_position.x,
+                camera_position.y - speed,
+                camera_position.z,
+            ));
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("forward") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y,
-                camera_position.z + 0.05,
-            ));
+            set_camera_position(camera_position + camera_front * speed);
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("backwards") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x,
-                camera_position.y,
-                camera_position.z - 0.05,
-            ));
+            set_camera_position(camera_position - camera_front * speed);
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("left") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x - 0.05,
-                camera_position.y,
-                camera_position.z,
-            ));
+            set_camera_position(camera_position - camera_right * speed);
+            camera_position = get_camera_position();
         }
 
         if input::is_bind_down("right") {
-            let camera_position = get_camera_position();
-            set_camera_position(Vec3::new(
-                camera_position.x + 0.05,
-                camera_position.y,
-                camera_position.z,
-            ));
+            set_camera_position(camera_position + camera_right * speed);
+            camera_position = get_camera_position();
+        }
+
+        if get_camera_rotation().x > 89.0 {
+            let rot = get_camera_rotation();
+            set_camera_rotation(Vec3::new(89.0, rot.y, rot.z));
+        } else if get_camera_rotation().x < -89.0 {
+            let rot = get_camera_rotation();
+            set_camera_rotation(Vec3::new(-89.0, rot.y, rot.z));
         }
     }
 
@@ -386,7 +406,7 @@ impl System for TestSystem {
     fn reg_message(&mut self, message: Message) {
         match message.contents {
             networking::MessageContents::SyncObject(sync_msg) => {
-                dbg!(&sync_msg);
+                //dbg!(&sync_msg);
                 if &sync_msg.object_name == "knife_model" {
                     let object = self.find_object_mut("knife_model");
                     object.unwrap().set_local_transform(sync_msg.transform);

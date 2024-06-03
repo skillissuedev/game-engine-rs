@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{objects::ObjectGroup, systems::System};
+use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use once_cell::sync::Lazy;
@@ -77,6 +78,16 @@ pub fn render(
     }
 }
 
+pub fn ui_render(
+    ctx: &Context,
+) {
+    unsafe {
+        for system in &mut SYSTEMS {
+            system.ui_render(ctx);
+        }
+    }
+}
+
 pub fn shadow_render(view_proj: &Mat4, display: &Display, target: &mut SimpleFrameBuffer) {
     unsafe {
         if !networking::is_server() {
@@ -106,8 +117,6 @@ pub fn add_system(system: Box<dyn System>) {
 
 pub fn register_object_id_name(id: u128, name: &str) {
     unsafe {
-        dbg!(id);
-        dbg!(name);
         match OBJECTS_ID_NAMES.get_mut(&id) {
             Some(name_in_map) => {
                 *name_in_map = name.into();

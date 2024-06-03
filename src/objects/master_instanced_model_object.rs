@@ -8,7 +8,7 @@ use crate::{
     managers::{
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
-        render::{self, Cascades, ShadowTextures, Vertex},
+        render::{self, get_projection_matrix, get_view_matrix, Cascades, ShadowTextures, Vertex},
     },
 };
 use egui_glium::egui_winit::egui::ComboBox;
@@ -16,7 +16,7 @@ use glam::{Mat4, Quat, Vec3};
 use glium::{
     framebuffer::SimpleFrameBuffer, implement_vertex, uniform, uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    }, vertex::EmptyInstanceAttributes, Display, IndexBuffer, Program, Surface, VertexBuffer
+    }, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -37,7 +37,6 @@ pub struct MasterInstancedModelObject {
     texture: Option<glium::texture::Texture2d>,
     vertex_buffer: Vec<VertexBuffer<Vertex>>,
     program: Vec<Program>,
-    shadow_program: Vec<Program>,
     started: bool,
     error: bool,
     inspector_anim_name: String,
@@ -82,7 +81,6 @@ impl MasterInstancedModelObject {
             texture: None,
             vertex_buffer: vec![],
             program: vec![],
-            shadow_program: vec![],
             started: false,
             error: false,
             animation_settings: CurrentAnimationSettings {
@@ -204,40 +202,31 @@ impl Object for MasterInstancedModelObject {
         _: &Cascades,
         _: &ShadowTextures,
     ) {
-        println!("MasterInstancedModelObject render!");
         //dbg!(&self.model_asset.objects);
         if self.error {
-            dbg!("error!");
             return;
         }
         if !self.started {
-            dbg!("not started!");
             self.start_mesh(display);
         }
-        println!("MasterInstancedModelObject render! 1");
 
         let matrices = match render::get_instance_positions(&self.name) {
             Some(matrices) => matrices,
             None => {
-                println!("MasterInstancedModelObject render! 1.5");
                 return
             },
         };
-        let instance_count = matrices.len();
-        
         let mut per_instance_data = Vec::new();
 
 
         for matrix in matrices {
             per_instance_data.push(Instance {
-                mvp: matrix.mvp.to_cols_array_2d(),
-                model: matrix.model.to_cols_array_2d(),
+                model: matrix.to_cols_array_2d(),
             });
         }
         let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
 
 
-        println!("MasterInstancedModelObject render! 2");
 
         //dbg!(&self.model_asset.objects);
         for i in 0..self.model_asset.objects.len() {
@@ -297,6 +286,8 @@ impl Object for MasterInstancedModelObject {
             };
 
             let uniforms = uniform! {
+                view: get_view_matrix().to_cols_array_2d(),
+                proj: get_projection_matrix().to_cols_array_2d(),
                 jointsMats: &joints,
                 jointsInverseBindMats: &inverse_bind_mats,
                 mesh: object.transform,
@@ -317,7 +308,6 @@ impl Object for MasterInstancedModelObject {
                 ..Default::default()
             };
 
-            dbg!("im rendering");
             target
                 .draw(
                     (&self.vertex_buffer[i], per_instance_buffer.per_instance().unwrap()),
@@ -673,8 +663,7 @@ pub enum ModelObjectError {
 
 #[derive(Clone, Copy)]
 pub struct Instance {
-    mvp: [[f32; 4]; 4],
     model: [[f32; 4]; 4],
 }
 
-implement_vertex!(Instance, mvp, model);
+implement_vertex!(Instance, model);

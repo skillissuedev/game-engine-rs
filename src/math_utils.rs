@@ -14,7 +14,7 @@ pub fn deg_vec_to_rad(deg_vec: Vec3) -> Vec3 {
     let y = deg_to_rad(deg_vec.y);
     let z = deg_to_rad(deg_vec.z);
 
-    return Vec3::new(x, y, z);
+    Vec3::new(x, y, z)
 }
 
 pub fn rad_vec_to_deg(rad_vec: Vec3) -> Vec3 {
@@ -22,5 +22,5 @@ pub fn rad_vec_to_deg(rad_vec: Vec3) -> Vec3 {
     let y = rad_to_deg(rad_vec.y);
     let z = rad_to_deg(rad_vec.z);
 
-    return Vec3::new(x, y, z);
+    Vec3::new(x, y, z)
 }

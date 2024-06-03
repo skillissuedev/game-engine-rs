@@ -17,7 +17,8 @@ pub mod character_controller;
 pub mod empty_object;
 pub mod model_object;
 pub mod instanced_model_object;
-pub mod master_instanced_model_onbject;
+pub mod master_instanced_model_object;
+pub mod instanced_model_transform_holder;
 pub mod nav_obstacle;
 pub mod navmesh;
 pub mod ray;
@@ -226,9 +227,26 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn add_child(&mut self, mut object: Box<dyn Object>) {
         object.set_parent_transform(self.global_transform());
-        dbg!(object.object_id());
         self.children_list_mut().push(object);
         self.children_list_mut().last_mut().unwrap().start();
+    }
+
+    fn delete_child(&mut self, name: &str) {
+        for (idx, object) in self.children_list_mut().iter_mut().enumerate() {
+            if object.name() == name {
+                if let Some(body_parameters) = object.body_parameters() {
+                    if let Some(handle) = body_parameters.rigid_body_handle {
+                        physics::remove_rigid_body_by_handle(handle);
+                    }
+                    if let Some(handle) = body_parameters.collider_handle {
+                        physics::remove_collider_by_handle(handle);
+                    }
+                }
+                self.children_list_mut().remove(idx);
+                return;
+            }
+            object.delete_child(name);
+        }
     }
 
     fn build_object_rigid_body(
@@ -280,7 +298,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
 impl_downcast!(Object);
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Transform {
     pub position: Vec3,
     pub rotation: Vec3,

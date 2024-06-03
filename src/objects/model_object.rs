@@ -24,7 +24,6 @@ use glium::{
 };
 use std::time::Instant;
 
-#[derive(Debug)]
 pub struct ModelObject {
     name: String,
     transform: Transform,
@@ -98,6 +97,20 @@ impl ModelObject {
             id: gen_object_id(),
             inspector_anim_name: "None".into(),
         }
+    }
+}
+
+impl std::fmt::Debug for ModelObject {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ModelObject")
+            .field("name", &self.name)
+            .field("object_type", &self.object_type())
+            .field("transform", &self.transform)
+            .field("parent_transform", &self.parent_transform)
+            .field("children", &self.children)
+            .field("looping", &self.is_looping())
+            .finish()
     }
 }
 
@@ -398,11 +411,9 @@ impl Object for ModelObject {
             let draw_params = glium::DrawParameters {
                 depth: glium::Depth {
                     test: glium::draw_parameters::DepthTest::IfLessOrEqual, // set to IfLess if it
-                    // won't work
                     write: true,
                     ..Default::default()
                 },
-                //blend: glium::draw_parameters::Blend::alpha_blending(),
                 backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
                 ..Default::default()
             };
@@ -565,7 +576,7 @@ impl ModelObject {
         let full_translation = Vec3::new(
             model_object_translation[0] + translation_vector.x,
             model_object_translation[1] + translation_vector.y,
-            model_object_translation[2] + translation_vector.z,
+            -(model_object_translation[2] + translation_vector.z),
         );
         let full_scale = Vec3::new(
             model_object_scale[0] + scale_vector.x,

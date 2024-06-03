@@ -6,7 +6,7 @@ use crate::{
 };
 use crate::objects::Object;
 use glam::Vec3;
-use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
+use mlua::{Error, FromLua, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, fs};
 
@@ -679,7 +679,6 @@ impl UserData for ObjectHandle {
                 Ok(None)
             },
         );
-        // i fucking hate my life
 
         methods.add_method(
             "groups_list",
@@ -788,7 +787,6 @@ impl UserData for ObjectHandle {
         );
 
 
-        // ah shit, here we go again
         // object-specific methods:
         methods.add_method("play_animation", |_, this, anim_name: String| {
             match systems::get_system_mut_with_id(&this.system_id) {
@@ -1162,6 +1160,7 @@ impl UserData for ObjectHandle {
 
             Ok(())
         });
+        // i could've used a macro
     }
 }
 

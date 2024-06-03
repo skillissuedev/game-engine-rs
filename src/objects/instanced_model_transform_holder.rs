@@ -9,7 +9,7 @@ use glium::{
 };
 
 #[derive(Debug)]
-pub struct InstancedModelObject {
+pub struct InstancedModelTransformHolder {
     name: String,
     transform: Transform,
     parent_transform: Option<Transform>,
@@ -17,16 +17,18 @@ pub struct InstancedModelObject {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    instance: String
+    instance: String,
+    mats: Vec<Mat4>
 }
 
-impl InstancedModelObject {
+impl InstancedModelTransformHolder {
     pub fn new(
         name: &str,
-        instance: &str
+        instance: &str,
+        transforms: Vec<Transform>
     ) -> Self {
 
-        InstancedModelObject {
+        InstancedModelTransformHolder {
             transform: Transform::default(),
             children: vec![],
             name: name.to_string(),
@@ -34,19 +36,18 @@ impl InstancedModelObject {
             groups: vec![],
             body: None,
             id: gen_object_id(),
-            instance: instance.into()
+            instance: instance.into(),
+            mats: Self::transforms_to_mats(transforms),
         }
     }
 }
 
-impl InstancedModelObject {
-    fn setup_mat(&self) -> Mat4 {
-        let global_transform = &self.global_transform();
-
-        let rotation_vector = deg_vec_to_rad(global_transform.rotation);
-        let mut translation_vector = global_transform.position;
+impl InstancedModelTransformHolder {
+    fn setup_mat(transform: &Transform) -> Mat4 {
+        let rotation_vector = deg_vec_to_rad(transform.rotation);
+        let mut translation_vector = transform.position;
         translation_vector.z = -translation_vector.z;
-        let scale_vector = global_transform.scale;
+        let scale_vector = transform.scale;
 
         let rotation_quat = Quat::from_euler(
             glam::EulerRot::XYZ,
@@ -56,21 +57,22 @@ impl InstancedModelObject {
         let transform =
             Mat4::from_scale_rotation_translation(scale_vector, rotation_quat, translation_vector);
         transform
+    }
 
-        //let view = render::get_view_matrix();
-        //let proj = render::get_projection_matrix();
+    pub fn set_transforms(&mut self, transforms: Vec<Transform>) {
+        self.mats = Self::transforms_to_mats(transforms);
+    }
 
-        //let mvp = proj * view * transform;
-
-
+    fn transforms_to_mats(transforms: Vec<Transform>) -> Vec<Mat4> { 
+        transforms.iter().map(|tr| Self::setup_mat(tr)).collect::<Vec<Mat4>>()
     }
 }
 
-impl Object for InstancedModelObject {
+impl Object for InstancedModelTransformHolder {
     fn start(&mut self) {}
 
     fn update(&mut self) {
-        render::add_instance_position(&self.instance, self.setup_mat());
+        render::add_instance_positions_vec(&self.instance, &self.mats);
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -86,7 +88,7 @@ impl Object for InstancedModelObject {
     }
 
     fn object_type(&self) -> &str {
-        "InstancedModelObject"
+        "InstancedModelTransformHolder"
     }
 
     fn set_name(&mut self, name: &str) {
