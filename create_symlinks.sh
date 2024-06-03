@@ -1,6 +1,6 @@
 #!/bin/bash
 
 cd target/release/
-ln -s ../../../baldej_assets assets
+ln -s ../../../game_assets assets
 cd ../debug/
-ln -s ../../../baldej_assets assets
+ln -s ../../../game_assets assets
