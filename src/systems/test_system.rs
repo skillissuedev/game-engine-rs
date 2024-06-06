@@ -236,7 +236,7 @@ impl System for TestSystem {
     }
 
     fn client_update(&mut self) {
-        dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
+        //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
         set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(camera_position.x, camera_position.y, camera_position.z)]);

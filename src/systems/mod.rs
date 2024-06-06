@@ -1,5 +1,7 @@
 pub mod test_system;
 pub mod main_system;
+pub mod world_generator;
+pub mod player_manager;
 
 use crate::{
     managers::{

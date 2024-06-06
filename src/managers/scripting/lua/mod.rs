@@ -35,7 +35,6 @@ impl LuaSystem {
                 };
 
                 let load_result = lua.load(script).exec();
-                dbg!(&load_result);
 
                 match load_result {
                     Ok(_) => {
@@ -1280,7 +1279,6 @@ impl UserData for Message {
                     Ok(None)
                 },
                 crate::managers::networking::MessageType::FromClient(sender) => {
-                    dbg!(&sender);
                     Ok(Some(sender.to_string()))
                 },
             }

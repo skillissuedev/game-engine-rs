@@ -9,7 +9,7 @@ use crate::{
         sound_asset::SoundAsset,
         texture_asset::TextureAsset,
     }, framework, managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems::{self, SystemValue}
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, saves, systems::{self, SystemValue}
     }, objects::{
         camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
     }, systems::System
@@ -1176,6 +1176,96 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             }
             Err(err) => debugger::error(&format!(
                 "failed to create a function set_global_system_value in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let register_save_value = lua.create_function_mut(
+            move |_, value_name: String| {
+                Ok(saves::register_save_value(&value_name))
+            }
+        );
+
+        match register_save_value {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("register_save_value", func) {
+                    debugger::error(&format!("failed to add a function register_save_value as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function register_save_value in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let unregister_save_value = lua.create_function_mut(
+            move |_, value_name: String| {
+                Ok(saves::unregister_save_value(&value_name))
+            }
+        );
+
+        match unregister_save_value {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("unregister_save_value", func) {
+                    debugger::error(&format!("failed to add a function unregister_save_value as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function unregister_save_value in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let save_game = lua.create_function_mut(
+            move |_, (): ()| {
+                Ok(saves::save_game())
+            }
+        );
+
+        match save_game {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("save_game", func) {
+                    debugger::error(&format!("failed to add a function save_game as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function save_game in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let new_save = lua.create_function_mut(
+            move |_, save_name: String| {
+                Ok(saves::new_save(&save_name).unwrap())
+            }
+        );
+
+        match new_save {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_save", func) {
+                    debugger::error(&format!("failed to add a function new_save as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_save in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        let load_save = lua.create_function_mut(
+            move |_, save_name: String| {
+                Ok(saves::load_save(&save_name).unwrap())
+            }
+        );
+
+        match load_save {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("load_save", func) {
+                    debugger::error(&format!("failed to add a function load_save as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function load_save in system {}\nerror: {}",
                 system_id, err
             )),
         }

@@ -5,6 +5,7 @@ use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
 use super::{
     debugger, networking, render::{Cascades, ShadowTextures}
@@ -180,7 +181,7 @@ pub struct CallList {
     pub mut_call: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SystemValue {
     String(String),
     Int(i32),

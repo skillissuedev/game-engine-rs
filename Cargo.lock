@@ -1118,6 +1118,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "game"
+version = "0.1.0"
+dependencies = [
+ "bitmask-enum",
+ "chron",
+ "colored",
+ "data-url",
+ "downcast-rs",
+ "egui_glium",
+ "ez_al",
+ "glam",
+ "glium",
+ "gltf",
+ "glutin",
+ "grid_pathfinding",
+ "grid_util",
+ "image",
+ "machineid-rs",
+ "mlua",
+ "nalgebra",
+ "once_cell",
+ "rand",
+ "rapier3d",
+ "renet",
+ "serde",
+ "serde_bare",
+ "serde_json",
+ "splines",
+ "toml",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2245,38 +2277,6 @@ checksum = "79528bef70da112116feb5ecb6b64f1394e5360660d6474a760789ea07885501"
 dependencies = [
  "proc-macro2",
  "syn 2.0.52",
-]
-
-[[package]]
-name = "projectbaldej"
-version = "0.1.0"
-dependencies = [
- "bitmask-enum",
- "chron",
- "colored",
- "data-url",
- "downcast-rs",
- "egui_glium",
- "ez_al",
- "glam",
- "glium",
- "gltf",
- "glutin",
- "grid_pathfinding",
- "grid_util",
- "image",
- "machineid-rs",
- "mlua",
- "nalgebra",
- "once_cell",
- "rand",
- "rapier3d",
- "renet",
- "serde",
- "serde_bare",
- "serde_json",
- "splines",
- "toml",
 ]
 
 [[package]]
