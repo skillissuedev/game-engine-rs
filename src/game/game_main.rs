@@ -13,8 +13,6 @@ pub fn start() {
         vec![InputEventType::Key(VirtualKeyCode::Grave)],
     );
 
-    dbg!(load_save("save1.json"));
-
     //add_system(Box::new(TestSystem::new()));
     add_system(Box::new(PlayerManager::new()));
     //add_system(Box::new(WorldGenerator::new()));

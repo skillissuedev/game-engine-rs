@@ -32,11 +32,14 @@ pub fn load_save(save_name: &str) -> Result<(), ()> {
     let values: Result<HashMap<&str, Vec<SystemValue>>, serde_json::Error> = serde_json::from_str(&json);
     match values {
         Ok(values) => {
-            for (key, value) in values {
-                framework::set_global_system_value(key, value);
-            };
-            unsafe { CURRENT_SAVE_FILE = Some(save_name.into()) }
-            Ok(())
+            unsafe {
+                for (key, value) in values {
+                    SAVE_SYSTEM_VALUES.push(key.into());
+                    framework::set_global_system_value(key, value);
+                };
+                CURRENT_SAVE_FILE = Some(save_name.into());
+                Ok(())
+            }
         },
         Err(err) => {
             unsafe { CURRENT_SAVE_FILE = Some(save_name.into()) }

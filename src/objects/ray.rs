@@ -9,9 +9,8 @@ use crate::{
         render,
         ui::Vec3Inspector,
     },
-    math_utils::deg_vec_to_rad,
 };
-use glam::{Mat4, Quat, Vec3, Vec4};
+use glam::Vec3;
 use rapier3d::{geometry::InteractionGroups, pipeline::QueryFilter};
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
