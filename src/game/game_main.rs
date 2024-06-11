@@ -18,6 +18,7 @@ pub fn start() {
     //add_system(Box::new(WorldGenerator::new()));
     add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()));
     add_system(Box::new(LuaSystem::new("world_generator", "scripts/lua/world_generation.lua").unwrap()));
+    add_system(Box::new(LuaSystem::new("tile1", "scripts/lua/tile1.lua").unwrap()));
 }
 
 pub fn update() {

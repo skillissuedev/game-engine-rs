@@ -9,13 +9,14 @@ use crate::{
         sound_asset::SoundAsset,
         texture_asset::TextureAsset,
     }, framework, managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, saves, systems::{self, SystemValue}
+        self, debugger, input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, saves, systems::{self, SystemValue}
     }, objects::{
         camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
     }, systems::System
 };
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
+use glutin::event::{MouseButton, VirtualKeyCode};
 use mlua::Lua;
 
 pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
@@ -1268,6 +1269,221 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 "failed to create a function load_save in system {}\nerror: {}",
                 system_id, err
             )),
+        }
+
+        let new_bind_keyboard = lua.create_function_mut(
+            move |_, (bind_name, keycode): (String, String)| {
+                match serde_json::from_str::<VirtualKeyCode>(&keycode.replace("\"", "")) {
+                    Ok(keycode) => input::new_bind(&bind_name, vec![InputEventType::Key(keycode)]),
+                    Err(err) => 
+                        debugger::error(&format!("new_bind_keyboard error!\nUnable to create bind '{}': failed to parse keycode {}\nerr: {}", bind_name, keycode, err)),
+                }
+
+                Ok(())
+            }
+        );
+
+        match new_bind_keyboard {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_bind_keyboard", func) {
+                    debugger::error(&format!("failed to add a function new_bind_keyboard as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function new_bind_keyboard in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let new_bind_mouse = lua.create_function_mut(
+            move |_, (bind_name, mouse_button): (String, String)| { // mouse_button = Left/Right/Middle
+                match serde_json::from_str::<MouseButton>(&mouse_button.replace("\"", "")) {
+                    Ok(mouse_button) => input::new_bind(&bind_name, vec![InputEventType::Mouse(mouse_button)]),
+                    Err(err) => 
+                        debugger::error(&format!("new_bind_mouse error!\nUnable to create bind '{}': failed to parse mouse button {}\nerr: {}", bind_name, mouse_button, err)),
+                }
+
+                Ok(())
+            }
+        );
+
+        match new_bind_mouse {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_bind_mouse", func) {
+                    debugger::error(&format!("failed to add a function new_bind_mouse as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function new_bind_mouse in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let is_bind_pressed = lua.create_function_mut(
+            move |_, bind_name: String| {
+                Ok(input::is_bind_pressed(&bind_name))
+            }
+        );
+
+        match is_bind_pressed {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("is_bind_pressed", func) {
+                    debugger::error(&format!("failed to add a function is_bind_pressed as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function is_bind_pressed in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let is_bind_down = lua.create_function_mut(
+            move |_, bind_name: String| {
+                Ok(input::is_bind_down(&bind_name))
+            }
+        );
+
+        match is_bind_down {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("is_bind_down", func) {
+                    debugger::error(&format!("failed to add a function is_bind_down as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function is_bind_down in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let is_bind_released = lua.create_function_mut(
+            move |_, bind_name: String| {
+                Ok(input::is_bind_released(&bind_name))
+            }
+        );
+
+        match is_bind_released {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("is_bind_released", func) {
+                    debugger::error(&format!("failed to add a function is_bind_released as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function is_bind_released in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let mouse_position = lua.create_function_mut(
+            move |_, (): ()| {
+                let position = input::mouse_position();
+                Ok(vec![position.x, position.y])
+            }
+        );
+
+        match mouse_position {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("mouse_position", func) {
+                    debugger::error(&format!("failed to add a function mouse_position as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function mouse_position in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let mouse_position = lua.create_function_mut(
+            move |_, (): ()| {
+                let position = input::mouse_position();
+                Ok(vec![position.x, position.y])
+            }
+        );
+
+        match mouse_position {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("mouse_position", func) {
+                    debugger::error(&format!("failed to add a function mouse_position as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function mouse_position in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let mouse_delta = lua.create_function_mut(
+            move |_, (): ()| {
+                let delta = input::mouse_delta();
+                Ok(vec![delta.x, delta.y])
+            }
+        );
+
+        match mouse_delta {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("mouse_delta", func) {
+                    debugger::error(&format!("failed to add a function mouse_delta as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function mouse_delta in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let is_mouse_locked = lua.create_function_mut(
+            move |_, (): ()| {
+                Ok(input::is_mouse_locked())
+            }
+        );
+
+        match is_mouse_locked {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("is_mouse_locked", func) {
+                    debugger::error(&format!("failed to add a function is_mouse_locked as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function is_mouse_locked in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
+        }
+
+        let set_mouse_locked = lua.create_function_mut(
+            move |_, lock: bool| {
+                Ok(input::set_mouse_locked(lock))
+            }
+        );
+
+        match set_mouse_locked {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("set_mouse_locked", func) {
+                    debugger::error(&format!("failed to add a function set_mouse_locked as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function set_mouse_locked in system {}\nerror: {}",
+                    system_id, err
+                )
+            ),
         }
     }
 }

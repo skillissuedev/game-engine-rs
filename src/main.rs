@@ -1,4 +1,4 @@
-use std::{env, net::Ipv4Addr};
+use std::net::Ipv4Addr;
 
 use clap::Parser;
 use framework::DebugMode;
@@ -28,7 +28,7 @@ fn main() {
                 seed = arg_seed;
             },
             None => {
-                println!("New save seed isn't specified. Setting to a rangdom one.");
+                println!("New save seed isn't specified. Setting a random one.");
                 seed = rand::thread_rng().gen_range(1..u32::MAX);
             },
         }

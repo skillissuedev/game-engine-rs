@@ -171,7 +171,7 @@ pub fn is_bind_down(requested_bind_name: &str) -> bool {
     false
 }
 
-pub fn is_bind_up(requested_bind_name: &str) -> bool {
+pub fn is_bind_released(requested_bind_name: &str) -> bool {
     let events = unsafe { &UP_EVENTS };
     let binds = unsafe { &BINDS };
 
@@ -217,6 +217,7 @@ pub fn is_mouse_locked() -> bool {
         IS_MOUSE_LOCKED
     }
 }
+
 pub fn set_mouse_locked(lock: bool) {
     unsafe {
         IS_MOUSE_LOCKED = lock
@@ -229,9 +230,3 @@ pub enum InputEventType {
     Mouse(MouseButton),
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum InputEventPressType {
-    JustPressed,
-    Down,
-    Up,
-}
