@@ -62,7 +62,7 @@ impl System for PlayerManager {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
-        set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(camera_position.x, camera_position.y, camera_position.z)]);
+        set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(-camera_position.x, camera_position.y, camera_position.z)]);
 
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
@@ -128,6 +128,7 @@ impl System for PlayerManager {
             let rot = get_camera_rotation();
             set_camera_rotation(Vec3::new(-89.0, rot.y, rot.z));
         }
+        //println!("{}", get_camera_position());
     }
 
     fn server_update(&mut self) {
@@ -172,4 +173,5 @@ impl System for PlayerManager {
         None
     }
 }
+
 

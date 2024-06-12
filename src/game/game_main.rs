@@ -3,8 +3,9 @@ use glium::glutin::event::VirtualKeyCode;
 use crate::{
     framework::{get_debug_mode, set_debug_mode, DebugMode},
     managers::{
-        input::{self, InputEventType}, saves::{load_save, new_save}, scripting::lua::LuaSystem, systems::add_system
-    }, systems::player_manager::PlayerManager,
+        input::{self, InputEventType}, scripting::lua::LuaSystem, systems::add_system
+    },
+    systems::player_manager::PlayerManager
 };
 
 pub fn start() {

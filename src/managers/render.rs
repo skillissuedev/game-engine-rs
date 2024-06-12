@@ -328,8 +328,6 @@ pub fn get_light_direction() -> Vec3 {
 pub fn get_view_matrix() -> Mat4 {
     unsafe {
         let mut camera_position = CAMERA_LOCATION.position.clone();
-        //camera_position.x = -camera_position.x;
-        //let old_x = camera_position.x;
         camera_position.x = -camera_position.x;
         camera_position.z = -camera_position.z;
         Mat4::look_at_lh(

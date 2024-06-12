@@ -1485,6 +1485,74 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 )
             ),
         }
+
+        let system_id_for_functions = system_id.clone();
+        let multiple_new_model_objects = lua.create_function_mut(
+            move |lua, (names, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
+            (Vec<String>, String, Option<String>, Option<String>, Option<String>)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let texture_asset;
+                    match texture_asset_path {
+                        Some(path) => {
+                            let asset = TextureAsset::from_file(&path);
+                            match asset {
+                                Ok(asset) => texture_asset = Some(asset),
+                                Err(err) => {
+                                    debugger::warn(&format!("lua warning: error when calling new_model_object, failed to load texture asset!\nerr: {:?}", err));
+                                    texture_asset = None;
+                                },
+                            }
+                        },
+                        None => texture_asset = None,
+                    }
+                    let mut shader_asset_path = ShaderAssetPath {
+                        vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
+                        fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
+                    };
+                    if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
+                        shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
+                    }
+                    if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
+                        shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
+                    }
+                    let shader_asset = ShaderAsset::load_from_file(shader_asset_path);
+                    match shader_asset {
+                        Ok(shader_asset) => {
+                            let model_asset = ModelAsset::from_gltf(&model_asset_path);
+                            match model_asset {
+                                Ok(model_asset) => {
+                                    for name in names {
+                                        let object = ModelObject::new(&name, model_asset.clone(), texture_asset.clone(), shader_asset.clone());
+                                        add_to_system_or_parent(lua, system, Box::new(object));
+                                    }
+                                },
+                                Err(err) => 
+                                    debugger::error(&format!("lua error: error when calling new_model_object, failed to load a model asset!\nerr: {:?}", err)),
+                            }
+                        },
+                        Err(err) => 
+                            debugger::error(&format!("lua error: error when calling new_model_object, failed to load a shader asset!\nerr: {:?}", err)),
+                    }
+                },
+                None => debugger::error("failed to call new_model_object, system not found"),
+            }
+            
+            Ok(())
+        });
+
+        match multiple_new_model_objects {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("multiple_new_model_objects", func) {
+                    debugger::error(&format!("failed to add a function multiple_new_model_objects as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function multiple_new_model_objects in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
     }
 }
 

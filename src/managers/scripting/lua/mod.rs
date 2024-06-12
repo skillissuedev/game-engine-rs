@@ -1213,6 +1213,7 @@ fn lua_body_render_colliders_and_groups_to_rust(object_name: String, object_syst
 
     (render_collider_type, body_type, membership, filter)
 }
+
 impl UserData for Message {
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method("contents_type", |_, this, _: ()| {
@@ -1228,7 +1229,7 @@ impl UserData for Message {
                     Ok(Some(message.object_name.to_string()))
                 },
                 MessageContents::Custom(_) => {
-                    debugger::error(&"lua error: get_sync_object_name in Message failed! the contents_type != 'SyncObject'");
+                    debugger::error(&"lua error: sync_object_name in Message failed! the contents_type != 'SyncObject'");
                     Ok(None)
                 },
             }
@@ -1250,7 +1251,7 @@ impl UserData for Message {
                     Ok(Some(pos_rot_scale))
                 },
                 MessageContents::Custom(_) => {
-                    debugger::error(&"lua error: get_sync_object_name in Message failed! the contents_type != 'SyncObject'");
+                    debugger::error(&"lua error: sync_object_pos_rot_scale in Message failed! the contents_type != 'SyncObject'");
                     Ok(None)
                 },
             }
@@ -1293,47 +1294,8 @@ impl UserData for Message {
     }
 }
 
-/*
-impl<'lua> FromLuaMulti<'lua> for SystemValue {
-    fn from_lua_multi(values: mlua::prelude::LuaMultiValue<'lua>, _lua: &'lua mlua::prelude::Lua) -> mlua::prelude::LuaResult<Self> {
-        if values.len() == 1 {
-            if let Some(value) = values.get(0) {
-                if let Some(value) = value.as_f32() {
-                    return Ok(SystemValue::Float(value));
-                } 
-                if let Some(value) = value.as_string() {
-                    return Ok(SystemValue::String(String::from(value.to_str().unwrap())));
-                } 
-                if let Some(value) = value.as_u32() {
-                    return Ok(SystemValue::UInt(value));
-                }
-                if let Some(value) = value.as_i32() {
-                    return Ok(SystemValue::Int(value));
-                }
-                if let Some(value) = value.as_boolean() {
-                    return Ok(SystemValue::Bool(value));
-                }
-                if let Some(value) = value.as_table() {
-                    let x: Result<f32, Error> = value.get(1);
-                    let y: Result<f32, Error> = value.get(2);
-                    let z: Result<f32, Error> = value.get(3);
-                    if let (Ok(x), Ok(y), Ok(z)) = (x.clone(), y, z) {
-                        return Ok(SystemValue::Vec3(x, y, z));
-                    } 
-                    if let Err(x) = x {
-                        println!("{}", x);
-                    }
-                }
-            }
-        } else {
-            debugger::error("FromLua for SystemValue failed! values.len != 1");
-        }
-        Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
-    }
-}*/
-
 impl<'lua> FromLua<'lua> for SystemValue {
-    fn from_lua(value: mlua::prelude::LuaValue<'lua>, lua: &'lua Lua) -> mlua::prelude::LuaResult<Self> {
+    fn from_lua(value: mlua::prelude::LuaValue<'lua>, _: &'lua Lua) -> mlua::prelude::LuaResult<Self> {
         if let Some(value) = value.as_f32() {
             return Ok(SystemValue::Float(value));
         } 
@@ -1376,3 +1338,5 @@ impl<'lua> IntoLua<'lua> for SystemValue {
         }
     }
 }
+
+impl UserData for ModelAsset {}
