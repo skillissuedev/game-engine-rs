@@ -79,7 +79,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = display.gl_window().window().inner_size().width;
     let mut win_h = display.gl_window().window().inner_size().height;
 
-    let shadow_textures = ShadowTextures::new(&display, 8192, 4096);
+    let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
 
     event_loop.run(move |ev, _, control_flow| {
         match ev {

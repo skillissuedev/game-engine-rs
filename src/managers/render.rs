@@ -232,12 +232,12 @@ pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextu
 
     let mut closest_shadow_fbo =
         SimpleFrameBuffer::depth_only(display, &shadow_textures.closest).unwrap();
-    closest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
     closest_shadow_fbo.clear_depth(1.0);
 
     let mut furthest_shadow_fbo =
         SimpleFrameBuffer::depth_only(display, &shadow_textures.furthest).unwrap();
-    furthest_shadow_fbo.clear_color(1.0, 1.0, 1.0, 1.0);
+    furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
     furthest_shadow_fbo.clear_depth(1.0);
 
     let view = get_view_matrix();
@@ -638,7 +638,7 @@ impl SunCamera {
             corners.max_y + 50.0,
             corners.min_z - 100.0,
             //corners.min_z + corners.max_z / 2.0,
-            corners.max_z + 100.0,
+            corners.max_z + 200.0,
         )
     }
 
@@ -737,9 +737,9 @@ impl CameraCorners {
         }
     }
 
-    pub fn get_sun_eye(&self) -> Vec3 {
+    /*pub fn get_sun_eye(&self) -> Vec3 {
         Vec3::new(self.min_x, self.max_y, self.min_z)
-    }
+    }*/
 
     pub fn new(start_distance: f32, end_distance: Option<f32>, view: Mat4) -> CameraCorners {
         let corners =

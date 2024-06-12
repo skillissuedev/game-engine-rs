@@ -122,11 +122,11 @@ pub trait System {
         for (idx, object) in self.objects_list_mut().iter_mut().enumerate() {
             if object.name() == name {
                 if let Some(body_parameters) = object.body_parameters() {
-                    if let Some(handle) = body_parameters.rigid_body_handle {
-                        physics::remove_rigid_body_by_handle(handle);
-                    }
                     if let Some(handle) = body_parameters.collider_handle {
                         physics::remove_collider_by_handle(handle);
+                    }
+                    if let Some(handle) = body_parameters.rigid_body_handle {
+                        physics::remove_rigid_body_by_handle(handle);
                     }
                 }
 

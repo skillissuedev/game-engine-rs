@@ -101,7 +101,7 @@ pub fn remove_collider_by_handle(handle: ColliderHandle) {
             handle,
             &mut ISLAND_MANAGER,
             &mut RIGID_BODY_SET,
-            true
+            false
         );
     }
 }
