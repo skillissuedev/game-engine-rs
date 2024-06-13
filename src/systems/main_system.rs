@@ -355,7 +355,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
         self.add_object(Box::new(cube));
 
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
-        input::new_bind(
+        /*input::new_bind(
             "forward",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)],
         );
@@ -393,7 +393,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
                 InputEventType::Key(glium::glutin::event::VirtualKeyCode::Return),
                 InputEventType::Mouse(glium::glutin::event::MouseButton::Right)
             ],
-        );
+        );*/
     }
 
     fn server_start(&mut self) {}

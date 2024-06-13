@@ -8,6 +8,7 @@ use crate::{
     }, objects::Object
 };
 use glam::Vec3;
+use winit::keyboard::KeyCode;
 
 pub struct PlayerManager {
     pub is_destroyed: bool,
@@ -27,31 +28,31 @@ impl System for PlayerManager {
     fn client_start(&mut self) {
         input::new_bind(
             "lock_mouse",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::L)],
+            vec![InputEventType::Key(KeyCode::KeyL)],
         );
         input::new_bind(
             "forward",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)],
+            vec![InputEventType::Key(KeyCode::KeyW)],
         );
         input::new_bind(
             "left",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)],
+            vec![InputEventType::Key(KeyCode::KeyA)],
         );
         input::new_bind(
             "backwards",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::S)],
+            vec![InputEventType::Key(KeyCode::KeyS)],
         );
         input::new_bind(
             "right",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::D)],
+            vec![InputEventType::Key(KeyCode::KeyD)],
         );
         input::new_bind(
             "cam_up",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::Q)],
+            vec![InputEventType::Key(KeyCode::KeyQ)],
         );
         input::new_bind(
             "cam_down",
-            vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
+            vec![InputEventType::Key(KeyCode::KeyE)],
         );
     }
 

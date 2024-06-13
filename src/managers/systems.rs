@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{objects::ObjectGroup, systems::System};
 use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -59,7 +59,7 @@ pub fn get_systems_iter<'a>() -> std::slice::Iter<'a, Box<dyn System>> {
 }
 
 pub fn render(
-    display: &Display,
+    display: &Display<WindowSurface>,
     target: &mut Frame,
     cascades: &Cascades,
     shadow_textures: &ShadowTextures,
@@ -89,7 +89,7 @@ pub fn ui_render(
     }
 }
 
-pub fn shadow_render(view_proj: &Mat4, display: &Display, target: &mut SimpleFrameBuffer) {
+pub fn shadow_render(view_proj: &Mat4, display: &Display<WindowSurface>, target: &mut SimpleFrameBuffer) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {

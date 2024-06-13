@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use crate::math_utils::deg_to_rad;
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
-    framebuffer::SimpleFrameBuffer, implement_vertex, index::PrimitiveType,
-    texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer,
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer
 };
 use once_cell::sync::Lazy;
 
@@ -23,7 +22,7 @@ pub struct Vertex {
 }
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
 
-pub fn init(display: &Display) {
+pub fn init(display: &Display<WindowSurface>) {
     unsafe {
         COLLIDER_CUBOID_VERTEX_BUFFER = Some(VertexBuffer::new(display, &CUBE_VERTS_LIST).unwrap());
         COLLIDER_CUBOID_INDEX_BUFFER = Some(
@@ -51,7 +50,7 @@ pub fn init(display: &Display) {
 }
 
 /// Call only after drawing everything.
-pub fn debug_draw(display: &Display, target: &mut Frame) {
+pub fn debug_draw(display: &Display<WindowSurface>, target: &mut Frame) {
     let proj = get_projection_matrix().to_cols_array_2d();
     let view = get_view_matrix().to_cols_array_2d();
 
@@ -226,7 +225,7 @@ pub fn add_ray_to_draw(ray: RenderRay) {
     }
 }
 
-pub fn draw(display: &Display, target: &mut Frame, shadow_textures: &ShadowTextures) {
+pub fn draw(display: &Display<WindowSurface>, target: &mut Frame, shadow_textures: &ShadowTextures) {
     //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
     target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
 
@@ -802,7 +801,7 @@ pub struct ShadowTextures {
 }
 
 impl ShadowTextures {
-    pub fn new(display: &Display, closest_size: u32, furthest_size: u32) -> ShadowTextures {
+    pub fn new(display: &Display<WindowSurface>, closest_size: u32, furthest_size: u32) -> ShadowTextures {
         let closest =
             glium::texture::DepthTexture2d::empty(display, closest_size, closest_size).unwrap(); // 1st Cascade
         let furthest =

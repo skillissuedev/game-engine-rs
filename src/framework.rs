@@ -11,20 +11,11 @@ use crate::{
         systems::{self, SystemValue},
     },
 };
-use egui_glium::egui_winit::egui::{FontData, FontDefinitions, FontFamily, Window};
+use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use glam::Vec2;
-use glium::{
-    backend::glutin,
-    glutin::{
-        dpi::PhysicalSize,
-        event::WindowEvent,
-        event_loop::{ControlFlow, EventLoop},
-        window::WindowBuilder,
-        ContextBuilder,
-    },
-    Display,
-};
+use glium::backend::glutin::SimpleWindowBuilder;
 use once_cell::sync::Lazy;
+use winit::{event::{Event, WindowEvent}, event_loop::{EventLoop, EventLoopBuilder}, window::{CursorGrabMode, WindowBuilder}};
 use std::{
     collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
@@ -38,14 +29,27 @@ static mut SCREEN_RESOLUTION: Vec2 = Vec2::new(1280.0, 720.0);
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode }
-    let event_loop = EventLoop::new();
+    /*let event_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("projectbaldej")
         .with_inner_size(PhysicalSize::new(1280, 720))
         .with_transparent(false);
     let cb = ContextBuilder::new().with_multisampling(4).with_srgb(true);//.with_vsync(true);
     let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
-    let mut egui_glium = egui_glium::EguiGlium::new(&display, &event_loop);
+    let mut egui_glium = egui_glium::EguiGlium::new(&display, &event_loop);*/
+    /*let event_loop = EventLoop::builder().build().expect("Failed to create an event loop");
+    let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new().build(&event_loop);*/
+    let event_loop: EventLoop<_> = EventLoopBuilder::new()
+        .build()
+        .expect("Event loop building failed");
+    let (window, display) = SimpleWindowBuilder::new()
+        .with_title("projectbaldej")
+        .with_inner_size(2560, 1080)
+        .build(&event_loop);
+    window.set_resizable(true);
+    window.set_transparent(false);
+
+    let mut egui_glium = egui_glium::EguiGlium::new(egui::ViewportId(Id::new(0)), &display, &window, &event_loop);
 
     let mut fps = 0;
 
@@ -63,7 +67,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .get_mut(&FontFamily::Monospace)
         .unwrap()
         .insert(0, "JetBrains Mono".into());
-    egui_glium.egui_ctx.set_fonts(fonts);
+    egui_glium.egui_ctx().set_fonts(fonts);
     let mut ui_state = managers::ui::UiState::default();
 
     let mut frames_count: usize = 0;
@@ -76,64 +80,71 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     navigation::update();
     game_main::start();
 
-    let mut win_w = display.gl_window().window().inner_size().width;
-    let mut win_h = display.gl_window().window().inner_size().height;
+    let mut win_w = window.inner_size().width;
+    let mut win_h = window.inner_size().height;
 
     let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
 
-    event_loop.run(move |ev, _, control_flow| {
+    event_loop.run(move |ev, window_target| {
         match ev {
-            glium::glutin::event::Event::MainEventsCleared => {
-                let time_since_last_frame = last_frame.elapsed();
-                last_frame = Instant::now();
-                update_game(time_since_last_frame);
-                if input::is_mouse_locked() {
-                    let _ = display.gl_window().window().set_cursor_grab(glium::glutin::window::CursorGrabMode::Locked);
-                } else {
-                    let _ = display.gl_window().window().set_cursor_grab(glium::glutin::window::CursorGrabMode::None);
-                }
-
-                egui_glium.run(&display, |ctx| {
-                    match get_debug_mode() {
-                        DebugMode::None => (),
-                        _ => {
-                            Window::new("inspector").show(ctx, |ui| {
-                                managers::ui::draw_inspector(ui, &fps, &mut ui_state);
-                            });
-                        }
-                    }
-
-                    systems::ui_render(ctx);
-                });
-
-                set_listener_transform(
-                    render::get_camera_position(),
-                    render::get_camera_front(),
-                );
-
-                let mut target = display.draw();
-
-                render::draw(&display, &mut target, &shadow_textures);
-                //game_main::render();
-                render::debug_draw(&display, &mut target);
-                egui_glium.paint(&display, &mut target);
-
-                target.finish().unwrap();
-                frames_count += 1;
+            Event::AboutToWait => {
+                window.request_redraw();
             },
-            glium::glutin::event::Event::DeviceEvent { device_id: _, event } => input::reg_device_event(&event),
-            glutin::glutin::event::Event::WindowEvent { event, .. } => {
-                let event_response = egui_glium.on_event(&event);
+            Event::DeviceEvent { device_id: _, event } => input::reg_device_event(&event),
+            Event::WindowEvent { window_id: _, event } => {
+                let event_response = egui_glium.on_event(&window, &event);
                 if event_response.consumed == false {
                     input::reg_event(&event);
                     match event {
+                        WindowEvent::RedrawRequested => {
+                            let time_since_last_frame = last_frame.elapsed();
+                            last_frame = Instant::now();
+                            update_game(time_since_last_frame);
+
+                            if input::is_mouse_locked() {
+                                let _ = window.set_cursor_grab(CursorGrabMode::Locked);
+                            } else {
+                                let _ = window.set_cursor_grab(CursorGrabMode::None);
+                            }
+
+                            egui_glium.run(&window, |ctx| {
+                                match get_debug_mode() {
+                                    DebugMode::None => (),
+                                    _ => {
+                                        Window::new("inspector").show(ctx, |ui| {
+                                            managers::ui::draw_inspector(ui, &fps, &mut ui_state);
+                                        });
+                                    }
+                                }
+
+                                systems::ui_render(ctx);
+                            });
+
+                            set_listener_transform(
+                                render::get_camera_position(),
+                                render::get_camera_front(),
+                            );
+
+                            let mut target = display.draw();
+
+                            render::draw(&display, &mut target, &shadow_textures);
+                            //game_main::render();
+                            render::debug_draw(&display, &mut target);
+                            egui_glium.paint(&display, &mut target);
+
+                            target.finish().unwrap();
+                            frames_count += 1;
+                        },
                         WindowEvent::CloseRequested => {
-                            *control_flow = ControlFlow::Exit;
+                            window_target.exit();
                             networking::disconnect();
+                            return;
                         }
                         WindowEvent::Resized(size) => {
                             win_w = size.width;
                             win_h = size.height;
+                            display.resize(size.into());
+                            //window.request_inner_size(size);
 
                             unsafe {
                                 SCREEN_RESOLUTION = Vec2::new(win_w as f32, win_h as f32);
@@ -149,14 +160,11 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
         if let Some(new_fps) = get_fps(&now, &frames_count) {
             fps = new_fps;
-            display
-                .gl_window()
-                .window()
-                .set_title(&format!("projectbaldej: {fps} fps"));
+            window.set_title(&format!("projectbaldej: {fps} fps"));
             frames_count = 0;
             now = Instant::now();
         }
-    });
+    }).unwrap();
 }
 
 pub fn start_game_without_render() {

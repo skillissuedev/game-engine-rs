@@ -9,7 +9,7 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use egui_glium::egui_winit::egui::Ui;
 use glam::{Mat4, Vec3};
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 use serde::{Deserialize, Serialize};
 
 pub mod camera_position;
@@ -67,7 +67,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn render(
         &mut self,
-        _display: &Display,
+        _display: &Display<WindowSurface>,
         _target: &mut Frame,
         _cascades: &Cascades,
         _shadow_textures: &ShadowTextures,
@@ -77,7 +77,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn shadow_render(
         &mut self,
         _view_proj: &Mat4,
-        _display: &Display,
+        _display: &Display<WindowSurface>,
         _target: &mut SimpleFrameBuffer,
     ) {
     }
@@ -152,7 +152,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn render_children(
         &mut self,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut Frame,
         cascades: &Cascades,
         shadow_texture: &ShadowTextures,
@@ -166,7 +166,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn shadow_render_children(
         &mut self,
         view_proj: &Mat4,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut SimpleFrameBuffer,
     ) {
         self.children_list_mut().iter_mut().for_each(|child| {

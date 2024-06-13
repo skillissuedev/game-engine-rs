@@ -16,8 +16,8 @@ use crate::{
 };
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
-use glutin::event::{MouseButton, VirtualKeyCode};
 use mlua::Lua;
+use winit::{event::MouseButton, keyboard::KeyCode};
 
 pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
     unsafe {
@@ -1273,7 +1273,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
         let new_bind_keyboard = lua.create_function_mut(
             move |_, (bind_name, keycode): (String, String)| {
-                match serde_json::from_str::<VirtualKeyCode>(&keycode.replace("\"", "")) {
+                match serde_json::from_str::<KeyCode>(&keycode.replace("\"", "")) {
                     Ok(keycode) => input::new_bind(&bind_name, vec![InputEventType::Key(keycode)]),
                     Err(err) => 
                         debugger::error(&format!("new_bind_keyboard error!\nUnable to create bind '{}': failed to parse keycode {}\nerr: {}", bind_name, keycode, err)),

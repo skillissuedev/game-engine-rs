@@ -1,7 +1,8 @@
 use super::debugger;
 use glam::Vec2;
-use glium::glutin::event::{DeviceEvent, ElementState, MouseButton, VirtualKeyCode, WindowEvent};
+//use glium::glutin::event::{DeviceEvent, ElementState, MouseButton, VirtualKeyCode, WindowEvent};
 use once_cell::sync::Lazy;
+use winit::{event::{DeviceEvent, ElementState, MouseButton, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
 use std::collections::HashMap;
 
 static mut BINDS: Lazy<HashMap<String, Vec<InputEventType>>> = Lazy::new(|| HashMap::new());
@@ -51,14 +52,15 @@ pub fn reg_event(event: &WindowEvent) {
         match event {
             WindowEvent::KeyboardInput {
                 device_id: _,
-                input,
+                //input,
                 is_synthetic: _,
+                event: input
             } => {
                 BINDS.iter().for_each(|bind_events| {
                     for bind_ev in bind_events.1 {
                         match bind_ev {
                             InputEventType::Key(keycode) => {
-                                if Some(keycode) == input.virtual_keycode.as_ref() {
+                                if keycode == &input.physical_key {
                                     let input_ev_type = InputEventType::Key(*keycode);
                                     match input.state {
                                         ElementState::Pressed => {
@@ -92,7 +94,6 @@ pub fn reg_event(event: &WindowEvent) {
                 device_id: _,
                 state,
                 button,
-                modifiers: _,
             } => {
                 let input_ev_type = InputEventType::Mouse(*button);
                 match state {
@@ -114,7 +115,7 @@ pub fn reg_event(event: &WindowEvent) {
                     }
                 }
             }
-            WindowEvent::CursorMoved { device_id: _, position, modifiers: _ } => {
+            WindowEvent::CursorMoved { device_id: _, position } => {
                 MOUSE_POSITION = Vec2::new(position.x as f32, position.y as f32);
             }
             WindowEvent::Resized(new_size) => {
@@ -226,7 +227,7 @@ pub fn set_mouse_locked(lock: bool) {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum InputEventType {
-    Key(VirtualKeyCode),
+    Key(KeyCode),
     Mouse(MouseButton),
 }
 

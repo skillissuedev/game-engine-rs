@@ -18,7 +18,6 @@ use crate::{
 use egui_glium::egui_winit::egui::TextBuffer;
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
-use glium::glutin::event::VirtualKeyCode;
 
 pub struct TestSystem {
     pub is_destroyed: bool,
@@ -123,7 +122,7 @@ impl System for TestSystem {
         self.add_object(ground_collider);
         self.add_object(test_shadow_model);
 
-        input::new_bind(
+        /*input::new_bind(
             "lock_mouse",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::L)],
         );
@@ -150,7 +149,7 @@ impl System for TestSystem {
         input::new_bind(
             "cam_down",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
-        );
+        );*/
 
         let grass_asset = ModelAsset::from_gltf("models/grass.gltf");
         let grass_master_instance =

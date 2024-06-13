@@ -15,12 +15,9 @@ use crate::{
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer,
-    uniform,
-    uniforms::{
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, uniform, uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    },
-    Display, IndexBuffer, Program, Surface, VertexBuffer,
+    }, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
 use std::time::Instant;
 
@@ -216,7 +213,7 @@ impl Object for ModelObject {
 
     fn render(
         &mut self,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut glium::Frame,
         cascades: &Cascades,
         shadow_texture: &ShadowTextures,
@@ -350,7 +347,7 @@ impl Object for ModelObject {
     fn shadow_render(
         &mut self,
         view_proj: &Mat4,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut SimpleFrameBuffer,
     ) {
         if !self.started {
@@ -609,7 +606,7 @@ impl ModelObject {
         }
     }
 
-    fn start_mesh(&mut self, display: &Display) {
+    fn start_mesh(&mut self, display: &Display<WindowSurface>) {
         let shadow_shader = ShaderAsset::load_shadow_shader();
 
         let shadow_shader = if let Ok(shadow_shader) = shadow_shader {

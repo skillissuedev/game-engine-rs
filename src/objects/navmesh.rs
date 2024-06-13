@@ -1,4 +1,5 @@
 use glam::Vec2;
+use glium::{glutin::surface::WindowSurface, Display};
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::managers::{
@@ -120,7 +121,7 @@ impl Object for NavigationGround {
 
     fn render(
         &mut self,
-        _display: &glium::Display,
+        _display: &Display<WindowSurface>,
         _target: &mut glium::Frame,
         _cascades: &crate::managers::render::Cascades,
         _shadow_textures: &crate::managers::render::ShadowTextures,
@@ -130,7 +131,7 @@ impl Object for NavigationGround {
     fn shadow_render(
         &mut self,
         _view_proj: &glam::Mat4,
-        _display: &glium::Display,
+        _display: &Display<WindowSurface>,
         _target: &mut glium::framebuffer::SimpleFrameBuffer,
     ) {
     }
@@ -205,7 +206,7 @@ impl Object for NavigationGround {
 
     fn render_children(
         &mut self,
-        display: &glium::Display,
+        display: &Display<WindowSurface>,
         target: &mut glium::Frame,
         cascades: &crate::managers::render::Cascades,
         shadow_texture: &crate::managers::render::ShadowTextures,
@@ -219,7 +220,7 @@ impl Object for NavigationGround {
     fn shadow_render_children(
         &mut self,
         view_proj: &glam::Mat4,
-        display: &glium::Display,
+        display: &Display<WindowSurface>,
         target: &mut glium::framebuffer::SimpleFrameBuffer,
     ) {
         self.children_list_mut().iter_mut().for_each(|child| {

@@ -1,4 +1,5 @@
-use glium::glutin::event::VirtualKeyCode;
+
+use winit::keyboard::KeyCode;
 
 use crate::{
     framework::{get_debug_mode, set_debug_mode, DebugMode},
@@ -11,7 +12,7 @@ use crate::{
 pub fn start() {
     input::new_bind(
         "debug_toggle",
-        vec![InputEventType::Key(VirtualKeyCode::Grave)],
+        vec![InputEventType::Key(KeyCode::Backquote)],
     );
 
     //add_system(Box::new(TestSystem::new()));

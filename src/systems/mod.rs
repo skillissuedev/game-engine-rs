@@ -11,7 +11,7 @@ use crate::{
 };
 use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 
 pub trait System {
     fn client_start(&mut self);
@@ -84,7 +84,7 @@ pub trait System {
 
     fn render_objects(
         &mut self,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut Frame,
         cascades: &Cascades,
         shadow_textures: &ShadowTextures,
@@ -103,7 +103,7 @@ pub trait System {
     fn shadow_render_objects(
         &mut self,
         view_proj: &Mat4,
-        display: &Display,
+        display: &Display<WindowSurface>,
         target: &mut SimpleFrameBuffer,
     ) {
         self.objects_list_mut()
