@@ -6,7 +6,7 @@ pub static mut DEFAULT_VERTEX_SHADER_PATH: &str = "shaders/default.vert";
 pub static mut DEFAULT_FRAGMENT_SHADER_PATH: &str = "shaders/default.frag";
 
 pub static mut DEFAULT_INSTANCED_VERTEX_SHADER_PATH: &str = "shaders/default_instanced.vert";
-pub static mut DEFAULT_INSTANCED_FRAGMENT_SHADER_PATH: &str = "shaders/default.frag";
+pub static mut DEFAULT_INSTANCED_FRAGMENT_SHADER_PATH: &str = "shaders/default_instanced.frag";
 
 #[derive(Debug, Clone)]
 pub struct ShaderAsset {

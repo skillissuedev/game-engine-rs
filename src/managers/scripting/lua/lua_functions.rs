@@ -323,8 +323,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         None => texture_asset = None,
                     }
                     let mut shader_asset_path = ShaderAssetPath {
-                        vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
-                        fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
+                        vertex_shader_path: assets::shader_asset::get_default_instanced_vertex_shader_path(),
+                        fragment_shader_path: assets::shader_asset::get_default_instanced_fragment_shader_path(),
                     };
                     if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
                         shader_asset_path.vertex_shader_path = vertex_shader_asset_path;

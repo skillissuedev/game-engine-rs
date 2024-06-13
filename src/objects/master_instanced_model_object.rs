@@ -36,7 +36,8 @@ pub struct MasterInstancedModelObject {
     pub texture_asset: Option<TextureAsset>,
     texture: Option<glium::texture::Texture2d>,
     vertex_buffer: Vec<VertexBuffer<Vertex>>,
-    program: Vec<Program>,
+    programs: Vec<Program>,
+    shadow_programs: Vec<Program>,
     started: bool,
     error: bool,
     inspector_anim_name: String,
@@ -80,7 +81,8 @@ impl MasterInstancedModelObject {
             shader_asset,
             texture: None,
             vertex_buffer: vec![],
-            program: vec![],
+            programs: vec![],
+            shadow_programs: vec![],
             started: false,
             error: false,
             animation_settings: CurrentAnimationSettings {
@@ -199,16 +201,18 @@ impl Object for MasterInstancedModelObject {
         &mut self,
         display: &Display,
         target: &mut glium::Frame,
-        _: &Cascades,
-        _: &ShadowTextures,
+        cascades: &Cascades,
+        shadow_texture: &ShadowTextures,
     ) {
-        //dbg!(&self.model_asset.objects);
         if self.error {
             return;
         }
         if !self.started {
             self.start_mesh(display);
         }
+
+        let closest_shadow_view_proj_cols = cascades.closest_view_proj.to_cols_array_2d();
+        let furthest_shadow_view_proj_cols = cascades.furthest_view_proj.to_cols_array_2d();
 
         let matrices = match render::get_instance_positions(&self.name) {
             Some(matrices) => matrices,
@@ -293,6 +297,20 @@ impl Object for MasterInstancedModelObject {
                 mesh: object.transform,
                 tex: Sampler(texture, sampler_behaviour),
                 lightPos: render::get_light_direction().to_array(),
+                closestShadowTexture: &shadow_texture.closest,
+                furthestShadowTexture: &shadow_texture.furthest,
+                closestShadowViewProj: [
+                    closest_shadow_view_proj_cols[0],
+                    closest_shadow_view_proj_cols[1],
+                    closest_shadow_view_proj_cols[2],
+                    closest_shadow_view_proj_cols[3],
+                ],
+                furthestShadowViewProj: [
+                    furthest_shadow_view_proj_cols[0],
+                    furthest_shadow_view_proj_cols[1],
+                    furthest_shadow_view_proj_cols[2],
+                    furthest_shadow_view_proj_cols[3],
+                ],
                 cameraPosition: camera_position,
             };
 
@@ -312,7 +330,7 @@ impl Object for MasterInstancedModelObject {
                 .draw(
                     (&self.vertex_buffer[i], per_instance_buffer.per_instance().unwrap()),
                     &indices.unwrap(),
-                    &self.program[i],
+                    &self.programs[i],
                     &uniforms,
                     &draw_params,
                 )
@@ -320,8 +338,94 @@ impl Object for MasterInstancedModelObject {
         }
     }
 
-    fn shadow_render(&mut self, _: &Mat4, _: &Display, _: &mut SimpleFrameBuffer) {
-        // no shadow rendering(for now?)
+    fn shadow_render(
+        &mut self,
+        view_proj: &Mat4,
+        display: &Display,
+        target: &mut SimpleFrameBuffer,
+    ) {
+        if !self.started {
+            self.start_mesh(display);
+        }
+
+        if self.error {
+            return;
+        }
+
+        let matrices = match render::get_instance_positions(&self.name) {
+            Some(matrices) => matrices,
+            None => {
+                return
+            },
+        };
+        let mut per_instance_data = Vec::new();
+
+
+        for matrix in matrices {
+            per_instance_data.push(Instance {
+                model: matrix.to_cols_array_2d(),
+            });
+        }
+        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+
+        for i in 0..self.model_asset.objects.len() {
+            let object = &self.model_asset.objects[i];
+
+            let indices = IndexBuffer::new(
+                display,
+                glium::index::PrimitiveType::TrianglesList,
+                &object.indices,
+            );
+
+            let mut transform: Option<&NodeTransform> = None;
+            for tr in &self.nodes_transforms {
+                if tr.node_id == self.model_asset.objects[i].node_index {
+                    transform = Some(tr);
+                    break;
+                }
+            }
+
+            match transform {
+                Some(_) => (),
+                None => {
+                    error("no node transform found!");
+                    return;
+                }
+            }
+
+
+            let view_proj_cols = view_proj.to_cols_array_2d();
+
+            let uniforms = uniform! {
+                view_proj: [
+                    view_proj_cols[0],
+                    view_proj_cols[1],
+                    view_proj_cols[2],
+                    view_proj_cols[3],
+                ],
+                lightPos: render::get_light_direction().to_array(),
+            };
+
+            let draw_params = glium::DrawParameters {
+                depth: glium::Depth {
+                    test: glium::draw_parameters::DepthTest::IfLessOrEqual, // set to IfLess if it
+                    write: true,
+                    ..Default::default()
+                },
+                backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+                ..Default::default()
+            };
+
+            target
+                .draw(
+                    (&self.vertex_buffer[i], per_instance_buffer.per_instance().unwrap()),
+                    &indices.unwrap(),
+                    &self.shadow_programs[i],
+                    &uniforms,
+                    &draw_params,
+                )
+                .unwrap();
+        }
     }
 }
 
@@ -440,6 +544,15 @@ impl MasterInstancedModelObject {
     }
 
     fn start_mesh(&mut self, display: &Display) {
+        let shadow_shader = ShaderAsset::load_shadow_shader();
+        let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
+            shadow_shader
+        } else {
+            error("failed to load shadow shader!");
+            self.error = true;
+            return;
+        };
+
         for i in &self.model_asset.objects {
             let vertex_buffer = VertexBuffer::new(display, &i.vertices);
             match vertex_buffer {
@@ -459,6 +572,9 @@ impl MasterInstancedModelObject {
         let vertex_shader_source = &self.shader_asset.vertex_shader_source;
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
 
+        let vertex_shadow_shader_src = &shadow_shader.vertex_shader_source;
+        let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
+
         for _ in &self.model_asset.objects {
             let program = Program::from_source(
                 display,
@@ -467,15 +583,33 @@ impl MasterInstancedModelObject {
                 None,
             );
 
-            match program {
-                Ok(prog) => self.program.push(prog),
+            let shadow_program = Program::from_source(
+                display,
+                &vertex_shadow_shader_src,
+                &fragment_shadow_shader_src,
+                None,
+            );
+
+            match shadow_program {
+                Ok(prog) => self.shadow_programs.push(prog),
                 Err(err) => {
                     error(&format!(
-                        "Mesh object error:\nprogram creation error!\nErr: {}",
+                        "MasterInstancedModelObject error:\nprogram creation error(shadow)!\nErr: {}",
                         err
                     ));
                     self.error = true;
-                    //panic!();
+                    return;
+                }
+            }
+
+            match program {
+                Ok(prog) => self.programs.push(prog),
+                Err(err) => {
+                    error(&format!(
+                        "MasterInstancedModelObject error:\nprogram creation error!\nErr: {}",
+                        err
+                    ));
+                    self.error = true;
                     return;
                 }
             }
@@ -493,7 +627,7 @@ impl MasterInstancedModelObject {
                 Ok(tx) => self.texture = Some(tx),
                 Err(err) => {
                     error(&format!(
-                        "Mesh object error:\ntexture creating error!\nErr: {}",
+                        "MasterInstancedModelObject error:\ntexture creating error!\nErr: {}",
                         err
                     ));
                     self.texture = None;
@@ -513,7 +647,7 @@ impl MasterInstancedModelObject {
                         Ok(tx) => self.texture = Some(tx),
                         Err(err) => {
                             error(&format!(
-                                "Mesh object error:\ntexture creating error!\nErr: {}",
+                                "MasterInstancedModelObject error:\ntexture creating error!\nErr: {}",
                                 err
                             ));
                             self.texture = None;
