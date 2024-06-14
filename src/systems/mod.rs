@@ -5,7 +5,7 @@ pub mod player_manager;
 
 use crate::{
     managers::{
-        networking::{self, Message, MessageReliability, NetworkError}, physics, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
+        debugger, networking::{self, Message, MessageReliability, NetworkError}, physics, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
     },
     objects::Object,
 };
@@ -133,8 +133,12 @@ pub trait System {
                 self.objects_list_mut().remove(idx);
                 return;
             }
-            object.delete_child(name);
+
+            if object.delete_child(name) == true {
+                return
+            }
         }
+        debugger::warn(&format!("Failed to delete object \"{}\". An object with such name wasn't found", name));
     }
 
     fn add_object(&mut self, object: Box<dyn Object>) {

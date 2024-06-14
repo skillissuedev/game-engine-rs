@@ -231,7 +231,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         self.children_list_mut().last_mut().unwrap().start();
     }
 
-    fn delete_child(&mut self, name: &str) {
+    fn delete_child(&mut self, name: &str) -> bool {
         for (idx, object) in self.children_list_mut().iter_mut().enumerate() {
             if object.name() == name {
                 if let Some(body_parameters) = object.body_parameters() {
@@ -243,10 +243,11 @@ pub trait Object: std::fmt::Debug + Downcast {
                     }
                 }
                 self.children_list_mut().remove(idx);
-                return;
+                return true;
             }
-            object.delete_child(name);
+            return object.delete_child(name);
         }
+        false
     }
 
     fn build_object_rigid_body(
