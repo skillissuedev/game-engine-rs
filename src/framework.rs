@@ -1,3 +1,5 @@
+use glutin::surface::GlSurface;
+use raw_window_handle::HasRawWindowHandle;
 use crate::{
     game::game_main,
     managers::{
@@ -13,9 +15,9 @@ use crate::{
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use glam::Vec2;
-use glium::backend::glutin::SimpleWindowBuilder;
+use glium::{glutin::{context::NotCurrentGlContext, display::{GetGlDisplay, GlDisplay}}, Display};
 use once_cell::sync::Lazy;
-use winit::{event::{Event, WindowEvent}, event_loop::{EventLoop, EventLoopBuilder}, window::{CursorGrabMode, WindowBuilder}};
+use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::{EventLoop, EventLoopBuilder}, window::{CursorGrabMode, WindowBuilder}};
 use std::{
     collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
@@ -39,7 +41,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut egui_glium = egui_glium::EguiGlium::new(&display, &event_loop);*/
     /*let event_loop = EventLoop::builder().build().expect("Failed to create an event loop");
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new().build(&event_loop);*/
-    let event_loop: EventLoop<_> = EventLoopBuilder::new()
+    /*let event_loop: EventLoop<_> = EventLoopBuilder::new()
         .build()
         .expect("Event loop building failed");
     let (window, display) = SimpleWindowBuilder::new()
@@ -47,7 +49,11 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .with_inner_size(2560, 1080)
         .build(&event_loop);
     window.set_resizable(true);
-    window.set_transparent(false);
+    window.set_transparent(false);*/
+    let event_loop: EventLoop<_> = EventLoopBuilder::new()
+        .build()
+        .expect("Event loop building failed");
+    let (window, display) = new_window(&event_loop);
 
     let mut egui_glium = egui_glium::EguiGlium::new(egui::ViewportId(Id::new(0)), &display, &window, &event_loop);
 
@@ -263,4 +269,59 @@ pub enum DebugMode {
 pub struct GameSettings {
     master_volume: u8,
     shadowmap_size: u32,
+}
+
+// Glium's SimpleWindowBuilder's build function with a few changes 
+// https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
+fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, Display<glutin::surface::WindowSurface>) {
+    // First we start by opening a new Window
+    let window_builder = WindowBuilder::new()
+        .with_title("projectbaldej")
+        .with_inner_size(PhysicalSize::new(1280, 720));
+    let display_builder =
+        glutin_winit::DisplayBuilder::new().with_window_builder(Some(window_builder));
+    let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
+        .with_multisampling(4)
+        //.with_swap_interval(Some(0), Some(0))
+        .with_single_buffering(true);
+    let (window, gl_config) = display_builder
+        .build(&event_loop, config_template_builder, |mut configs| {
+            // Just use the first configuration since we don't have any special preferences here
+            configs.next().unwrap()
+        })
+    .unwrap();
+    let window = window.unwrap();
+
+    // Now we get the window size to use as the initial size of the Surface
+    let (width, height): (u32, u32) = window.inner_size().into();
+    let attrs =
+        glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
+        .build(
+            window.raw_window_handle(),
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
+
+    // Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
+    let surface = unsafe {
+        gl_config
+            .display()
+            .create_window_surface(&gl_config, &attrs)
+            .unwrap()
+    };
+    let context_attributes = glutin::context::ContextAttributesBuilder::new()
+        .build(Some(window.raw_window_handle()));
+    let current_context = Some(unsafe {
+        gl_config
+            .display()
+            .create_context(&gl_config, &context_attributes)
+            .expect("failed to create context")
+    })
+    .unwrap()
+        .make_current(&surface)
+        .unwrap();
+    surface.set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait).unwrap();
+    let display = Display::from_context_surface(current_context, surface).unwrap();
+
+    (window, display)
 }
