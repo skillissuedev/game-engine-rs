@@ -4,20 +4,19 @@ pub mod world_generator;
 pub mod player_manager;
 
 use crate::{
-    managers::{
+    framework::Framework, managers::{
         debugger, networking::{self, Message, MessageReliability, NetworkError}, physics, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
-    },
-    objects::Object,
+    }, objects::Object
 };
 use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 
 pub trait System {
-    fn client_start(&mut self);
-    fn server_start(&mut self);
-    fn client_update(&mut self);
-    fn server_update(&mut self);
+    fn client_start(&mut self, framework: &mut Framework);
+    fn server_start(&mut self, framework: &mut Framework);
+    fn client_update(&mut self, framework: &mut Framework);
+    fn server_update(&mut self, framework: &mut Framework);
     fn server_render(&mut self);
     fn client_render(&mut self);
     fn call(&self, call_id: &str);
@@ -69,17 +68,17 @@ pub trait System {
         None
     }
 
-    fn update_objects(&mut self) {
+    fn update_objects(&mut self, framework: &mut Framework) {
         //println!("update objects!");
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.update_transform());
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.update());
+            .for_each(|object| object.update(framework));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.update_children());
+            .for_each(|object| object.update_children(framework));
     }
 
     fn render_objects(

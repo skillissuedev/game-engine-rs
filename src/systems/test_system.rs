@@ -3,7 +3,7 @@ use crate::{
     assets::{
         model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset,
         texture_asset::TextureAsset,
-    }, framework::{get_delta_time, set_global_system_value}, managers::{
+    }, framework::{get_delta_time, set_global_system_value, Framework}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType},
         networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
@@ -34,7 +34,7 @@ impl TestSystem {
 }
 
 impl System for TestSystem {
-    fn client_start(&mut self) {
+    fn client_start(&mut self, _: &mut Framework) {
         set_camera_position(Vec3::new(0.0, 0.0, 0.0));
         let asset = ModelAsset::from_gltf("models/knife_test.gltf");
         let test_anim_asset = ModelAsset::from_gltf("models/test_anim.gltf");
@@ -50,13 +50,6 @@ impl System for TestSystem {
         ));
         test_shadow_model.set_position(Vec3::new(0.0, 2.0, 25.0), false);
 
-        let sound_asset = SoundAsset::from_wav("sounds/tone.wav").unwrap();
-        let emitter =
-            SoundEmitter::new("sound_emitter", &sound_asset, SoundSourceType::Positional).unwrap();
-        let emitter2 =
-            SoundEmitter::new("sound_emitter2", &sound_asset, SoundSourceType::Simple).unwrap();
-        self.add_object(Box::new(emitter));
-        self.add_object(Box::new(emitter2));
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
 
         let test_anim = Box::new(ModelObject::new(
@@ -171,7 +164,7 @@ impl System for TestSystem {
         self.add_object(Box::new(grass_instance));
     }
 
-    fn server_start(&mut self) {
+    fn server_start(&mut self, _: &mut Framework) {
         let ground_asset = ModelAsset::from_gltf("models/test_tile.gltf").unwrap();
         //let ground_nav_asset = ModelAsset::from_file("models/ground_navmesh.gltf").unwrap();
         let mut knife_model = Box::new(EmptyObject::new("knife_model"));
@@ -234,7 +227,7 @@ impl System for TestSystem {
         self.add_object(ground_collider);
     }
 
-    fn client_update(&mut self) {
+    fn client_update(&mut self, _: &mut Framework) {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
@@ -307,7 +300,7 @@ impl System for TestSystem {
         }
     }
 
-    fn server_update(&mut self) {
+    fn server_update(&mut self, _: &mut Framework) {
         {
             let obj = self.find_object_mut("knife_model").unwrap();
             let obj_tr = obj.local_transform();

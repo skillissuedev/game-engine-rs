@@ -1,5 +1,5 @@
 use crate::{
-    framework,
+    framework::{self, Framework},
     managers::{
         self,
         physics::{self, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
@@ -44,7 +44,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     }
 
     fn start(&mut self);
-    fn update(&mut self);
+    fn update(&mut self, framework: &mut Framework);
     fn children_list(&self) -> &Vec<Box<dyn Object>>;
     fn children_list_mut(&mut self) -> &mut Vec<Box<dyn Object>>;
     fn name(&self) -> &str;
@@ -140,13 +140,13 @@ pub trait Object: std::fmt::Debug + Downcast {
         }
     }
 
-    fn update_children(&mut self) {
+    fn update_children(&mut self, framework: &mut Framework) {
         let global_transform = self.global_transform();
 
         self.children_list_mut().iter_mut().for_each(|child| {
             child.set_parent_transform(global_transform);
-            child.update();
-            child.update_children();
+            child.update(framework);
+            child.update_children(framework);
         });
     }
 

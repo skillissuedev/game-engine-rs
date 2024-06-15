@@ -1,8 +1,8 @@
-use crate::managers::{
+use crate::{framework::Framework, managers::{
     debugger,
     physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
     render, systems,
-};
+}};
 use glam::Vec3;
 use rapier3d::{
     dynamics::{RigidBodyBuilder, RigidBodyHandle, RigidBodyType},
@@ -90,7 +90,7 @@ impl Trigger {
 impl Object for Trigger {
     fn start(&mut self) {}
 
-    fn update(&mut self) {}
+    fn update(&mut self, _: &mut Framework) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -192,16 +192,6 @@ impl Object for Trigger {
                 self.set_rotation(rot, false);
             }
         }
-    }
-
-    fn update_children(&mut self) {
-        let global_transform = self.global_transform();
-
-        self.children_list_mut().iter_mut().for_each(|child| {
-            child.set_parent_transform(global_transform);
-            child.update();
-            child.update_children();
-        });
     }
 
     fn debug_render(&self) {

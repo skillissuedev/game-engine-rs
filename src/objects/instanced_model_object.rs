@@ -1,5 +1,5 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{managers::{
+use crate::{framework::Framework, managers::{
     physics::ObjectBodyParameters,
     render::{self, Cascades, ShadowTextures},
 }, math_utils::deg_vec_to_rad};
@@ -69,7 +69,7 @@ impl InstancedModelObject {
 impl Object for InstancedModelObject {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         render::add_instance_position(&self.instance, self.setup_mat());
     }
 

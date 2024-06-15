@@ -1,5 +1,5 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::managers::{physics::ObjectBodyParameters, render};
+use crate::{framework::Framework, managers::{physics::ObjectBodyParameters, render}};
 
 #[derive(Debug)]
 pub struct CameraPosition {
@@ -29,7 +29,7 @@ impl CameraPosition {
 impl Object for CameraPosition {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         let global_transform = self.global_transform();
         render::set_camera_position(global_transform.position);
         render::set_camera_rotation(global_transform.rotation);

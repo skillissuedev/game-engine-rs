@@ -1,5 +1,5 @@
 use crate::{
-    framework::{self, DebugMode},
+    framework::{self, DebugMode, Framework},
     managers::{
         self, debugger,
         physics::{
@@ -52,7 +52,7 @@ impl Ray {
 impl Object for Ray {
     fn start(&mut self) {}
 
-    fn update(&mut self) {}
+    fn update(&mut self, _: &mut Framework) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children

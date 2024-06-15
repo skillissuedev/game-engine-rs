@@ -1,7 +1,7 @@
 use egui_glium::egui_winit::egui;
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::managers::physics::ObjectBodyParameters;
+use crate::{framework::Framework, managers::physics::ObjectBodyParameters};
 
 #[derive(Debug)]
 pub struct EmptyObject {
@@ -31,7 +31,7 @@ impl EmptyObject {
 impl Object for EmptyObject {
     fn start(&mut self) {}
 
-    fn update(&mut self) {}
+    fn update(&mut self, _: &mut Framework) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children

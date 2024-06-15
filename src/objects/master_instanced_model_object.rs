@@ -4,12 +4,11 @@ use crate::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
         shader_asset::ShaderAsset,
         texture_asset::TextureAsset,
-    },
-    managers::{
+    }, framework::Framework, managers::{
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
         render::{self, get_projection_matrix, get_view_matrix, Cascades, ShadowTextures, Vertex},
-    },
+    }
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
@@ -100,7 +99,7 @@ impl MasterInstancedModelObject {
 impl Object for MasterInstancedModelObject {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         self.update_animation();
         for node in &self.model_asset.root_nodes {
             set_nodes_global_transform(

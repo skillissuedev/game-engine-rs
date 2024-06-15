@@ -1,6 +1,6 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::ModelAsset, managers::{
+    assets::model_asset::ModelAsset, framework::Framework, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
@@ -66,7 +66,7 @@ impl LuaSystem {
 }
 
 impl System for LuaSystem {
-    fn client_start(&mut self) {
+    fn client_start(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -76,7 +76,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn server_start(&mut self) {
+    fn server_start(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -86,7 +86,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn client_update(&mut self) {
+    fn client_update(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -96,7 +96,7 @@ impl System for LuaSystem {
         }
     }
 
-    fn server_update(&mut self) {
+    fn server_update(&mut self, _: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -1081,8 +1081,8 @@ impl UserData for ObjectHandle {
                         match object.downcast_mut::<SoundEmitter>() {
                             Some(object) => {
                                 match object.get_max_distance() {
-                                    Ok(distance) => return Ok(Some(distance)),
-                                    Err(_) => (),
+                                    Some(distance) => return Ok(Some(distance)),
+                                    None => (),
                                 }
                             },
                             None => {

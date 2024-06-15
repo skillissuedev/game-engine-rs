@@ -1,5 +1,5 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{managers::{
+use crate::{framework::Framework, managers::{
     physics::ObjectBodyParameters,
     render::{self, Cascades, ShadowTextures},
 }, math_utils::deg_vec_to_rad};
@@ -71,7 +71,7 @@ impl InstancedModelTransformHolder {
 impl Object for InstancedModelTransformHolder {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         render::add_instance_positions_vec(&self.instance, &self.mats);
     }
 

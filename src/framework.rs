@@ -1,3 +1,4 @@
+use ez_al::EzAl;
 use glutin::surface::GlSurface;
 use raw_window_handle::HasRawWindowHandle;
 use crate::{
@@ -80,11 +81,15 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut now = std::time::Instant::now();
     let mut last_frame = std::time::Instant::now();
 
-    sound::init().unwrap();
+    let al = EzAl::new().unwrap();
+    let mut framework = Framework {
+        al: Some(al),
+    };
+
     render::init(&display);
 
     navigation::update();
-    game_main::start();
+    game_main::start(&mut framework);
 
     let mut win_w = window.inner_size().width;
     let mut win_h = window.inner_size().height;
@@ -105,7 +110,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         WindowEvent::RedrawRequested => {
                             let time_since_last_frame = last_frame.elapsed();
                             last_frame = Instant::now();
-                            update_game(time_since_last_frame);
+                            update_game(&mut framework, time_since_last_frame);
 
                             if input::is_mouse_locked() {
                                 let _ = window.set_cursor_grab(CursorGrabMode::Locked);
@@ -127,6 +132,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             });
 
                             set_listener_transform(
+                                &framework.al.as_ref().unwrap(),
                                 render::get_camera_position(),
                                 render::get_camera_front(),
                             );
@@ -175,7 +181,11 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
 pub fn start_game_without_render() {
     println!("starting game without render");
-    game_main::start();
+    let mut framework = Framework {
+        al: None
+    };
+
+    game_main::start(&mut framework);
 
     let tickrate_tick = Duration::from_millis(16);
     let clock = chron::Clock::new(NonZeroU32::new(60).unwrap());
@@ -183,21 +193,21 @@ pub fn start_game_without_render() {
     for tick in clock {
         match tick {
             chron::clock::Tick::Update => {
-                update_game(tickrate_tick);
+                update_game(&mut framework, tickrate_tick);
             }
             chron::clock::Tick::Render { interpolation: _ } => {}
         }
     }
 }
 
-fn update_game(delta_time: Duration) {
+fn update_game(framework: &mut Framework, delta_time: Duration) {
     set_delta_time(delta_time);
     render::update();
     physics::update();
     networking::update(delta_time);
     navigation::update();
     game_main::update();
-    systems::update();
+    systems::update(framework);
     navigation::create_grids();
     input::update();
 }
@@ -222,12 +232,12 @@ pub fn set_debug_mode(mode: DebugMode) {
     unsafe { DEBUG_MODE = mode }
 }
 
-fn set_audio_listener_transformations() {
+fn set_audio_listener_transformations(al: &EzAl) {
     let camera_pos = render::get_camera_position();
     let camera_rot = render::get_camera_rotation();
 
-    sound::set_listener_position(camera_pos);
-    sound::set_listener_orientation(camera_rot);
+    sound::set_listener_position(al, camera_pos);
+    sound::set_listener_orientation(al, camera_rot);
 }
 
 fn set_delta_time(dt: Duration) {
@@ -324,4 +334,8 @@ fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window
     let display = Display::from_context_surface(current_context, surface).unwrap();
 
     (window, display)
+}
+
+pub struct Framework {
+    pub al: Option<EzAl>
 }

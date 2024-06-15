@@ -165,29 +165,17 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
             match system_option {
                 Some(system) => {
-                    let sound_asset = SoundAsset::from_wav(&wav_sound_path);
-                    match sound_asset {
-                        Ok(asset) => {
-                            let emitter_type = match is_positional {
-                                true => SoundSourceType::Positional,
-                                false => SoundSourceType::Simple,
-                            };
+                    let emitter_type = match is_positional {
+                        true => SoundSourceType::Positional,
+                        false => SoundSourceType::Simple,
+                    };
 
-                            let object = SoundEmitter::new(&name, &asset, emitter_type);
-                            match object {
-                                Ok(mut object) => {
-                                    if is_positional {
-                                        let _ = object.set_max_distance(max_distance);
-                                    }
-                                    object.set_looping(should_loop);
-                                    add_to_system_or_parent(lua, system, Box::new(object));
-                                },
-                                Err(err) => 
-                                    debugger::error(&format!("failed to call new_sound_emitter_object: got an error when creating SoundEmitter! err: {:?}", err)),
-                            }
-                        },
-                        Err(err) => debugger::error(&format!("failed to call new_sound_emitter_object: got an error when creating SoundAsset! err: {:?}", err)),
+                    let mut object = SoundEmitter::new_from_path(&name, wav_sound_path, emitter_type);
+                    if is_positional {
+                        let _ = object.set_max_distance(max_distance);
                     }
+                    object.set_looping(should_loop);
+                    add_to_system_or_parent(lua, system, Box::new(object));
                 },
                 None => debugger::error("failed to call new_sound_emitter_object, system not found"),
             }

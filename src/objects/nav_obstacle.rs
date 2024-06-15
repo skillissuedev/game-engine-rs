@@ -1,6 +1,6 @@
-use crate::managers::{
-    navigation, navigation::NavMeshObstacleTransform, physics::ObjectBodyParameters,
-};
+use crate::{framework::Framework, managers::{
+    navigation::{self, NavMeshObstacleTransform}, physics::ObjectBodyParameters,
+}};
 use glam::{Vec2, Vec3};
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -39,7 +39,7 @@ impl NavObstacle {
 impl Object for NavObstacle {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         let position = self.global_transform().position;
         let position_xz = Vec2::new(position.x, position.z);
         let size_xz = Vec2::new(self.size.x, self.size.z);

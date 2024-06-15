@@ -1,15 +1,20 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
-    assets::sound_asset::SoundAsset,
-    managers::{debugger::warn, physics::ObjectBodyParameters},
+    assets::sound_asset::SoundAsset, framework::Framework, managers::{debugger::{self, warn}, physics::ObjectBodyParameters}
 };
 use core::f32;
 use ez_al::{SoundError, SoundSource, SoundSourceType};
 use glam::Vec3;
 use std::fmt::Debug;
 
+enum SoundEmitterAsset {
+    Asset(SoundAsset),
+    AssetPath(String)
+}
+
 pub struct SoundEmitter {
     name: String,
+    asset: SoundEmitterAsset,
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
@@ -17,44 +22,71 @@ pub struct SoundEmitter {
     id: u128,
     groups: Vec<ObjectGroup>,
     pub source_type: SoundSourceType,
-    pub source: SoundSource,
+    pub source: Option<SoundSource>,
     max_distance_inspector: Option<String>,
+    emitter_type: SoundSourceType,
+    error: bool,
+    looping: bool,
+    max_distance: f32
 }
 
 impl SoundEmitter {
-    pub fn new(
-        name: &str,
-        asset: &SoundAsset,
-        emitter_type: SoundSourceType,
-    ) -> Result<SoundEmitter, SoundError> {
-        let source = SoundSource::new(&asset.wav, emitter_type.clone());
-        match source {
-            Ok(source) => Ok(SoundEmitter {
-                name: name.to_string(),
-                transform: Transform::default(),
-                parent_transform: None,
-                children: vec![],
-                body: None,
-                id: gen_object_id(),
-                groups: vec![],
-                source_type: emitter_type,
-                source,
-                max_distance_inspector: None,
-            }),
-            Err(err) => Err(err),
+    pub fn new(name: &str, asset: SoundAsset, emitter_type: SoundSourceType) -> SoundEmitter {
+        SoundEmitter {
+            name: name.to_string(),
+            asset: SoundEmitterAsset::Asset(asset),
+            transform: Transform::default(),
+            parent_transform: None,
+            children: vec![],
+            body: None,
+            id: gen_object_id(),
+            groups: vec![],
+            source_type: emitter_type,
+            source: None,
+            max_distance_inspector: None,
+            emitter_type,
+            error: false,
+            looping: false,
+            max_distance: 50.0
+        }
+    }
+    
+    pub fn new_from_path(name: &str, asset_path: String, emitter_type: SoundSourceType) -> SoundEmitter {
+        SoundEmitter {
+            name: name.to_string(),
+            asset: SoundEmitterAsset::AssetPath(asset_path),
+            transform: Transform::default(),
+            parent_transform: None,
+            children: vec![],
+            body: None,
+            id: gen_object_id(),
+            groups: vec![],
+            source_type: emitter_type,
+            source: None,
+            max_distance_inspector: None,
+            emitter_type,
+            error: false,
+            looping: false,
+            max_distance: 50.0
         }
     }
 
     pub fn set_looping(&mut self, should_loop: bool) {
-        self.source.set_looping(should_loop);
+        self.looping = should_loop
     }
 
     pub fn is_looping(&self) -> bool {
-        self.source.is_looping()
+        self.looping
     }
 
     pub fn play_sound(&mut self) {
-        self.source.play_sound();
+        if !self.error {
+            if let Some(source) = &mut self.source {
+                source.play_sound();
+            }
+        } else {
+            debugger::error("SoundEmitter error!\nFailed to call play_sound, because of an error in this object");
+        }
     }
 
     pub fn set_max_distance(&mut self, distance: f32) -> Result<(), SoundError> {
@@ -64,32 +96,82 @@ impl SoundEmitter {
                 Err(SoundError::WrongSoundSourceType)
             }
             SoundSourceType::Positional => {
-                let _ = self.source.set_max_distance(distance);
+                self.max_distance = distance;
                 Ok(())
             }
         }
     }
 
-    pub fn get_max_distance(&mut self) -> Result<f32, SoundError> {
+    pub fn get_max_distance(&mut self) -> Option<f32> {
         match self.source_type {
             SoundSourceType::Simple => {
                 warn("tried to get max distance when emitter type is simple");
-                Err(SoundError::WrongSoundSourceType)
+                None
             }
-            SoundSourceType::Positional => Ok(self.source.get_max_distance().unwrap()),
+            SoundSourceType::Positional => Some(self.max_distance),
         }
+
     }
 
     pub fn update_sound_transforms(&mut self, sound_position: Vec3) {
-        let _ = self.source.update(sound_position.into());
+        let _ = self.source
+            .as_mut()
+            .expect("update_sound_transforms failed, shouldn't be happening")
+            .update(sound_position.into());
     }
 }
 
 impl Object for SoundEmitter {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
-        self.update_sound_transforms(self.global_transform().position);
+    fn update(&mut self, framework: &mut Framework) {
+        if self.error == false {
+            match &mut self.source {
+                None => {
+                    let source;
+                    if let Some(al) = &framework.al {
+                        match &self.asset {
+                            SoundEmitterAsset::Asset(asset) => 
+                                source = SoundSource::new(al, &asset.wav, self.emitter_type.clone()),
+                            SoundEmitterAsset::AssetPath(path) => {
+                                let asset = SoundAsset::from_wav(&framework, &path);
+                                match asset {
+                                    Ok(asset) => 
+                                        source = SoundSource::new(al, &asset.wav, self.emitter_type.clone()),
+                                    Err(err) => {
+                                        debugger::error(&format!("SoundEmitter error!\nFailed to load a SoundAsset.\nPath: {}\nError: {:?}", path, err));
+                                        self.error = true;
+                                        return
+                                    },
+                                }
+                            },
+                        }
+
+                        match source {
+                            Ok(source) => {
+                                self.source = Some(source);
+                            },
+                            Err(err) => {
+                                debugger::error(&format!("SoundEmitter error!\nFailed to create a SoundSource.\nError: {:?}", err));
+                                self.error = true;
+                                ()
+                            },
+                        }
+                    } else {
+                        debugger::error(&format!("SoundEmitter error!\nFramework's al value = None, probably running without render!"));
+                        self.error = true;
+                        ()
+                    }
+                }
+                Some(source) => {
+                    source.set_looping(self.looping);
+                    if let SoundSourceType::Positional = source.source_type {
+                        source.set_max_distance(self.max_distance);
+                    }
+                    self.update_sound_transforms(self.global_transform().position);
+                }
+            }
+        }
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -142,9 +224,9 @@ impl Object for SoundEmitter {
     fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("SoundEmitter parameters");
 
-        let mut looping = self.source.is_looping();
+        let mut looping = self.is_looping();
         ui.checkbox(&mut looping, "looping");
-        self.source.set_looping(looping);
+        self.set_looping(looping);
 
         let mut set_distance_string: Option<String> = None;
         let mut cancel = false;

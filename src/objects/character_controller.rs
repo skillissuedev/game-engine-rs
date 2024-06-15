@@ -1,6 +1,6 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
-    framework,
+    framework::{self, Framework},
     managers::{
         debugger, navigation,
         physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters},
@@ -92,7 +92,7 @@ impl CharacterController {
 impl Object for CharacterController {
     fn start(&mut self) {}
 
-    fn update(&mut self) {
+    fn update(&mut self, _: &mut Framework) {
         if let Some(movement) = &self.movement {
             let pos = self.global_transform().position;
             //dbg!(self.local_transform());

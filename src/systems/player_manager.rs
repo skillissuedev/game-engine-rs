@@ -1,6 +1,6 @@
 use super::System;
 use crate::{
-    framework::{get_delta_time, set_global_system_value}, managers::{
+    framework::{get_delta_time, set_global_system_value, Framework}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType},
         networking::Message,
         render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction},
@@ -25,7 +25,7 @@ impl PlayerManager {
 }
 
 impl System for PlayerManager {
-    fn client_start(&mut self) {
+    fn client_start(&mut self, _: &mut Framework) {
         input::new_bind(
             "lock_mouse",
             vec![InputEventType::Key(KeyCode::KeyL)],
@@ -56,10 +56,10 @@ impl System for PlayerManager {
         );
     }
 
-    fn server_start(&mut self) {
+    fn server_start(&mut self, _: &mut Framework) {
     }
 
-    fn client_update(&mut self) {
+    fn client_update(&mut self, _: &mut Framework) {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
@@ -132,8 +132,7 @@ impl System for PlayerManager {
         //println!("{}", get_camera_position());
     }
 
-    fn server_update(&mut self) {
-    }
+    fn server_update(&mut self, _: &mut Framework) {}
 
     fn server_render(&mut self) {}
     fn client_render(&mut self) {}

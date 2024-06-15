@@ -1,6 +1,6 @@
 use super::System;
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::TextureAsset}, framework::{get_delta_time, get_resolution}, managers::{
+    assets::{model_asset::ModelAsset, shader_asset::{ShaderAsset, ShaderAssetPath}, texture_asset::TextureAsset}, framework::{get_delta_time, get_resolution, Framework}, managers::{
         input::{self, is_mouse_locked, set_mouse_locked, InputEventType}, networking::Message, physics::{BodyColliderType, BodyType}, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
     }, objects::{instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, ray::Ray, Object, Transform}
 };
@@ -346,7 +346,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
         });
     }
 
-    fn client_start(&mut self) {
+    fn client_start(&mut self, _: &mut Framework) {
         let ray = Ray::new("ray", Vec3::new(0.0, 0.0, 900.0), None);
         self.add_object(Box::new(ray));
 
@@ -396,10 +396,10 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
         );*/
     }
 
-    fn server_start(&mut self) {}
+    fn server_start(&mut self, _: &mut Framework) {}
     fn server_render(&mut self) {}
 
-    fn client_update(&mut self) {
+    fn client_update(&mut self, _: &mut Framework) {
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
         //locking mouse
@@ -532,7 +532,7 @@ fn new_prop_name_client(tile: &mut Box<Object>, transform: Transform, model: Mod
         }
     }
 
-    fn server_update(&mut self) {}
+    fn server_update(&mut self, _: &mut Framework) {}
 
     fn client_render(&mut self) {}
 

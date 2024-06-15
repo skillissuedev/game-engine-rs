@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{objects::ObjectGroup, systems::System};
+use crate::{framework::Framework, objects::ObjectGroup, systems::System};
 use egui_glium::egui_winit::egui::Context;
 use glam::Mat4;
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
@@ -38,17 +38,17 @@ pub fn get_system_mut_with_id(id: &str) -> Option<&mut Box<dyn System>> {
     }
 }
 
-pub fn update() {
+pub fn update(framework: &mut Framework) {
     unsafe {
         if networking::is_server() {
             for system in &mut SYSTEMS {
-                system.server_update();
-                system.update_objects();
+                system.server_update(framework);
+                system.update_objects(framework);
             }
         } else {
             for system in &mut SYSTEMS {
-                system.client_update();
-                system.update_objects();
+                system.client_update(framework);
+                system.update_objects(framework);
             }
         }
     }
@@ -99,19 +99,19 @@ pub fn shadow_render(view_proj: &Mat4, display: &Display<WindowSurface>, target:
     }
 }
 
-pub fn add_system(system: Box<dyn System>) {
+pub fn add_system(system: Box<dyn System>, framework: &mut Framework) {
     unsafe {
         SYSTEMS.push(system);
         if networking::is_server() {
             SYSTEMS
                 .last_mut()
                 .expect("Failed to add system")
-                .server_start();
+                .server_start(framework);
         } else {
             SYSTEMS
                 .last_mut()
                 .expect("Failed to add system")
-                .client_start();
+                .client_start(framework);
         }
     }
 }
