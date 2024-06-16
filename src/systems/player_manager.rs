@@ -1,10 +1,8 @@
 use super::System;
 use crate::{
     framework::{get_delta_time, set_global_system_value, Framework}, managers::{
-        input::{self, is_mouse_locked, set_mouse_locked, InputEventType},
-        networking::Message,
-        render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction},
-        systems::{CallList, SystemValue},
+        //framework.input.{self, is_mouse_locked, set_mouse_locked, InputEventType},
+        input::InputEventType, networking::Message, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
     }, objects::Object
 };
 use glam::Vec3;
@@ -25,32 +23,32 @@ impl PlayerManager {
 }
 
 impl System for PlayerManager {
-    fn client_start(&mut self, _: &mut Framework) {
-        input::new_bind(
+    fn client_start(&mut self, framework: &mut Framework) {
+        framework.input.new_bind(
             "lock_mouse",
             vec![InputEventType::Key(KeyCode::KeyL)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "forward",
             vec![InputEventType::Key(KeyCode::KeyW)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "left",
             vec![InputEventType::Key(KeyCode::KeyA)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "backwards",
             vec![InputEventType::Key(KeyCode::KeyS)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "right",
             vec![InputEventType::Key(KeyCode::KeyD)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "cam_up",
             vec![InputEventType::Key(KeyCode::KeyQ)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "cam_down",
             vec![InputEventType::Key(KeyCode::KeyE)],
         );
@@ -59,7 +57,7 @@ impl System for PlayerManager {
     fn server_start(&mut self, _: &mut Framework) {
     }
 
-    fn client_update(&mut self, _: &mut Framework) {
+    fn client_update(&mut self, framework: &mut Framework) {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
@@ -68,13 +66,13 @@ impl System for PlayerManager {
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
         //locking mouse
-        if input::is_bind_pressed("lock_mouse") {
-            set_mouse_locked(!is_mouse_locked());
+        if framework.input.is_bind_pressed("lock_mouse") {
+            framework.input.set_mouse_locked(!framework.input.is_mouse_locked());
         }
 
         // movement
         let delta_time = get_delta_time().as_secs_f32();
-        let delta = input::mouse_delta();
+        let delta = framework.input.mouse_delta();
         let camera_rotation = get_camera_rotation();
 
         set_camera_rotation(Vec3::new(camera_rotation.x - delta.y * 50.0 * delta_time, camera_rotation.y + delta.x * 50.0 * delta_time, camera_rotation.z));
@@ -85,7 +83,7 @@ impl System for PlayerManager {
         let camera_right = get_camera_right();
         let mut camera_position = get_camera_position();
 
-        if input::is_bind_down("cam_up") {
+        if framework.input.is_bind_down("cam_up") {
             set_camera_position(Vec3::new(
                 camera_position.x,
                 camera_position.y + speed,
@@ -94,7 +92,7 @@ impl System for PlayerManager {
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("cam_down") {
+        if framework.input.is_bind_down("cam_down") {
             set_camera_position(Vec3::new(
                 camera_position.x,
                 camera_position.y - speed,
@@ -103,22 +101,22 @@ impl System for PlayerManager {
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("forward") {
+        if framework.input.is_bind_down("forward") {
             set_camera_position(camera_position + camera_front * speed);
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("backwards") {
+        if framework.input.is_bind_down("backwards") {
             set_camera_position(camera_position - camera_front * speed);
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("left") {
+        if framework.input.is_bind_down("left") {
             set_camera_position(camera_position - camera_right * speed);
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("right") {
+        if framework.input.is_bind_down("right") {
             set_camera_position(camera_position + camera_right * speed);
         }
 

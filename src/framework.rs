@@ -6,7 +6,7 @@ use crate::{
     managers::{
         self,
         assets::get_full_asset_path,
-        input, navigation,
+        input::InputManager, navigation::{self, NavigationManager},
         networking,
         physics,
         render::{self, ShadowTextures},
@@ -64,12 +64,19 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
     let al = EzAl::new().unwrap();
     let mut framework = Framework {
+        debug_mode,
+        delta_time: Duration::default(),
+        system_globals: HashMap::new(),
+        resolution: Vec2::new(1280.0, 720.0),
+
         al: Some(al),
+        input: InputManager::default(),
+        navigation: NavigationManager::default(),
     };
 
     render::init(&display);
 
-    navigation::update();
+    framework.navigation.update();
     game_main::start(&mut framework);
 
     let mut win_w = window.inner_size().width;
@@ -82,18 +89,19 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
             Event::AboutToWait => {
                 window.request_redraw();
             },
-            Event::DeviceEvent { device_id: _, event } => input::reg_device_event(&event),
+            Event::DeviceEvent { device_id: _, event } => framework.input.reg_device_event(&event),
             Event::WindowEvent { window_id: _, event } => {
                 let event_response = egui_glium.on_event(&window, &event);
                 if event_response.consumed == false {
-                    input::reg_event(&event);
+                    framework.input.reg_event(&event);
+
                     match event {
                         WindowEvent::RedrawRequested => {
                             let time_since_last_frame = last_frame.elapsed();
                             last_frame = Instant::now();
                             update_game(&mut framework, time_since_last_frame);
 
-                            if input::is_mouse_locked() {
+                            if framework.input.is_mouse_locked() {
                                 let _ = window.set_cursor_grab(CursorGrabMode::Locked);
                             } else {
                                 let _ = window.set_cursor_grab(CursorGrabMode::None);
@@ -162,9 +170,18 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
 pub fn start_game_without_render() {
     println!("starting game without render");
+
     let mut framework = Framework {
-        al: None
+        debug_mode: DebugMode::None,
+        delta_time: Duration::default(),
+        system_globals: HashMap::new(),
+        resolution: Vec2::new(0.0, 0.0),
+
+        al: None,
+        input: InputManager::default(),
+        navigation: NavigationManager::default(),
     };
+
 
     game_main::start(&mut framework);
 
@@ -186,11 +203,12 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     render::update();
     physics::update();
     networking::update(delta_time);
-    navigation::update();
-    game_main::update();
+    framework.navigation.update();
+    game_main::update(framework);
     systems::update(framework);
-    navigation::create_grids();
-    input::update();
+    framework.navigation.create_grids();
+
+    framework.input.update();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -318,5 +336,12 @@ fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window
 }
 
 pub struct Framework {
-    pub al: Option<EzAl>
+    pub debug_mode: DebugMode,
+    pub delta_time: Duration,
+    pub system_globals: HashMap<String, Vec<SystemValue>>,
+    pub resolution: Vec2,
+
+    pub al: Option<EzAl>,
+    pub input: InputManager,
+    pub navigation: NavigationManager
 }

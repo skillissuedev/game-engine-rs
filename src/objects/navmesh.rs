@@ -38,11 +38,11 @@ impl NavigationGround {
 impl Object for NavigationGround {
     fn start(&mut self) {}
 
-    fn update(&mut self, _: &mut Framework) {
+    fn update(&mut self, framework: &mut Framework) {
         let pos = self.global_transform().position;
         self.dimensions.set_position(Vec2::new(pos.x, pos.z));
 
-        navigation::add_navmesh(*self.object_id(), self.dimensions.clone());
+        framework.navigation.add_navmesh(*self.object_id(), self.dimensions.clone());
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {

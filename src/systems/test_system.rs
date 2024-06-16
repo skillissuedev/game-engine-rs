@@ -4,7 +4,7 @@ use crate::{
         model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset,
         texture_asset::TextureAsset,
     }, framework::{get_delta_time, set_global_system_value, Framework}, managers::{
-        input::{self, is_mouse_locked, set_mouse_locked, InputEventType},
+        //framework.input.{self, is_mouse_locked, set_mouse_locked, InputEventType},
         networking::{
             self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage,
         },
@@ -15,8 +15,6 @@ use crate::{
         character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, Object
     }
 };
-use egui_glium::egui_winit::egui::TextBuffer;
-use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
 
 pub struct TestSystem {
@@ -115,31 +113,31 @@ impl System for TestSystem {
         self.add_object(ground_collider);
         self.add_object(test_shadow_model);
 
-        /*input::new_bind(
+        /*framework.input.new_bind(
             "lock_mouse",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::L)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "forward",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::W)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "left",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::A)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "backwards",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::S)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "right",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::D)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "cam_up",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::Q)],
         );
-        input::new_bind(
+        framework.input.new_bind(
             "cam_down",
             vec![InputEventType::Key(glium::glutin::event::VirtualKeyCode::E)],
         );*/
@@ -227,7 +225,7 @@ impl System for TestSystem {
         self.add_object(ground_collider);
     }
 
-    fn client_update(&mut self, _: &mut Framework) {
+    fn client_update(&mut self, framework: &mut Framework) {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
@@ -236,13 +234,13 @@ impl System for TestSystem {
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
         //locking mouse
-        if input::is_bind_pressed("lock_mouse") {
-            set_mouse_locked(!is_mouse_locked());
+        if framework.input.is_bind_pressed("lock_mouse") {
+            framework.input.set_mouse_locked(!framework.input.is_mouse_locked());
         }
 
         // movement
         let delta_time = get_delta_time().as_secs_f32();
-        let delta = input::mouse_delta();
+        let delta = framework.input.mouse_delta();
         let camera_rotation = get_camera_rotation();
 
         set_camera_rotation(Vec3::new(camera_rotation.x - delta.y * 50.0 * delta_time, camera_rotation.y + delta.x * 50.0 * delta_time, camera_rotation.z));
@@ -253,7 +251,7 @@ impl System for TestSystem {
         let camera_right = get_camera_right();
         let mut camera_position = get_camera_position();
 
-        if input::is_bind_down("cam_up") {
+        if framework.input.is_bind_down("cam_up") {
             set_camera_position(Vec3::new(
                 camera_position.x,
                 camera_position.y + speed,
@@ -262,7 +260,7 @@ impl System for TestSystem {
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("cam_down") {
+        if framework.input.is_bind_down("cam_down") {
             set_camera_position(Vec3::new(
                 camera_position.x,
                 camera_position.y - speed,
@@ -271,22 +269,22 @@ impl System for TestSystem {
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("forward") {
+        if framework.input.is_bind_down("forward") {
             set_camera_position(camera_position + camera_front * speed);
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("backwards") {
+        if framework.input.is_bind_down("backwards") {
             set_camera_position(camera_position - camera_front * speed);
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("left") {
+        if framework.input.is_bind_down("left") {
             set_camera_position(camera_position - camera_right * speed);
             camera_position = get_camera_position();
         }
 
-        if input::is_bind_down("right") {
+        if framework.input.is_bind_down("right") {
             set_camera_position(camera_position + camera_right * speed);
             camera_position = get_camera_position();
         }

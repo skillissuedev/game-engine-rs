@@ -39,11 +39,11 @@ impl NavObstacle {
 impl Object for NavObstacle {
     fn start(&mut self) {}
 
-    fn update(&mut self, _: &mut Framework) {
+    fn update(&mut self, framework: &mut Framework) {
         let position = self.global_transform().position;
         let position_xz = Vec2::new(position.x, position.z);
         let size_xz = Vec2::new(self.size.x, self.size.z);
-        navigation::add_obstacle(NavMeshObstacleTransform::new(position_xz, size_xz));
+        framework.navigation.add_obstacle(NavMeshObstacleTransform::new(position_xz, size_xz));
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {

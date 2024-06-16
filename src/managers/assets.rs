@@ -8,15 +8,14 @@ pub fn get_full_asset_path(path: &str) -> String {
         Ok(exe_path) => {
             let executable_path = exe_path.to_str();
             match executable_path {
-                Some(executable_path_string) => exec_path = executable_path_string.to_owned(), //println!("Path of this executable is: {}", executable_path_string.to_owned() + "/" + path),
+                Some(executable_path_string) => exec_path = executable_path_string.to_owned(),
                 None => crash("Getting current exe path error!"),
             }
         }
-        Err(_e) => crash("Getting current exe path error!"),
+        Err(err) => crash(&format!("Getting current exe path error!\nError: {}", err)),
     };
 
     let full_exec_path_splitted: Vec<&str> = exec_path.split("/").collect();
-    //let full_path = exec_dir_path.to_string() + path;
 
     let mut full_path: String = "".to_string();
 

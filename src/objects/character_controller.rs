@@ -2,7 +2,7 @@ use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
     framework::{self, Framework},
     managers::{
-        debugger, navigation,
+        debugger,
         physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters},
     },
     math_utils::deg_to_rad,
@@ -92,7 +92,7 @@ impl CharacterController {
 impl Object for CharacterController {
     fn start(&mut self) {}
 
-    fn update(&mut self, _: &mut Framework) {
+    fn update(&mut self, framework: &mut Framework) {
         if let Some(movement) = &self.movement {
             let pos = self.global_transform().position;
             //dbg!(self.local_transform());
@@ -103,7 +103,7 @@ impl Object for CharacterController {
                 self.last_path_point = None;
             } else {
                 let target = movement.target;
-                let next_pos = navigation::find_next_path_point(
+                let next_pos = framework.navigation.find_next_path_point(
                     Vec2::new(pos.x, pos.z),
                     Vec2::new(target.x, target.z),
                 );

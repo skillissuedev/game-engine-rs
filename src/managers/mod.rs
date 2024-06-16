@@ -5,7 +5,7 @@ pub mod navigation;
 pub mod networking;
 pub mod physics;
 pub mod render;
-pub mod scripting;
+//pub mod scripting;
 pub mod sound;
 pub mod systems;
 pub mod ui;
