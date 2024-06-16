@@ -32,25 +32,6 @@ static mut SCREEN_RESOLUTION: Vec2 = Vec2::new(1280.0, 720.0);
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
     unsafe { DEBUG_MODE = debug_mode }
-    /*let event_loop = EventLoop::new();
-    let wb = WindowBuilder::new()
-        .with_title("projectbaldej")
-        .with_inner_size(PhysicalSize::new(1280, 720))
-        .with_transparent(false);
-    let cb = ContextBuilder::new().with_multisampling(4).with_srgb(true);//.with_vsync(true);
-    let display = Display::new(wb, cb, &event_loop).expect("failed to create glium display");
-    let mut egui_glium = egui_glium::EguiGlium::new(&display, &event_loop);*/
-    /*let event_loop = EventLoop::builder().build().expect("Failed to create an event loop");
-    let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new().build(&event_loop);*/
-    /*let event_loop: EventLoop<_> = EventLoopBuilder::new()
-        .build()
-        .expect("Event loop building failed");
-    let (window, display) = SimpleWindowBuilder::new()
-        .with_title("projectbaldej")
-        .with_inner_size(2560, 1080)
-        .build(&event_loop);
-    window.set_resizable(true);
-    window.set_transparent(false);*/
     let event_loop: EventLoop<_> = EventLoopBuilder::new()
         .build()
         .expect("Event loop building failed");

@@ -431,11 +431,10 @@ pub fn get_network_events() -> Vec<NetworkEvent> {
 fn generate_client_id() -> u64 {
     let mut id_in_binary = "".to_string();
 
-    let mut id_builer = IdBuilder::new(machineid_rs::Encryption::MD5);
+    let mut id_builer = IdBuilder::new(machineid_rs::Encryption::SHA256);
     id_builer.add_component(HWIDComponent::CPUID);
     id_builer.add_component(HWIDComponent::OSName);
     id_builer.add_component(HWIDComponent::SystemID);
-    id_builer.add_component(HWIDComponent::DriveSerial);
 
     match id_builer.build("really great key") {
         Ok(id_str) => {

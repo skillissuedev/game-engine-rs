@@ -1,8 +1,5 @@
-use std::sync::Mutex;
-
 use ez_al::EzAl;
 use glam::Vec3;
-use once_cell::sync::Lazy;
 
 pub fn set_listener_position(al: &EzAl, position: Vec3) {
     ez_al::set_listener_position(&al, position.into());
