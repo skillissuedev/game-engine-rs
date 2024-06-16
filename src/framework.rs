@@ -12,7 +12,7 @@ use crate::{
         render::{self, ShadowTextures},
         sound::{self, set_listener_transform},
         systems::{self, SystemValue},
-    },
+    }, objects::{camera_position::CameraPosition, character_controller::CharacterController},
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use glam::Vec2;
@@ -344,4 +344,14 @@ pub struct Framework {
     pub al: Option<EzAl>,
     pub input: InputManager,
     pub navigation: NavigationManager
+}
+
+impl Framework {
+    pub fn new_camera_position_object(name: &str) -> CameraPosition {
+        CameraPosition::new(name)
+    }
+
+    pub fn new_character_controller_object(name: &str, shape: physics::BodyColliderType, membership_groups: Option<physics::CollisionGroups>, mask: Option<physics::CollisionGroups>) -> CharacterController {
+        CharacterController::new(name, shape, membership_groups, mask)
+    }
 }
