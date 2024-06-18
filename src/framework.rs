@@ -8,7 +8,7 @@ use crate::{
         assets::get_full_asset_path,
         input::InputManager, navigation::{self, NavigationManager},
         networking,
-        physics,
+        physics::{self, CollisionGroups, PhysicsManager},
         render::{self, ShadowTextures},
         sound::{self, set_listener_transform},
         systems::{self, SystemValue},
@@ -72,6 +72,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         al: Some(al),
         input: InputManager::default(),
         navigation: NavigationManager::default(),
+        physics: PhysicsManager::default()
     };
 
     render::init(&display);
@@ -112,7 +113,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                     DebugMode::None => (),
                                     _ => {
                                         Window::new("inspector").show(ctx, |ui| {
-                                            managers::ui::draw_inspector(ui, &fps, &mut ui_state);
+                                            managers::ui::draw_inspector(&mut framework, ui, &fps, &mut ui_state);
                                         });
                                     }
                                 }
@@ -180,6 +181,7 @@ pub fn start_game_without_render() {
         al: None,
         input: InputManager::default(),
         navigation: NavigationManager::default(),
+        physics: PhysicsManager::default()
     };
 
 
@@ -201,7 +203,7 @@ pub fn start_game_without_render() {
 fn update_game(framework: &mut Framework, delta_time: Duration) {
     set_delta_time(delta_time);
     render::update();
-    physics::update();
+    framework.physics.update();
     networking::update(delta_time);
     framework.navigation.update();
     game_main::update(framework);
@@ -343,7 +345,8 @@ pub struct Framework {
 
     pub al: Option<EzAl>,
     pub input: InputManager,
-    pub navigation: NavigationManager
+    pub navigation: NavigationManager,
+    pub physics: PhysicsManager
 }
 
 impl Framework {
@@ -351,7 +354,13 @@ impl Framework {
         CameraPosition::new(name)
     }
 
-    pub fn new_character_controller_object(name: &str, shape: physics::BodyColliderType, membership_groups: Option<physics::CollisionGroups>, mask: Option<physics::CollisionGroups>) -> CharacterController {
-        CharacterController::new(name, shape, membership_groups, mask)
+    pub fn new_character_controller_object(
+        &mut self,
+        name: &str, 
+        shape: physics::BodyColliderType, 
+        membership_groups: Option<CollisionGroups>, 
+        mask: Option<CollisionGroups>
+    ) -> CharacterController {
+        CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
     }
 }

@@ -1,13 +1,13 @@
 use crate::{framework::Framework, managers::{
     debugger,
-    physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
+    physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderColliderType},
     render, systems,
 }};
 use glam::Vec3;
 use rapier3d::{
     dynamics::{RigidBodyBuilder, RigidBodyHandle, RigidBodyType},
     geometry::{ActiveCollisionTypes, ColliderHandle, ColliderSet, CollisionEvent},
-    pipeline::ActiveEvents,
+    pipeline::{ActiveEvents, PhysicsPipeline},
 };
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -28,6 +28,7 @@ pub struct Trigger {
 
 impl Trigger {
     pub fn new(
+        physics: &mut PhysicsManager,
         name: &str,
         membership_group: Option<CollisionGroups>,
         mask: Option<CollisionGroups>,
@@ -62,14 +63,13 @@ impl Trigger {
 
         let body = RigidBodyBuilder::new(RigidBodyType::Fixed).build();
 
-        let body_handle = unsafe { physics::RIGID_BODY_SET.insert(body) };
-        let collider_handle = unsafe {
-            physics::COLLIDER_SET.insert_with_parent(
+        let body_handle = physics.rigid_body_set.insert(body);
+        let collider_handle = 
+            physics.collider_set.insert_with_parent(
                 collider,
                 body_handle,
-                &mut physics::RIGID_BODY_SET,
-            )
-        };
+                &mut physics.rigid_body_set,
+            );
 
         Trigger {
             name: name.to_string(),
@@ -148,95 +148,6 @@ impl Object for Trigger {
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         todo!()
     }
-
-    fn find_object(&self, object_name: &str) -> Option<&Box<dyn Object>> {
-        for object in self.children_list() {
-            if object.name() == object_name {
-                return Some(object);
-            }
-
-            match object.find_object(object_name) {
-                Some(found_obj) => return Some(found_obj),
-                None => (),
-            }
-        }
-
-        None
-    }
-
-    fn find_object_mut(&mut self, object_name: &str) -> Option<&mut Box<dyn Object>> {
-        for object in self.children_list_mut() {
-            if object.name() == object_name {
-                return Some(object);
-            }
-
-            match object.find_object_mut(object_name) {
-                Some(found_obj) => return Some(found_obj),
-                None => (),
-            }
-        }
-
-        None
-    }
-
-    fn update_transform(&mut self) {
-        if let Some(parameters) = self.body_parameters() {
-            if let None = parameters.rigid_body_handle {
-                return;
-            }
-
-            let position_and_rotation_option = physics::get_body_transformations(parameters);
-
-            if let Some((pos, rot)) = position_and_rotation_option {
-                self.set_position(pos, false);
-                self.set_rotation(rot, false);
-            }
-        }
-    }
-
-    fn debug_render(&self) {
-        // Adding collider to render manager's render colliders list if debug mode != None
-        match crate::framework::get_debug_mode() {
-            crate::framework::DebugMode::Full => {
-                if let Some(mut render_collider) = self.render_collider {
-                    let transform = self.global_transform();
-                    render_collider.set_transform(transform.position, transform.rotation);
-                    render::add_collider_to_draw(render_collider);
-                }
-
-                self.children_list()
-                    .iter()
-                    .for_each(|child| child.debug_render());
-            }
-            _ => (),
-        }
-    }
-
-    fn set_position(&mut self, position: Vec3, _set_rigid_body_position: bool) {
-        let mut transform = self.local_transform();
-        transform.position = position;
-        self.set_local_transform(transform);
-
-        physics::set_rigidbody_position(self.body_handle, position);
-    }
-
-    fn set_rotation(&mut self, rotation: Vec3, set_rigid_body_rotation: bool) {
-        let mut transform = self.local_transform();
-        transform.rotation = rotation;
-        self.set_local_transform(transform);
-
-        if let Some(parameters) = self.body_parameters() {
-            if set_rigid_body_rotation == true {
-                physics::set_body_rotation(parameters, rotation);
-            }
-        }
-    }
-
-    fn set_scale(&mut self, scale: Vec3) {
-        let mut transform = self.local_transform();
-        transform.scale = scale;
-        self.set_local_transform(transform);
-    }
 }
 
 impl std::fmt::Debug for Trigger {
@@ -250,20 +161,16 @@ impl std::fmt::Debug for Trigger {
 }
 
 impl Trigger {
-    pub fn is_intersecting(&self) -> bool {
-        let intersections_count = unsafe {
-            physics::NARROW_PHASE
-                .intersection_pairs_with(self.collider_handle)
-                .count()
-        };
+    pub fn is_intersecting(&self, physics: &PhysicsManager) -> bool {
+        let intersections_count = physics.narrow_phase
+            .intersection_pairs_with(self.collider_handle)
+            .count();
 
         match intersections_count {
             0 => {
-                let contact_count = unsafe {
-                    physics::NARROW_PHASE
-                        .contact_pairs_with(self.collider_handle)
-                        .count()
-                };
+                let contact_count = physics.narrow_phase
+                    .contact_pairs_with(self.collider_handle)
+                    .count();
                 if contact_count > 0 {
                     true
                 } else {
@@ -274,11 +181,11 @@ impl Trigger {
         }
     }
 
-    pub fn is_intersecting_with_group(&self, group: ObjectGroup) -> bool {
+    pub fn is_intersecting_with_group(&self, physics: &PhysicsManager, group: ObjectGroup) -> bool {
         let intersections_iter =
-            unsafe { physics::NARROW_PHASE.intersection_pairs_with(self.collider_handle) };
+            physics.narrow_phase.intersection_pairs_with(self.collider_handle);
 
-        let collider_set = unsafe { &physics::COLLIDER_SET };
+        let collider_set = &physics.collider_set;
 
         for (collider1, collider2, intersecting) in intersections_iter {
             if intersecting {

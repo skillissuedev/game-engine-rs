@@ -1,12 +1,12 @@
 use egui_glium::egui_winit::egui::{self, ComboBox, TextEdit, Ui};
 use glam::Vec3;
 
-use crate::framework::{set_debug_mode, DebugMode};
+use crate::framework::{set_debug_mode, DebugMode, Framework};
 
 use super::{physics::RenderColliderType, systems};
 
 // inspector
-pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
+pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
     ui.label(format!("fps: {}", fps));
     ui.checkbox(&mut ui_state.full_debug_checkbox_val, "full debug");
     handle_full_debug_checkbox_value(ui_state.full_debug_checkbox_val);
@@ -86,7 +86,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                             &object.local_transform().position,
                             true,
                         ) {
-                            object.set_position(pos, true);
+                            object.set_position(framework, pos, true);
                         }
                         ui.label("local rotation:");
                         if let Some(rot) = draw_vec3_editor_inspector(
@@ -95,7 +95,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                             &object.local_transform().rotation,
                             true,
                         ) {
-                            object.set_rotation(rot, true);
+                            object.set_rotation(framework, rot, true);
                         }
                         ui.label("local scale:");
                         if let Some(sc) = draw_vec3_editor_inspector(
@@ -206,6 +206,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                                     match collider.clone().collider_type {
                                                         InspectorRenderColliderType::Ball => {
                                                             object.build_object_rigid_body(
+                                                                framework, 
                                                                 None,
                                                                 Some(RenderColliderType::Ball(
                                                                     None, None, x, trigger,
@@ -217,6 +218,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                                         }
                                                         InspectorRenderColliderType::Cuboid => {
                                                             object.build_object_rigid_body(
+                                                                framework, 
                                                                 None,
                                                                 Some(RenderColliderType::Cuboid(
                                                                     None, None, x, y, z, trigger,
@@ -228,6 +230,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                                         }
                                                         InspectorRenderColliderType::Capsule => {
                                                             object.build_object_rigid_body(
+                                                                framework, 
                                                                 None,
                                                                 Some(RenderColliderType::Capsule(
                                                                     None, None, x, y, trigger,
@@ -239,6 +242,7 @@ pub fn draw_inspector(ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
                                                         }
                                                         InspectorRenderColliderType::Cylinder => {
                                                             object.build_object_rigid_body(
+                                                                framework, 
                                                                 None,
                                                                 Some(RenderColliderType::Cylinder(
                                                                     None, None, x, y, trigger,

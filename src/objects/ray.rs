@@ -2,10 +2,7 @@ use crate::{
     framework::{self, DebugMode, Framework},
     managers::{
         self, debugger,
-        physics::{
-            get_ray_intersaction_position, is_ray_intersecting, CollisionGroups,
-            ObjectBodyParameters, RenderRay,
-        },
+        physics::{CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderRay},
         render,
         ui::Vec3Inspector,
     },
@@ -127,7 +124,7 @@ impl Object for Ray {
 }
 
 impl Ray {
-    pub fn is_intersecting(&self) -> bool {
+    pub fn is_intersecting(&self, physics: &PhysicsManager) -> bool {
         let global_transform = self.global_transform();
         let toi = global_transform.position.distance(global_transform.position + self.direction);
 
@@ -145,10 +142,10 @@ impl Ray {
         //dbg!(rotated_direction.normalize());
         //dbg!(query_filter.groups);
 
-        is_ray_intersecting(ray, toi, query_filter)
+        physics.is_ray_intersecting(ray, toi, query_filter)
     }
 
-    pub fn intersection_position(&self) -> Option<Vec3> {
+    pub fn intersection_position(&self, physics: &PhysicsManager) -> Option<Vec3> {
         let global_transform = self.global_transform();
         let toi = global_transform.position.distance(global_transform.position + self.direction);
 
@@ -162,7 +159,7 @@ impl Ray {
             self.direction.into(),
         );
 
-        match get_ray_intersaction_position(ray, toi, query_filter) {
+        match physics.get_ray_intersaction_position(ray, toi, query_filter) {
             Some(pos) => Some(Vec3::new(-pos.x, pos.y, pos.z)),
             None => None,
         }

@@ -1,11 +1,10 @@
-pub mod test_system;
 pub mod main_system;
 pub mod world_generator;
 pub mod player_manager;
 
 use crate::{
     framework::Framework, managers::{
-        debugger, networking::{self, Message, MessageReliability, NetworkError}, physics, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
+        debugger, networking::{self, Message, MessageReliability, NetworkError}, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
     }, objects::Object
 };
 use egui_glium::egui_winit::egui::Context;
@@ -72,7 +71,7 @@ pub trait System {
         //println!("update objects!");
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.update_transform());
+            .for_each(|object| object.update_transform(framework));
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.update(framework));
@@ -117,15 +116,15 @@ pub trait System {
         self.set_destroyed(true);
     }
 
-    fn delete_object(&mut self, name: &str) {
+    fn delete_object(&mut self, framework: &mut Framework, name: &str) {
         for (idx, object) in self.objects_list_mut().iter_mut().enumerate() {
             if object.name() == name {
                 if let Some(body_parameters) = object.body_parameters() {
                     if let Some(handle) = body_parameters.collider_handle {
-                        physics::remove_collider_by_handle(handle);
+                        framework.physics.remove_collider_by_handle(handle);
                     }
                     if let Some(handle) = body_parameters.rigid_body_handle {
-                        physics::remove_rigid_body_by_handle(handle);
+                        framework.physics.remove_rigid_body_by_handle(handle);
                     }
                 }
 
@@ -133,7 +132,7 @@ pub trait System {
                 return;
             }
 
-            if object.delete_child(name) == true {
+            if object.delete_child(framework, name) == true {
                 return
             }
         }

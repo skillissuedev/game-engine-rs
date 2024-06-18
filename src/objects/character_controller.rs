@@ -3,7 +3,7 @@ use crate::{
     framework::{self, Framework},
     managers::{
         debugger,
-        physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters},
+        physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager},
     },
     math_utils::deg_to_rad,
 };
@@ -35,6 +35,7 @@ pub struct CharacterControllerMovement {
 
 impl CharacterController {
     pub fn new(
+        physics: &mut PhysicsManager,
         name: &str,
         shape: BodyColliderType,
         membership_groups: Option<CollisionGroups>,
@@ -72,7 +73,7 @@ impl CharacterController {
             .sensor(true)
             .build();
 
-        let collider_handle = unsafe { physics::COLLIDER_SET.insert(collider) };
+        let collider_handle = physics.collider_set.insert(collider);
 
         CharacterController {
             transform: Transform::default(),
@@ -99,7 +100,7 @@ impl Object for CharacterController {
             let speed = movement.speed;
             if let Some(next_pos) = self.last_path_point {
                 let direction = self.get_direction(next_pos);
-                self.move_controller(direction * speed);
+                self.move_controller(framework, direction * speed);
                 self.last_path_point = None;
             } else {
                 let target = movement.target;
@@ -113,7 +114,7 @@ impl Object for CharacterController {
                     Some(next_pos) => {
                         let full_pos = Vec3::new(next_pos.x, pos.y, next_pos.y);
                         let direction = self.get_direction(full_pos);
-                        self.move_controller(direction * speed);
+                        self.move_controller(framework, direction * speed);
                         self.last_path_point = Some(full_pos);
                     }
                     None => {
@@ -198,11 +199,14 @@ impl CharacterController {
         direction
     }
 
-    pub fn move_controller(&mut self, direction: Vec3) {
-        unsafe {
-            let collider = physics::COLLIDER_SET.get_mut(self.collider);
+    pub fn move_controller(&mut self, framework: &mut Framework, direction: Vec3) {
+        let mut new_position = None;
+        {
+            let collider = framework.physics.collider_set.get(self.collider);
             if let Some(collider) = collider {
+                let shape = collider.shape();
                 let global_position = self.global_transform().position;
+
                 let direction = Vec3 {
                     x: -direction.x,
                     y: direction.y,
@@ -211,30 +215,43 @@ impl CharacterController {
 
                 let movement = self.controller.move_shape(
                     framework::get_delta_time().as_secs_f32(),
-                    &physics::RIGID_BODY_SET,
-                    &physics::COLLIDER_SET,
-                    &physics::QUERY_PIPELINE,
-                    collider.shape(),
+                    &framework.physics.rigid_body_set,
+                    &framework.physics.collider_set,
+                    &framework.physics.query_pipeline,
+                    shape,
                     &global_position.into(),
                     direction.into(),
                     QueryFilter::new().exclude_sensors(),
                     |_| {},
                 );
 
-                let translation = movement.translation;
-                let new_position: Vec3 = self.local_transform().position
-                    + Vec3::new(translation.x, translation.y, translation.z);
-                self.set_position(new_position, false);
-                collider.set_position(new_position.into());
+                let object_position = self.local_transform().position
+                    + Vec3::new(movement.translation.x, movement.translation.y, movement.translation.z);
+                self.set_position(framework, object_position, false);
+                new_position = Some(object_position);
+            }
+            else {
+                debugger::error(
+                    "CharacterController's move_controller error!\nfailed to get collider",
+                );
+            }
+        }
 
-                //let total_elapsed = timer.elapsed();
-                //dbg!(total_elapsed);
+        {
+            if let Some(new_position) = new_position {
+                let collider = framework.physics.collider_set.get_mut(self.collider);
+                if let Some(collider) = collider {
+                    collider.set_position(new_position.into());
+                }
             } else {
                 debugger::error(
                     "CharacterController's move_controller error!\nfailed to get collider",
                 );
             }
         }
+
+        //let total_elapsed = timer.elapsed();
+        //dbg!(total_elapsed);
     }
 
     pub fn walk_to(&mut self, target: Vec3, speed: f32) {

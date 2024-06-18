@@ -2,7 +2,7 @@ use crate::{
     framework::{self, Framework},
     managers::{
         self,
-        physics::{self, BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
+        physics::{BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
         render::{self, Cascades, ShadowTextures},
     },
 };
@@ -125,17 +125,17 @@ pub trait Object: std::fmt::Debug + Downcast {
         None
     }
 
-    fn update_transform(&mut self) {
+    fn update_transform(&mut self, framework: &mut Framework) {
         if let Some(parameters) = self.body_parameters() {
             if let None = parameters.rigid_body_handle {
                 return;
             }
 
-            let position_and_rotation_option = physics::get_body_transformations(parameters);
+            let position_and_rotation_option = framework.physics.get_body_transformations(parameters);
 
             if let Some((pos, rot)) = position_and_rotation_option {
-                self.set_position(pos, false);
-                self.set_rotation(rot, false);
+                self.set_position(framework, pos, false);
+                self.set_rotation(framework, rot, false);
             }
         }
     }
@@ -195,26 +195,26 @@ pub trait Object: std::fmt::Debug + Downcast {
         }
     }
 
-    fn set_position(&mut self, position: Vec3, set_rigid_body_position: bool) {
+    fn set_position(&mut self, framework: &mut Framework, position: Vec3, set_rigid_body_position: bool) {
         let mut transform = self.local_transform();
         transform.position = position;
         self.set_local_transform(transform);
 
         if let Some(parameters) = self.body_parameters() {
             if set_rigid_body_position == true {
-                physics::set_body_position(parameters, position);
+                framework.physics.set_body_position(parameters, position);
             }
         }
     }
 
-    fn set_rotation(&mut self, rotation: Vec3, set_rigid_body_rotation: bool) {
+    fn set_rotation(&mut self, framework: &mut Framework, rotation: Vec3, set_rigid_body_rotation: bool) {
         let mut transform = self.local_transform();
         transform.rotation = rotation;
         self.set_local_transform(transform);
 
         if let Some(parameters) = self.body_parameters() {
             if set_rigid_body_rotation == true {
-                physics::set_body_rotation(parameters, rotation);
+                framework.physics.set_body_rotation(parameters, rotation);
             }
         }
     }
@@ -231,27 +231,28 @@ pub trait Object: std::fmt::Debug + Downcast {
         self.children_list_mut().last_mut().unwrap().start();
     }
 
-    fn delete_child(&mut self, name: &str) -> bool {
+    fn delete_child(&mut self, framework: &mut Framework, name: &str) -> bool {
         for (idx, object) in self.children_list_mut().iter_mut().enumerate() {
             if object.name() == name {
                 if let Some(body_parameters) = object.body_parameters() {
                     if let Some(handle) = body_parameters.rigid_body_handle {
-                        physics::remove_rigid_body_by_handle(handle);
+                        framework.physics.remove_rigid_body_by_handle(handle);
                     }
                     if let Some(handle) = body_parameters.collider_handle {
-                        physics::remove_collider_by_handle(handle);
+                        framework.physics.remove_collider_by_handle(handle);
                     }
                 }
                 self.children_list_mut().remove(idx);
                 return true;
             }
-            return object.delete_child(name);
+            return object.delete_child(framework, name);
         }
         false
     }
 
     fn build_object_rigid_body(
         &mut self,
+        framework: &mut Framework,
         body_type: Option<BodyType>,
         custom_render_collider: Option<RenderColliderType>,
         mass: f32,
@@ -260,7 +261,7 @@ pub trait Object: std::fmt::Debug + Downcast {
     ) {
         match body_type {
             Some(body_type) => {
-                let mut body_parameters = physics::new_rigid_body(
+                let mut body_parameters = framework.physics.new_rigid_body(
                     body_type,
                     Some(self.global_transform()),
                     mass,
@@ -275,7 +276,7 @@ pub trait Object: std::fmt::Debug + Downcast {
             }
             None => {
                 if let Some(mut body) = self.body_parameters() {
-                    physics::remove_rigid_body(&mut body);
+                    framework.physics.remove_rigid_body(&mut body);
                 }
                 if let Some(render_collider) = custom_render_collider {
                     let mut params = ObjectBodyParameters::empty();
