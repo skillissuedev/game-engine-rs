@@ -4,7 +4,7 @@ use clap::Parser;
 use framework::DebugMode;
 use rand::Rng;
 
-use crate::{framework::set_global_system_value, managers::{networking::get_current_networking_mode, saves::{load_save, new_save, register_save_value}, systems::SystemValue}};
+use crate::{framework::set_global_system_value, managers::{networking::get_current_networking_mode, systems::SystemValue}};
 
 mod assets;
 mod framework;
@@ -34,22 +34,22 @@ fn main() {
         }
 
         set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(seed)]);
-        register_save_value("WorldGeneratorSeed");
+        //register_save_value("WorldGeneratorSeed");
 
-        match new_save(&save_name) {
+        /*match new_save(&save_name) {
             Ok(_) => println!("Successfully created a new save file!"),
             Err(err) => println!("Failed to create a new save file!\nErr: {}", err),
-        }
+        }*/
         return;
     }
 
     if let Some(save) = args.load_save {
         println!("Runnning game as server on port 7777");
 
-        if let Err(_) = load_save(&save) {
+        /*if let Err(_) = load_save(&save) {
             println!("Failed to load the save file and start the server!");
             return;
-        }
+        }*/
 
         managers::networking::new_server(7777, 10).unwrap();
         framework::start_game_without_render();

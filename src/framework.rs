@@ -4,14 +4,7 @@ use raw_window_handle::HasRawWindowHandle;
 use crate::{
     game::game_main,
     managers::{
-        self,
-        assets::get_full_asset_path,
-        input::InputManager, navigation::{self, NavigationManager},
-        networking,
-        physics::{self, CollisionGroups, PhysicsManager},
-        render::{self, ShadowTextures},
-        sound::{self, set_listener_transform},
-        systems::{self, SystemValue},
+        self, assets::get_full_asset_path, input::InputManager, navigation::{self, NavigationManager}, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{self, ShadowTextures}, saves::SavesManager, sound::{self, set_listener_transform}, systems::{self, SystemValue}
     }, objects::{camera_position::CameraPosition, character_controller::CharacterController},
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
@@ -72,7 +65,8 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         al: Some(al),
         input: InputManager::default(),
         navigation: NavigationManager::default(),
-        physics: PhysicsManager::default()
+        physics: PhysicsManager::default(),
+        saves: SavesManager::default(),
     };
 
     render::init(&display);
@@ -181,7 +175,8 @@ pub fn start_game_without_render() {
         al: None,
         input: InputManager::default(),
         navigation: NavigationManager::default(),
-        physics: PhysicsManager::default()
+        physics: PhysicsManager::default(),
+        saves: SavesManager::default(),
     };
 
 
@@ -346,7 +341,8 @@ pub struct Framework {
     pub al: Option<EzAl>,
     pub input: InputManager,
     pub navigation: NavigationManager,
-    pub physics: PhysicsManager
+    pub physics: PhysicsManager,
+    pub saves: SavesManager,
 }
 
 impl Framework {
