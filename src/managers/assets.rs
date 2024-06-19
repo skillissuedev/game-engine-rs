@@ -1,5 +1,77 @@
-use super::debugger::crash;
-use std::env;
+use crate::assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset};
+
+use super::debugger::{error, crash};
+use std::{collections::HashMap, env};
+
+#[derive(Default)]
+pub struct AssetManager {
+    loaded_model_assets: HashMap<String, ModelAsset>,
+    loaded_sound_assets: HashMap<String, SoundAsset>,
+    loaded_texture_assets: HashMap<String, TextureAsset>,
+    loaded_shader_assets: HashMap<String, ShaderAsset>,
+}
+
+impl AssetManager {
+    pub fn preload_model_asset(&mut self, asset_id: String, asset: ModelAsset) -> Result<(), AssetManagerError> {
+        match self.loaded_model_assets.get(&asset_id) {
+            Some(_) => {
+                error(
+                    &format!("AssetManager error!\nFailed to preload ModelAsset '{}'\nError: ModelAsset with this id already exists!", asset_id)
+                );
+                Err(AssetManagerError::AssetAlreadyLoaded)
+            },
+            None => {
+                self.loaded_model_assets.insert(asset_id, asset);
+                Ok(())
+            },
+        }
+    }
+
+    pub fn preload_sound_asset(&mut self, asset_id: String, asset: SoundAsset) -> Result<(), AssetManagerError> {
+        match self.loaded_sound_assets.get(&asset_id) {
+            Some(_) => {
+                error(
+                    &format!("AssetManager error!\nFailed to preload SoundAsset '{}'\nError: SoundAsset with this id already exists!", asset_id)
+                );
+                Err(AssetManagerError::AssetAlreadyLoaded)
+            },
+            None => {
+                self.loaded_sound_assets.insert(asset_id, asset);
+                Ok(())
+            },
+        }
+    }
+
+    pub fn preload_texture_asset(&mut self, asset_id: String, asset: TextureAsset) -> Result<(), AssetManagerError> {
+        match self.loaded_texture_assets.get(&asset_id) {
+            Some(_) => {
+                error(
+                    &format!("AssetManager error!\nFailed to preload TextureAsset '{}'\nError: TextureAsset with this id already exists!", asset_id)
+                );
+                Err(AssetManagerError::AssetAlreadyLoaded)
+            },
+            None => {
+                self.loaded_texture_assets.insert(asset_id, asset);
+                Ok(())
+            },
+        }
+    }
+
+    pub fn preload_shader_asset(&mut self, asset_id: String, asset: ShaderAsset) -> Result<(), AssetManagerError> {
+        match self.loaded_shader_assets.get(&asset_id) {
+            Some(_) => {
+                error(
+                    &format!("AssetManager error!\nFailed to preload ShaderAsset '{}'\nError: ShaderAsset with this id already exists!", asset_id)
+                );
+                Err(AssetManagerError::AssetAlreadyLoaded)
+            },
+            None => {
+                self.loaded_shader_assets.insert(asset_id, asset);
+                Ok(())
+            },
+        }
+    }
+}
 
 pub fn get_full_asset_path(path: &str) -> String {
     let mut exec_path: String = "".to_string();
@@ -32,4 +104,9 @@ pub fn get_full_asset_path(path: &str) -> String {
     }
 
     full_path
+}
+
+#[derive(Debug)]
+pub enum AssetManagerError {
+    AssetAlreadyLoaded
 }

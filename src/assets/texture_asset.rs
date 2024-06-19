@@ -1,4 +1,4 @@
-use crate::managers::{assets::get_full_asset_path, debugger};
+use crate::{framework::Framework, managers::{assets::get_full_asset_path, debugger}};
 
 pub static mut DEFAULT_TEXTURE_PATH: &str = "textures/default_texture.png";
 
@@ -75,6 +75,21 @@ impl TextureAsset {
             image_raw: image,
             image_dimensions,
         })
+    }
+
+    pub fn preload_texture_asset(framework: &mut Framework, asset_id: String, path: &str) -> Result<(), ()> {
+        match Self::from_file(&path) {
+            Ok(asset) => 
+                if let Err(err) = framework.assets.preload_texture_asset(asset_id, asset) {
+                    debugger::error(&format!("Failed to preload the TexutreAsset!\nAssetManager error: {:?}\nPath: {:?}", err, path));
+                    return Err(())
+                },
+            Err(err) => {
+                debugger::error(&format!("Failed to preload the TexutreAsset!\nFailed to load the asset\nError: {:?}\nPath: {:?}", err, path));
+                return Err(())
+            },
+        }
+        Ok(())
     }
 }
 

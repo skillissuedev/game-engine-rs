@@ -1,9 +1,7 @@
 use std::path::Path;
-use crate::managers::{
-    assets::{self, get_full_asset_path},
-    debugger::{self, error, warn},
-    render::Vertex,
-};
+use crate::{framework::Framework, managers::{
+    assets::get_full_asset_path, debugger::{self, error, warn}, render::Vertex
+}};
 use data_url::DataUrl;
 use glam::Mat4;
 use gltf::Gltf;
@@ -68,7 +66,7 @@ pub enum AnimationChannelType {
 
 impl ModelAsset {
     pub fn from_gltf(path: &str) -> Result<ModelAsset, ModelAssetError> {
-        let full_path = assets::get_full_asset_path(path);
+        let full_path = get_full_asset_path(path);
         let gltf_result = Gltf::open(&full_path);
         let gltf: Gltf;
         match gltf_result {
@@ -328,6 +326,22 @@ impl ModelAsset {
             joints_mats: joints_vec_to_array(joints.clone()),
             joints_inverse_bind_mats: joints_vec_to_inverse_mat_array(joints.clone()),
         })
+    }
+
+    pub fn preload_model_asset_from_gltf(framework: &mut Framework, asset_id: &str, path: &str) -> Result<(), ()> {
+        let asset = Self::from_gltf(path);
+        match asset {
+            Ok(asset) => 
+                if let Err(err) = framework.assets.preload_model_asset(asset_id.into(), asset) {
+                    debugger::error(&format!("Failed to preload the ModelAsset!\nAssetManager error\nErr: {:?}", err));
+                    return Err(())
+                },
+            Err(err) => {
+                debugger::error(&format!("Failed to preload the ModelAsset!\nFailed to load the asset\nErr: {:?}", err));
+                return Err(())
+            },
+        }
+        Ok(())
     }
 
     pub fn get_animations_list(&self) -> Option<&Vec<Animation>> {
