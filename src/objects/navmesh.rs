@@ -135,26 +135,6 @@ impl Object for NavigationGround {
         _: &mut glium::framebuffer::SimpleFrameBuffer,
     ) {}
 
-    fn debug_render(&self) {
-        // Adding collider to render manager's render colliders list if debug mode != None
-        match crate::framework::get_debug_mode() {
-            crate::framework::DebugMode::Full => {
-                if let Some(body) = self.body_parameters() {
-                    if let Some(mut render_collider) = body.render_collider_type {
-                        let transform = self.global_transform();
-                        render_collider.set_transform(transform.position, transform.rotation);
-                        crate::managers::render::add_collider_to_draw(render_collider);
-                    }
-                }
-
-                self.children_list()
-                    .iter()
-                    .for_each(|child| child.debug_render());
-            }
-            _ => (),
-        }
-    }
-
     fn add_child(&mut self, mut object: Box<dyn Object>) {
         object.set_parent_transform(self.global_transform());
         dbg!(object.object_id());

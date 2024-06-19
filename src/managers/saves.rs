@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs::{self, File}, io::{self, Read, Write}, path::Path};
 
-use crate::{framework, managers::debugger};
+use crate::{framework::{self, Framework}, managers::debugger};
 
 use super::{assets::get_full_asset_path, systems::SystemValue};
 
@@ -11,7 +11,7 @@ pub struct SavesManager {
 }
 
 impl SavesManager {
-    pub fn load_save(&mut self, save_name: &str) -> Result<(), ()> {
+    pub fn load_save(&mut self, framework: &mut Framework, save_name: &str) -> Result<(), ()> {
         let save_file_path = "saves/".to_string() + save_name;
         let save_file_path = get_full_asset_path(&save_file_path);
 
@@ -38,7 +38,7 @@ impl SavesManager {
             Ok(values) => {
                 for (key, value) in values {
                     self.save_system_values.push(key.into());
-                    framework::set_global_system_value(key, value);
+                    framework.set_global_system_value(key, value);
                 };
                 self.current_save_file = Some(save_name.into());
                 Ok(())
@@ -64,7 +64,7 @@ impl SavesManager {
         self.save_system_values.retain(|value| value != system_value_name);
     }
 
-    pub fn new_save(&mut self, save_name: &str) -> Result<(), io::Error> {
+    pub fn new_save(&mut self, framework: &mut Framework, save_name: &str) -> Result<(), io::Error> {
         let save_dir_path = "saves/";
         let save_dir_path = get_full_asset_path(save_dir_path);
 
@@ -83,16 +83,16 @@ impl SavesManager {
 
         println!("saves manager: save file '{}' created and used as current one!", save_name);
         self.current_save_file = Some(save_name.into());
-        self.save_game();
+        self.save_game(framework);
 
         Ok(())
     }
 
-    pub fn save_game(&mut self) {
+    pub fn save_game(&mut self, framework: &mut Framework) {
         let mut values_list: HashMap<&str, Vec<SystemValue>> = HashMap::new();
 
         for value_name in &self.save_system_values {
-            let value = framework::get_global_system_value(&value_name);
+            let value = framework.get_global_system_value(&value_name);
             match value {
                 Some(value) => {
                     values_list.insert(value_name, value);

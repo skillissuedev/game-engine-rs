@@ -4,7 +4,7 @@ use clap::Parser;
 use framework::DebugMode;
 use rand::Rng;
 
-use crate::{framework::set_global_system_value, managers::{networking::get_current_networking_mode, systems::SystemValue}};
+use crate::managers::networking::get_current_networking_mode;
 
 mod assets;
 mod framework;
@@ -33,7 +33,7 @@ fn main() {
             },
         }
 
-        set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(seed)]);
+        //set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(seed)]);
         //register_save_value("WorldGeneratorSeed");
 
         /*match new_save(&save_name) {

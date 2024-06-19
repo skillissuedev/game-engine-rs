@@ -175,9 +175,9 @@ pub trait Object: std::fmt::Debug + Downcast {
         });
     }
 
-    fn debug_render(&self) {
+    fn debug_render(&self, framework: &mut Framework) {
         // Adding collider to render manager's render colliders list if debug mode != None
-        match framework::get_debug_mode() {
+        match framework.debug_mode() {
             framework::DebugMode::Full => {
                 if let Some(body) = self.body_parameters() {
                     if let Some(mut render_collider) = body.render_collider_type {
@@ -189,7 +189,7 @@ pub trait Object: std::fmt::Debug + Downcast {
 
                 self.children_list()
                     .iter()
-                    .for_each(|child| child.debug_render());
+                    .for_each(|child| child.debug_render(framework));
             }
             _ => (),
         }

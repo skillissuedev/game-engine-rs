@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::math_utils::deg_to_rad;
+use crate::{framework::Framework, math_utils::deg_to_rad};
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
     framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer
@@ -225,7 +225,7 @@ pub fn add_ray_to_draw(ray: RenderRay) {
     }
 }
 
-pub fn draw(display: &Display<WindowSurface>, target: &mut Frame, shadow_textures: &ShadowTextures) {
+pub fn draw(display: &Display<WindowSurface>, target: &mut Frame, shadow_textures: &ShadowTextures, framework: &mut Framework) {
     //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
     target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
 
@@ -254,7 +254,7 @@ pub fn draw(display: &Display<WindowSurface>, target: &mut Frame, shadow_texture
 
     update_camera_vectors();
 
-    systems::render(&display, target, &cascades, shadow_textures);
+    systems::render(&display, target, &cascades, shadow_textures, framework);
 }
 
 pub fn update() {

@@ -1,6 +1,6 @@
 use super::System;
 use crate::{
-    framework::{get_delta_time, set_global_system_value, Framework}, managers::{
+    framework::Framework, managers::{
         //framework.input.{self, is_mouse_locked, set_mouse_locked, InputEventType},
         input::InputEventType, networking::Message, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
     }, objects::Object
@@ -61,7 +61,7 @@ impl System for PlayerManager {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
         let camera_position = get_camera_position();
-        set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(-camera_position.x, camera_position.y, camera_position.z)]);
+        framework.set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(-camera_position.x, camera_position.y, camera_position.z)]);
 
         set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
@@ -71,7 +71,7 @@ impl System for PlayerManager {
         }
 
         // movement
-        let delta_time = get_delta_time().as_secs_f32();
+        let delta_time = framework.delta_time().as_secs_f32();
         let delta = framework.input.mouse_delta();
         let camera_rotation = get_camera_rotation();
 

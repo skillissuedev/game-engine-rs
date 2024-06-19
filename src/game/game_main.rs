@@ -1,7 +1,7 @@
 use winit::keyboard::KeyCode;
 
 use crate::{
-    framework::{get_debug_mode, set_debug_mode, DebugMode, Framework},
+    framework::{DebugMode, Framework},
     managers::{
         input::InputEventType, /*scripting::lua::LuaSystem,*/ systems::add_system
     },
@@ -25,10 +25,10 @@ pub fn start(framework: &mut Framework) {
 
 pub fn update(framework: &mut Framework) {
     if framework.input.is_bind_pressed("debug_toggle") {
-        match get_debug_mode() {
-            DebugMode::None => set_debug_mode(DebugMode::ShowFps),
+        match framework.debug_mode() {
+            DebugMode::None => framework.set_debug_mode(DebugMode::ShowFps),
             _ => {
-                set_debug_mode(DebugMode::None);
+                framework.set_debug_mode(DebugMode::None);
             }
         }
     }

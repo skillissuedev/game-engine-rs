@@ -214,7 +214,7 @@ impl CharacterController {
                 };
 
                 let movement = self.controller.move_shape(
-                    framework::get_delta_time().as_secs_f32(),
+                    framework.delta_time().as_secs_f32(),
                     &framework.physics.rigid_body_set,
                     &framework.physics.collider_set,
                     &framework.physics.query_pipeline,

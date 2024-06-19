@@ -86,6 +86,7 @@ pub trait System {
         target: &mut Frame,
         cascades: &Cascades,
         shadow_textures: &ShadowTextures,
+        framework: &mut Framework
     ) {
         self.objects_list_mut()
             .into_iter()
@@ -95,7 +96,7 @@ pub trait System {
             .for_each(|object| object.render_children(display, target, cascades, shadow_textures));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.debug_render());
+            .for_each(|object| object.debug_render(framework));
     }
 
     fn shadow_render_objects(

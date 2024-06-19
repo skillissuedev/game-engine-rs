@@ -63,6 +63,7 @@ pub fn render(
     target: &mut Frame,
     cascades: &Cascades,
     shadow_textures: &ShadowTextures,
+    framework: &mut Framework
 ) {
     unsafe {
         if networking::is_server() {
@@ -73,7 +74,7 @@ pub fn render(
         } else {
             for system in &mut SYSTEMS {
                 system.client_render();
-                system.render_objects(display, target, cascades, shadow_textures);
+                system.render_objects(display, target, cascades, shadow_textures, framework);
             }
         }
     }

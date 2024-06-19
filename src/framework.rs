@@ -16,15 +16,10 @@ use std::{
     collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
 
-static mut DEBUG_MODE: DebugMode = DebugMode::None;
-static mut DELTA_TIME: Duration = Duration::new(0, 0);
 static FONT: Lazy<Vec<u8>> =
     Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
-static mut SYSTEM_GLOBALS: Lazy<HashMap<String, Vec<SystemValue>>> = Lazy::new(|| HashMap::new());
-static mut SCREEN_RESOLUTION: Vec2 = Vec2::new(1280.0, 720.0);
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
-    unsafe { DEBUG_MODE = debug_mode }
     let event_loop: EventLoop<_> = EventLoopBuilder::new()
         .build()
         .expect("Event loop building failed");
@@ -69,6 +64,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         saves: SavesManager::default(),
         assets: AssetManager::default(),
     };
+    framework.set_debug_mode(debug_mode);
 
     render::init(&display);
 
@@ -104,7 +100,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             }
 
                             egui_glium.run(&window, |ctx| {
-                                match get_debug_mode() {
+                                match framework.debug_mode() {
                                     DebugMode::None => (),
                                     _ => {
                                         Window::new("inspector").show(ctx, |ui| {
@@ -124,7 +120,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
                             let mut target = display.draw();
 
-                            render::draw(&display, &mut target, &shadow_textures);
+                            render::draw(&display, &mut target, &shadow_textures, &mut framework);
                             //game_main::render();
                             render::debug_draw(&display, &mut target);
                             egui_glium.paint(&display, &mut target);
@@ -144,7 +140,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             //window.request_inner_size(size);
 
                             unsafe {
-                                SCREEN_RESOLUTION = Vec2::new(win_w as f32, win_h as f32);
                                 render::ASPECT_RATIO = win_w as f32 / win_h as f32;
                             }
                         }
@@ -198,7 +193,8 @@ pub fn start_game_without_render() {
 }
 
 fn update_game(framework: &mut Framework, delta_time: Duration) {
-    set_delta_time(delta_time);
+    framework.delta_time = delta_time;
+
     render::update();
     framework.physics.update();
     networking::update(delta_time);
@@ -219,53 +215,6 @@ fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
     None
 }
 
-pub fn get_debug_mode() -> DebugMode {
-    unsafe { DEBUG_MODE }
-}
-pub fn get_resolution() -> Vec2 {
-    unsafe { SCREEN_RESOLUTION }
-}
-
-pub fn set_debug_mode(mode: DebugMode) {
-    unsafe { DEBUG_MODE = mode }
-}
-
-fn set_audio_listener_transformations(al: &EzAl) {
-    let camera_pos = render::get_camera_position();
-    let camera_rot = render::get_camera_rotation();
-
-    sound::set_listener_position(al, camera_pos);
-    sound::set_listener_orientation(al, camera_rot);
-}
-
-fn set_delta_time(dt: Duration) {
-    unsafe {
-        DELTA_TIME = dt;
-    }
-}
-
-pub fn set_global_system_value(key: &str, value: Vec<SystemValue>) {
-    unsafe {
-        if let Some(hashmap_val) = SYSTEM_GLOBALS.get_mut(key) {
-            *hashmap_val = value;
-        } else {
-            SYSTEM_GLOBALS.insert(key.into(), value);
-        }
-    }
-}
-
-pub fn get_global_system_value(key: &str) -> Option<Vec<SystemValue>> {
-    unsafe {
-        match SYSTEM_GLOBALS.get(key) {
-            Some(value) => Some(value.clone()),
-            None => None
-        }
-    }
-}
-
-pub fn get_delta_time() -> Duration {
-    unsafe { DELTA_TIME }
-}
 
 #[derive(Clone, Copy)]
 pub enum DebugMode {
@@ -349,8 +298,35 @@ pub struct Framework {
 }
 
 impl Framework {
+    pub fn debug_mode(&self) -> DebugMode {
+        self.debug_mode
+    }
+
+    pub fn set_debug_mode(&mut self, debug_mode: DebugMode) {
+        self.debug_mode = debug_mode
+    }
+
+    pub fn delta_time(&self) -> Duration {
+        self.delta_time
+    }
+
     pub fn new_camera_position_object(name: &str) -> CameraPosition {
         CameraPosition::new(name)
+    }
+
+    pub fn set_global_system_value(&mut self, key: &str, value: Vec<SystemValue>) {
+        if let Some(hashmap_val) = self.system_globals.get_mut(key) {
+            *hashmap_val = value;
+        } else {
+            self.system_globals.insert(key.into(), value);
+        }
+    }
+
+    pub fn get_global_system_value(&self, key: &str) -> Option<Vec<SystemValue>> {
+        match self.system_globals.get(key) {
+            Some(value) => Some(value.clone()),
+            None => None
+        }
     }
 
     pub fn new_character_controller_object(

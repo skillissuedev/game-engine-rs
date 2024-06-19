@@ -1,7 +1,7 @@
 use egui_glium::egui_winit::egui::{self, ComboBox, TextEdit, Ui};
 use glam::Vec3;
 
-use crate::framework::{set_debug_mode, DebugMode, Framework};
+use crate::framework::{DebugMode, Framework};
 
 use super::{physics::RenderColliderType, systems};
 
@@ -9,7 +9,7 @@ use super::{physics::RenderColliderType, systems};
 pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
     ui.label(format!("fps: {}", fps));
     ui.checkbox(&mut ui_state.full_debug_checkbox_val, "full debug");
-    handle_full_debug_checkbox_value(ui_state.full_debug_checkbox_val);
+    handle_full_debug_checkbox_value(framework, ui_state.full_debug_checkbox_val);
 
     ui.separator();
 
@@ -336,11 +336,11 @@ enum InspectorRenderColliderType {
     Cylinder, //(f32, f32),
 }
 
-fn handle_full_debug_checkbox_value(full_debug: bool) {
+fn handle_full_debug_checkbox_value(framework: &mut Framework, full_debug: bool) {
     if full_debug {
-        set_debug_mode(DebugMode::Full)
+        framework.set_debug_mode(DebugMode::Full)
     } else {
-        set_debug_mode(DebugMode::ShowFps)
+        framework.set_debug_mode(DebugMode::ShowFps)
     }
 }
 
