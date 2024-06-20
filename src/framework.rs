@@ -1,6 +1,8 @@
 use ez_al::EzAl;
 use glutin::surface::GlSurface;
+use gtk::prelude::DisplayExtManual;
 use raw_window_handle::HasRawWindowHandle;
+use wry::{Rect, WebViewBuilder};
 use crate::{
     game::game_main,
     managers::{
@@ -24,6 +26,20 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .build()
         .expect("Event loop building failed");
     let (window, display) = new_window(&event_loop);
+    dbg!(window.raw_window_handle());
+    let web_view = WebViewBuilder::new(&window)
+        .with_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        .unwrap()
+        .with_bounds(Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        })
+        .build()
+        .unwrap();
+
+
 
     let mut egui_glium = egui_glium::EguiGlium::new(egui::ViewportId(Id::new(0)), &display, &window, &event_loop);
 
@@ -77,6 +93,9 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
 
     event_loop.run(move |ev, window_target| {
+        while gtk::events_pending() {
+            gtk::main_iteration_do(false);
+        }
         match ev {
             Event::AboutToWait => {
                 window.request_redraw();
@@ -231,6 +250,11 @@ pub struct GameSettings {
 // Glium's SimpleWindowBuilder's build function with a few changes 
 // https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
 fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, Display<glutin::surface::WindowSurface>) {
+    gtk::init().unwrap();
+    if gtk::gdk::Display::default().unwrap().backend().is_wayland() {
+      panic!("No wayland :(");
+    }
+
     // First we start by opening a new Window
     let window_builder = WindowBuilder::new()
         .with_title("projectbaldej")
