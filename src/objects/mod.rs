@@ -67,18 +67,13 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn render(
         &mut self,
-        _display: &Display<WindowSurface>,
-        _target: &mut Frame,
-        _cascades: &Cascades,
-        _shadow_textures: &ShadowTextures,
+        _framework: &mut Framework
     ) {
     }
 
     fn shadow_render(
         &mut self,
-        _view_proj: &Mat4,
-        _display: &Display<WindowSurface>,
-        _target: &mut SimpleFrameBuffer,
+        _framework: &mut Framework
     ) {
     }
 

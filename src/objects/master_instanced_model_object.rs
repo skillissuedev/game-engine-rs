@@ -7,7 +7,7 @@ use crate::{
     }, framework::Framework, managers::{
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
-        render::{self, get_projection_matrix, get_view_matrix, Cascades, ShadowTextures, Vertex},
+        render::{self, Cascades, ShadowTextures, Vertex},
     }
 };
 use egui_glium::egui_winit::egui::ComboBox;
@@ -274,7 +274,7 @@ impl Object for MasterInstancedModelObject {
             let inverse_bind_mats =
                 UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
 
-            let camera_position: [f32; 3] = render::get_camera_position().into();
+            let camera_position: [f32; 3] = framework.render.get_camera_position().into();
 
 
             let sampler_behaviour = glium::uniforms::SamplerBehavior {

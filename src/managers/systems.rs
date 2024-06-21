@@ -59,10 +59,6 @@ pub fn get_systems_iter<'a>() -> std::slice::Iter<'a, Box<dyn System>> {
 }
 
 pub fn render(
-    display: &Display<WindowSurface>,
-    target: &mut Frame,
-    cascades: &Cascades,
-    shadow_textures: &ShadowTextures,
     framework: &mut Framework
 ) {
     unsafe {
@@ -74,7 +70,7 @@ pub fn render(
         } else {
             for system in &mut SYSTEMS {
                 system.client_render();
-                system.render_objects(display, target, cascades, shadow_textures, framework);
+                system.render_objects(framework);
             }
         }
     }

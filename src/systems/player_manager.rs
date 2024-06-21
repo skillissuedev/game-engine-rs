@@ -2,7 +2,7 @@ use super::System;
 use crate::{
     framework::Framework, managers::{
         //framework.input.{self, is_mouse_locked, set_mouse_locked, InputEventType},
-        input::InputEventType, networking::Message, render::{get_camera_front, get_camera_position, get_camera_right, get_camera_rotation, set_camera_position, set_camera_rotation, set_light_direction}, systems::{CallList, SystemValue}
+        input::InputEventType, networking::Message, systems::{CallList, SystemValue}
     }, objects::Object
 };
 use glam::Vec3;

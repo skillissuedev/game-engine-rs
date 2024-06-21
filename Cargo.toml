@@ -34,8 +34,6 @@ glutin-winit = "0.4.0"
 raw-window-handle = "0.5"
 egui_glium = "0.26.3"
 glium = "0.34.0"
-wry = "0.35.2"
-gtk = "0.18.1"
 
 [profile.dev.package.rapier3d]
 opt-level = 3

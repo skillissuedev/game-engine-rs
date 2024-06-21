@@ -1,12 +1,10 @@
 use ez_al::EzAl;
 use glutin::surface::GlSurface;
-use gtk::prelude::DisplayExtManual;
 use raw_window_handle::HasRawWindowHandle;
-use wry::{Rect, WebViewBuilder};
 use crate::{
     game::game_main,
     managers::{
-        self, assets::{get_full_asset_path, AssetManager}, input::InputManager, navigation::{self, NavigationManager}, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{self, ShadowTextures}, saves::SavesManager, sound::{self, set_listener_transform}, systems::{self, SystemValue}
+        self, assets::{get_full_asset_path, AssetManager}, input::InputManager, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{self, RenderManager, ShadowTextures}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
     }, objects::{camera_position::CameraPosition, character_controller::CharacterController},
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
@@ -26,20 +24,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .build()
         .expect("Event loop building failed");
     let (window, display) = new_window(&event_loop);
-    dbg!(window.raw_window_handle());
-    let web_view = WebViewBuilder::new(&window)
-        .with_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        .unwrap()
-        .with_bounds(Rect {
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 200,
-        })
-        .build()
-        .unwrap();
-
-
 
     let mut egui_glium = egui_glium::EguiGlium::new(egui::ViewportId(Id::new(0)), &display, &window, &event_loop);
 
@@ -79,10 +63,11 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
+        render: Some(RenderManager::new(display))
     };
     framework.set_debug_mode(debug_mode);
 
-    render::init(&display);
+    //render::init(&display);
 
     framework.navigation.update();
     game_main::start(&mut framework);
@@ -90,12 +75,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut win_w = window.inner_size().width;
     let mut win_h = window.inner_size().height;
 
-    let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
-
     event_loop.run(move |ev, window_target| {
-        while gtk::events_pending() {
-            gtk::main_iteration_do(false);
-        }
         match ev {
             Event::AboutToWait => {
                 window.request_redraw();
@@ -131,20 +111,21 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                 systems::ui_render(ctx);
                             });
 
+                            let render = framework.render.unwrap();
+
                             set_listener_transform(
                                 &framework.al.as_ref().unwrap(),
-                                render::get_camera_position(),
-                                render::get_camera_front(),
+                                render.get_camera_position(),
+                                render.get_camera_front(),
                             );
 
                             let mut target = display.draw();
-
-                            render::draw(&display, &mut target, &shadow_textures, &mut framework);
-                            //game_main::render();
-                            render::debug_draw(&display, &mut target);
+                            render.draw();
+                            systems::render(&mut framework);
+                            render.debug_draw();
+                            render.finish_render();
                             egui_glium.paint(&display, &mut target);
 
-                            target.finish().unwrap();
                             frames_count += 1;
                         },
                         WindowEvent::CloseRequested => {
@@ -158,9 +139,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             display.resize(size.into());
                             //window.request_inner_size(size);
 
-                            unsafe {
-                                render::ASPECT_RATIO = win_w as f32 / win_h as f32;
-                            }
+                            framework.render.unwrap().aspect_ratio = win_w as f32 / win_h as f32;
                         }
                         _ => (),
                     }
@@ -193,6 +172,7 @@ pub fn start_game_without_render() {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
+        render: RenderManager::default()
     };
 
 
@@ -250,11 +230,6 @@ pub struct GameSettings {
 // Glium's SimpleWindowBuilder's build function with a few changes 
 // https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
 fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, Display<glutin::surface::WindowSurface>) {
-    gtk::init().unwrap();
-    if gtk::gdk::Display::default().unwrap().backend().is_wayland() {
-      panic!("No wayland :(");
-    }
-
     // First we start by opening a new Window
     let window_builder = WindowBuilder::new()
         .with_title("projectbaldej")
@@ -319,6 +294,7 @@ pub struct Framework {
     pub physics: PhysicsManager,
     pub saves: SavesManager,
     pub assets: AssetManager,
+    pub render: Option<RenderManager>
 }
 
 impl Framework {

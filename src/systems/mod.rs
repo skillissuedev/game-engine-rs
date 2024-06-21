@@ -82,18 +82,14 @@ pub trait System {
 
     fn render_objects(
         &mut self,
-        display: &Display<WindowSurface>,
-        target: &mut Frame,
-        cascades: &Cascades,
-        shadow_textures: &ShadowTextures,
         framework: &mut Framework
     ) {
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.render(display, target, cascades, shadow_textures));
+            .for_each(|object| object.render(framework));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.render_children(display, target, cascades, shadow_textures));
+            .for_each(|object| object.render_children(framework));
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.debug_render(framework));
