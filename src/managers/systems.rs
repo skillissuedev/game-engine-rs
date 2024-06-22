@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    debugger, networking, render::{Cascades, ShadowTextures}
+    debugger, networking, render::{Cascades, CurrentCascade, RenderManager, ShadowTextures}
 };
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
@@ -86,11 +86,11 @@ pub fn ui_render(
     }
 }
 
-pub fn shadow_render(view_proj: &Mat4, display: &Display<WindowSurface>, target: &mut SimpleFrameBuffer) {
+pub fn shadow_render(render: &mut RenderManager, cascade: &CurrentCascade) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {
-                system.shadow_render_objects(view_proj, display, target);
+                system.shadow_render_objects(render, cascade);
             }
         }
     }

@@ -59,11 +59,19 @@ impl System for PlayerManager {
 
     fn client_update(&mut self, framework: &mut Framework) {
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
-        set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
-        let camera_position = get_camera_position();
-        framework.set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(-camera_position.x, camera_position.y, camera_position.z)]);
+        let camera_position;
+        let delta_time = framework.delta_time();
+        {
+            let render = framework.render.as_mut().unwrap();
+            render.set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
+            camera_position = render.get_camera_position();
+        }
+        {
+            framework.set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(-camera_position.x, camera_position.y, camera_position.z)]);
+        }
 
-        set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
+        let render = framework.render.as_mut().unwrap();
+        render.set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
 
         //locking mouse
         if framework.input.is_bind_pressed("lock_mouse") {
@@ -71,61 +79,61 @@ impl System for PlayerManager {
         }
 
         // movement
-        let delta_time = framework.delta_time().as_secs_f32();
+        let delta_time = delta_time.as_secs_f32();
         let delta = framework.input.mouse_delta();
-        let camera_rotation = get_camera_rotation();
+        let camera_rotation = render.get_camera_rotation();
 
-        set_camera_rotation(Vec3::new(camera_rotation.x - delta.y * 50.0 * delta_time, camera_rotation.y + delta.x * 50.0 * delta_time, camera_rotation.z));
+        render.set_camera_rotation(Vec3::new(camera_rotation.x - delta.y * 50.0 * delta_time, camera_rotation.y + delta.x * 50.0 * delta_time, camera_rotation.z));
 
         let speed = 420.0 * delta_time;
 
-        let camera_front = get_camera_front();
-        let camera_right = get_camera_right();
-        let mut camera_position = get_camera_position();
+        let camera_front = render.get_camera_front();
+        let camera_right = render.get_camera_right();
+        let mut camera_position = render.get_camera_position();
 
         if framework.input.is_bind_down("cam_up") {
-            set_camera_position(Vec3::new(
+            render.set_camera_position(Vec3::new(
                 camera_position.x,
                 camera_position.y + speed,
                 camera_position.z,
             ));
-            camera_position = get_camera_position();
+            camera_position = render.get_camera_position();
         }
 
         if framework.input.is_bind_down("cam_down") {
-            set_camera_position(Vec3::new(
+            render.set_camera_position(Vec3::new(
                 camera_position.x,
                 camera_position.y - speed,
                 camera_position.z,
             ));
-            camera_position = get_camera_position();
+            camera_position = render.get_camera_position();
         }
 
         if framework.input.is_bind_down("forward") {
-            set_camera_position(camera_position + camera_front * speed);
-            camera_position = get_camera_position();
+            render.set_camera_position(camera_position + camera_front * speed);
+            camera_position = render.get_camera_position();
         }
 
         if framework.input.is_bind_down("backwards") {
-            set_camera_position(camera_position - camera_front * speed);
-            camera_position = get_camera_position();
+            render.set_camera_position(camera_position - camera_front * speed);
+            camera_position = render.get_camera_position();
         }
 
         if framework.input.is_bind_down("left") {
-            set_camera_position(camera_position - camera_right * speed);
-            camera_position = get_camera_position();
+            render.set_camera_position(camera_position - camera_right * speed);
+            camera_position = render.get_camera_position();
         }
 
         if framework.input.is_bind_down("right") {
-            set_camera_position(camera_position + camera_right * speed);
+            render.set_camera_position(camera_position + camera_right * speed);
         }
 
-        if get_camera_rotation().x > 89.0 {
-            let rot = get_camera_rotation();
-            set_camera_rotation(Vec3::new(89.0, rot.y, rot.z));
-        } else if get_camera_rotation().x < -89.0 {
-            let rot = get_camera_rotation();
-            set_camera_rotation(Vec3::new(-89.0, rot.y, rot.z));
+        if render.get_camera_rotation().x > 89.0 {
+            let rot = render.get_camera_rotation();
+            render.set_camera_rotation(Vec3::new(89.0, rot.y, rot.z));
+        } else if render.get_camera_rotation().x < -89.0 {
+            let rot = render.get_camera_rotation();
+            render.set_camera_rotation(Vec3::new(-89.0, rot.y, rot.z));
         }
         //println!("{}", get_camera_position());
     }

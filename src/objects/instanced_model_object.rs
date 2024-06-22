@@ -1,12 +1,6 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{framework::Framework, managers::{
-    physics::ObjectBodyParameters,
-    render::{self, Cascades, ShadowTextures},
-}, math_utils::deg_vec_to_rad};
+use crate::{framework::Framework, managers::{debugger, physics::ObjectBodyParameters}, math_utils::deg_vec_to_rad};
 use glam::{Mat4, Quat};
-use glium::{
-    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display
-};
 
 #[derive(Debug)]
 pub struct InstancedModelObject {
@@ -69,8 +63,11 @@ impl InstancedModelObject {
 impl Object for InstancedModelObject {
     fn start(&mut self) {}
 
-    fn update(&mut self, _: &mut Framework) {
-        render::add_instance_position(&self.instance, self.setup_mat());
+    fn update(&mut self, framework: &mut Framework) {
+        match &mut framework.render {
+            Some(render) => render.add_instance_position(&self.instance, self.setup_mat()),
+            None => debugger::warn("InstancedModelObject is useless without render!"),
+        }
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -129,10 +126,6 @@ impl Object for InstancedModelObject {
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
         &mut self.groups
     }
-
-    fn render(&mut self, _: &Display<WindowSurface>, _: &mut glium::Frame, _: &Cascades, _: &ShadowTextures) {}
-
-    fn shadow_render(&mut self, _: &Mat4, _: &Display<WindowSurface>, _: &mut SimpleFrameBuffer) {}
 }
 
 #[derive(Debug)]

@@ -1,16 +1,11 @@
 use std::collections::HashMap;
 
-use crate::{framework::Framework, math_utils::deg_to_rad};
+use crate::math_utils::deg_to_rad;
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
     framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer
 };
-use once_cell::sync::Lazy;
-
-use super::{
-    physics::{RenderColliderType, RenderRay},
-    systems,
-};
+use super::physics::{RenderColliderType, RenderRay};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -21,53 +16,6 @@ pub struct Vertex {
     pub weights: [f32; 4],
 }
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights);
-
-pub fn init(display: &Display<WindowSurface>) {
-    unsafe {
-        COLLIDER_CUBOID_VERTEX_BUFFER = Some(VertexBuffer::new(display, &CUBE_VERTS_LIST).unwrap());
-        COLLIDER_CUBOID_INDEX_BUFFER = Some(
-            IndexBuffer::new(display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap(),
-        );
-        COLLIDER_CUBOID_SHADER = Some(
-            Program::from_source(
-                display,
-                include_str!("../assets/collider_shader.vert"),
-                include_str!("../assets/collider_shader.frag"),
-                None,
-            )
-            .unwrap(),
-        );
-        RAY_SHADER = Some(
-            Program::from_source(
-                display,
-                include_str!("../assets/ray_shader.vert"),
-                include_str!("../assets/ray_shader.frag"),
-                None,
-            )
-            .unwrap(),
-        );
-    }
-}
-
-
-pub fn add_collider_to_draw(col: RenderColliderType) {
-    unsafe {
-        RENDER_COLLIDERS.push(col);
-    }
-}
-
-pub fn add_ray_to_draw(ray: RenderRay) {
-    unsafe {
-        RENDER_RAYS.push(ray);
-    }
-}
-
-
-pub fn update() {
-    unsafe {
-        INSTANCED_POSITIONS.clear();
-    }
-}
 
 /* some consts to make code cleaner */
 const ZERO_VEC3: Vec3 = Vec3 {
@@ -158,45 +106,6 @@ const CUBE_INDICES_LIST: [u32; 36] = [
     1, 2, 0, 3, 6, 2, 7, 5, 6, 5, 0, 4, 6, 0, 2, 3, 5, 7, 1, 3, 2, 3, 7, 6, 7, 5, 4, 5, 1, 0, 6, 4,
     0, 3, 1, 5,
 ];
-static mut COLLIDER_CUBOID_VERTEX_BUFFER: Option<VertexBuffer<Vertex>> = None;
-static mut COLLIDER_CUBOID_INDEX_BUFFER: Option<IndexBuffer<u32>> = None;
-static mut RENDER_COLLIDERS: Vec<RenderColliderType> = vec![];
-static mut RENDER_RAYS: Vec<RenderRay> = vec![];
-static mut RAY_SHADER: Option<Program> = None;
-static mut COLLIDER_CUBOID_SHADER: Option<Program> = None;
-
-static mut INSTANCED_POSITIONS: Lazy<HashMap<String, Vec<Mat4>>> = Lazy::new(|| HashMap::new());
-
-pub fn add_instance_position(instance: &str, position: Mat4) {
-    unsafe {
-        match INSTANCED_POSITIONS.get_mut(instance) {
-            Some(positions) => positions.push(position),
-            None => {
-                INSTANCED_POSITIONS.insert(instance.into(), vec![position]);
-            },
-        }
-    }
-}
-
-pub fn add_instance_positions_vec(instance: &str, positions: &Vec<Mat4>) {
-    unsafe {
-        match INSTANCED_POSITIONS.get_mut(instance) {
-            Some(instanced_positions) => instanced_positions.extend(positions.iter()),
-            None => {
-                INSTANCED_POSITIONS.insert(instance.into(), positions.to_owned());
-            },
-        }
-    }
-}
-
-pub fn get_instance_positions(instance: &str) -> Option<&Vec<Mat4>> {
-    unsafe {
-        match INSTANCED_POSITIONS.get(instance) {
-            Some(positions) => Some(positions),
-            None => None,
-        }
-    }
-}
 
 
 struct SunCamera {
@@ -424,9 +333,40 @@ pub struct RenderManager {
     pub target: Option<Frame>,
     pub render_rays: Vec<RenderRay>,
     pub render_colliders: Vec<RenderColliderType>,
+    pub cascades: Cascades,
+    pub ray_shader: Program,
+    pub collider_cuboid_shader: Program,
+    pub collider_cuboid_vertex_buffer: VertexBuffer<Vertex>,
+    pub collider_cuboid_index_buffer: IndexBuffer<u32>,
+    pub instanced_positions: HashMap<String, Vec<Mat4>>,
 }
+
 impl RenderManager {
     pub fn new(display: Display<WindowSurface>) -> Self {
+        let ray_shader = Program::from_source(
+            &display,
+            include_str!("../assets/ray_shader.vert"),
+            include_str!("../assets/ray_shader.frag"),
+            None
+        ).unwrap();
+        let collider_cuboid_shader = Program::from_source(
+            &display,
+            include_str!("../assets/collider_shader.vert"),
+            include_str!("../assets/collider_shader.frag"),
+            None,
+        ).unwrap();
+        let collider_cuboid_vertex_buffer = VertexBuffer::new(&display, &CUBE_VERTS_LIST).unwrap();
+        let collider_cuboid_index_buffer = IndexBuffer::new(&display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap();
+        let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
+        /*let mut closest_shadow_fbo =
+            SimpleFrameBuffer::depth_only(&display, &shadow_textures.closest).unwrap();
+        closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
+        closest_shadow_fbo.clear_depth(1.0);
+        let mut furthest_shadow_fbo =
+            SimpleFrameBuffer::depth_only(&display, &shadow_textures.furthest).unwrap();
+        furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
+        furthest_shadow_fbo.clear_depth(1.0);*/
+
         Self {
             light_direction: Vec3::new(-1.0, 0.0, 0.0),
             camera_location: CameraLocation {
@@ -438,11 +378,19 @@ impl RenderManager {
                 up: DEFAULT_UP_VECTOR,
             },
             aspect_ratio: 1.0,
-            shadow_textures: ShadowTextures::new(&display, 4096, 4096),
+            /*closest_shadow_fbo,
+            furthest_shadow_fbo,*/
+            shadow_textures,
             display,
             target: None,
             render_rays: Vec::new(),
-            render_colliders: Vec::new()
+            render_colliders: Vec::new(),
+            cascades: Cascades::new(90.0, 1.0, Vec3::new(-1.0, 0.0, 0.0), Mat4::IDENTITY),
+            ray_shader,
+            collider_cuboid_shader,
+            collider_cuboid_vertex_buffer,
+            collider_cuboid_index_buffer,
+            instanced_positions: HashMap::new(),
         }
     }
 
@@ -521,8 +469,6 @@ impl RenderManager {
 
     pub fn draw(&mut self) {
         //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
-        let mut target = self.display.draw();
-        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
         let display = &self.display;
         let shadow_textures = &self.shadow_textures;
 
@@ -537,192 +483,169 @@ impl RenderManager {
         furthest_shadow_fbo.clear_depth(1.0);
 
         let view = self.get_view_matrix();
-        let cascades = Cascades::new(self.get_camera_fov(), self.aspect_ratio, self.get_light_direction(), view);
-        systems::shadow_render(
-            &cascades.closest.as_mat4(),
-            display,
-            &mut closest_shadow_fbo,
-        );
-        systems::shadow_render(
-            &cascades.furthest.as_mat4(),
-            display,
-            &mut furthest_shadow_fbo,
-        );
-
         self.update_camera_vectors();
-
-        //systems::render(&display, &mut target, &cascades, shadow_textures, framework);
+        self.cascades = Cascades::new(self.get_camera_fov(), self.aspect_ratio, self.get_light_direction(), view);
     }
 
     /// Call only after drawing everything.
-    pub fn debug_draw(&self) {
-        let display = &self.display;
-
+    pub fn debug_draw(&mut self) {
         let proj = self.get_projection_matrix().to_cols_array_2d();
         let view = self.get_view_matrix().to_cols_array_2d();
 
-        if let Some(target) = self.target {
-            RENDER_RAYS.iter().for_each(|ray| {
-                let uniforms = uniform! {
-                    proj: proj,
-                    view: view,
-                };
+        self.render_colliders.clone().iter().for_each(|collider| {
+            let mvp_and_sensor = self.calculate_collider_mvp_and_sensor(&collider);
+            let uniforms = uniform! {
+                mvp: mvp_and_sensor.0,
+                sensor: mvp_and_sensor.1
+            };
 
-                let draw_params = glium::DrawParameters {
-                    depth: glium::Depth {
-                        test: glium::draw_parameters::DepthTest::IfLess,
-                        write: true,
-                        ..Default::default()
-                    },
-                    blend: glium::draw_parameters::Blend::alpha_blending(),
+            let draw_params = glium::DrawParameters {
+                depth: glium::Depth {
+                    test: glium::draw_parameters::DepthTest::IfLess,
+                    write: true,
                     ..Default::default()
-                };
+                },
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                ..Default::default()
+            };
 
-                let origin = ray.origin;
-                let dir = origin + ray.direction;
+            let vert_buffer = &self.collider_cuboid_vertex_buffer;
+            let index_buffer = &self.collider_cuboid_index_buffer;
+            let shader = &self.collider_cuboid_shader;
 
-                let verts_list: [Vertex; 9] = [
-                    Vertex {
-                        position: [origin.x - 0.15, origin.y + 0.15, origin.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [origin.x + 0.15, origin.y + 0.15, origin.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [origin.x - 0.15, origin.y - 0.15, origin.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [origin.x + 0.15, origin.y - 0.15, origin.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [dir.x - 0.15, dir.y + 0.15, dir.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [dir.x + 0.15, dir.y + 0.15, dir.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [dir.x - 0.15, dir.y - 0.15, dir.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [dir.x + 0.15, dir.y - 0.15, dir.z],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    Vertex {
-                        position: [dir.x, dir.y, dir.z + 0.15],
-                        normal: [0.0, 0.0, 0.0],
-                        tex_coords: [0.0, 0.0],
-                        joints: [0.0, 0.0, 0.0, 0.0],
-                        weights: [0.0, 0.0, 0.0, 0.0],
-                    },
-                    ];
+            self.target.as_mut().unwrap() // drawing solid semi-transparent cuboid
+                .draw(
+                    vert_buffer,
+                    index_buffer,
+                    shader,
+                    &uniforms,
+                    &draw_params,
+                )
+                .unwrap();
+        });
+        self.render_colliders.clear();
 
-                let indices: [u32; 48] = [
-                    0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0,
-                    1, 5, 2, 3, 6, 2, 3, 7, 4, 5, 8, 4, 6, 8, 5, 7, 8, 6, 7, 8,
+        self.render_rays.iter().for_each(|ray| {
+            let uniforms = uniform! {
+                proj: proj,
+                view: view,
+            };
+
+            let draw_params = glium::DrawParameters {
+                depth: glium::Depth {
+                    test: glium::draw_parameters::DepthTest::IfLess,
+                    write: true,
+                    ..Default::default()
+                },
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                ..Default::default()
+            };
+
+            let origin = ray.origin;
+            let dir = origin + ray.direction;
+
+            let verts_list: [Vertex; 9] = [
+                Vertex {
+                    position: [origin.x - 0.15, origin.y + 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [origin.x + 0.15, origin.y + 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [origin.x - 0.15, origin.y - 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [origin.x + 0.15, origin.y - 0.15, origin.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x - 0.15, dir.y + 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x + 0.15, dir.y + 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x - 0.15, dir.y - 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x + 0.15, dir.y - 0.15, dir.z],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
+                Vertex {
+                    position: [dir.x, dir.y, dir.z + 0.15],
+                    normal: [0.0, 0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    joints: [0.0, 0.0, 0.0, 0.0],
+                    weights: [0.0, 0.0, 0.0, 0.0],
+                },
                 ];
 
-                //dbg!(ray);
-                //dbg!(origin);
-                //dbg!(dir);
+            let indices: [u32; 48] = [
+                0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0,
+                1, 5, 2, 3, 6, 2, 3, 7, 4, 5, 8, 4, 6, 8, 5, 7, 8, 6, 7, 8,
+            ];
 
-                let vert_buffer = VertexBuffer::new(display, &verts_list)
-                    .expect("failed to create vertex buffer while debug rendering rays");
-                let index_buffer = IndexBuffer::new(display, PrimitiveType::TriangleFan, &indices)
-                    .expect("failed to create index buffer while debug rendering rays");
+            //dbg!(ray);
+            //dbg!(origin);
+            //dbg!(dir);
 
-                let shader = RAY_SHADER.take().unwrap();
+            let vert_buffer = VertexBuffer::new(&self.display, &verts_list)
+                .expect("failed to create vertex buffer while debug rendering rays");
+            let index_buffer = IndexBuffer::new(&self.display, PrimitiveType::TriangleFan, &indices)
+                .expect("failed to create index buffer while debug rendering rays");
 
-                target // drawing solid semi-transparent cuboid
-                    .draw(
-                        &vert_buffer,
-                        &index_buffer,
-                        &shader,
-                        &uniforms,
-                        &draw_params,
-                    )
-                    .unwrap();
+            let shader = &self.ray_shader;
 
-                RAY_SHADER = Some(shader);
-            });
-            RENDER_RAYS.clear();
+            self.target.as_mut().unwrap() // drawing solid semi-transparent cuboid
+                .draw(
+                    &vert_buffer,
+                    &index_buffer,
+                    &shader,
+                    &uniforms,
+                    &draw_params,
+                )
+                .unwrap();
 
-            let colliders = unsafe { &mut RENDER_COLLIDERS };
-            colliders.iter().for_each(|collider| {
-                let mvp_and_sensor = calculate_collider_mvp_and_sensor(collider);
-                let uniforms = uniform! {
-                    mvp: mvp_and_sensor.0,
-                    sensor: mvp_and_sensor.1
-                };
+            }
+        );
+        self.render_rays.clear();
 
-                unsafe {
-                    let draw_params = glium::DrawParameters {
-                        depth: glium::Depth {
-                            test: glium::draw_parameters::DepthTest::IfLess,
-                            write: true,
-                            ..Default::default()
-                        },
-                        blend: glium::draw_parameters::Blend::alpha_blending(),
-                        ..Default::default()
-                    };
-
-                    let vert_buffer = COLLIDER_CUBOID_VERTEX_BUFFER.take().unwrap();
-                    let index_buffer = COLLIDER_CUBOID_INDEX_BUFFER.take().unwrap();
-                    let shader = COLLIDER_CUBOID_SHADER.take().unwrap();
-
-                    target // drawing solid semi-transparent cuboid
-                        .draw(
-                            &vert_buffer,
-                            &index_buffer,
-                            &shader,
-                            &uniforms,
-                            &draw_params,
-                        )
-                        .unwrap();
-
-                    COLLIDER_CUBOID_SHADER = Some(shader);
-                    COLLIDER_CUBOID_VERTEX_BUFFER = Some(vert_buffer);
-                    COLLIDER_CUBOID_INDEX_BUFFER = Some(index_buffer);
-                }
-            });
-        }
-        unsafe { RENDER_COLLIDERS.clear() }
     }
 
     pub fn finish_render(&mut self) {
-        if let Some(target) = self.target {
+        let target = self.target.take();
+        if let Some(target) = target {
             target.finish();
-            //self.target = None;
         }
     }
 
@@ -828,4 +751,68 @@ impl RenderManager {
             }
         }
     }
+
+    pub fn add_collider_to_draw(&mut self, col: RenderColliderType) {
+        self.render_colliders.push(col);
+    }
+
+    pub fn add_ray_to_draw(&mut self, ray: RenderRay) {
+        self.render_rays.push(ray);
+    }
+
+
+    pub fn update(&mut self) {
+        self.instanced_positions.clear();
+    }
+
+    pub fn add_instance_position(&mut self, instance: &str, position: Mat4) {
+        match self.instanced_positions.get_mut(instance) {
+            Some(positions) => positions.push(position),
+            None => {
+                self.instanced_positions.insert(instance.into(), vec![position]);
+            },
+        }
+    }
+
+    pub fn add_instance_positions_vec(&mut self, instance: &str, positions: &Vec<Mat4>) {
+        match self.instanced_positions.get_mut(instance) {
+            Some(instanced_positions) => instanced_positions.extend(positions.iter()),
+            None => {
+                self.instanced_positions.insert(instance.into(), positions.to_owned());
+            },
+        }
+    }
+
+    pub fn get_instance_positions(&self, instance: &str) -> Option<&Vec<Mat4>> {
+        match self.instanced_positions.get(instance) {
+            Some(positions) => Some(positions),
+            None => None,
+        }
+    }
+
+    pub fn prepare_for_normal_render(&mut self) {
+        let mut target = self.display.draw();
+        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
+    }
+
+    pub fn closest_shadow_fbo(&self) -> SimpleFrameBuffer<'_> {
+        let mut closest_shadow_fbo =
+            SimpleFrameBuffer::depth_only(&self.display, &self.shadow_textures.closest).unwrap();
+        closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
+        closest_shadow_fbo.clear_depth(1.0);
+        closest_shadow_fbo
+    }
+
+    pub fn furthest_shadow_fbo(&self) -> SimpleFrameBuffer<'_> {
+        let mut furthest_shadow_fbo =
+            SimpleFrameBuffer::depth_only(&self.display, &self.shadow_textures.furthest).unwrap();
+        furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
+        furthest_shadow_fbo.clear_depth(1.0);
+        furthest_shadow_fbo
+    }
+}
+
+pub enum CurrentCascade {
+    Closest,
+    Furthest
 }

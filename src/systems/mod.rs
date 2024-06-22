@@ -4,7 +4,7 @@ pub mod player_manager;
 
 use crate::{
     framework::Framework, managers::{
-        debugger, networking::{self, Message, MessageReliability, NetworkError}, render::{Cascades, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
+        debugger, networking::{self, Message, MessageReliability, NetworkError}, render::{Cascades, CurrentCascade, RenderManager, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
     }, objects::Object
 };
 use egui_glium::egui_winit::egui::Context;
@@ -97,16 +97,15 @@ pub trait System {
 
     fn shadow_render_objects(
         &mut self,
-        view_proj: &Mat4,
-        display: &Display<WindowSurface>,
-        target: &mut SimpleFrameBuffer,
+        render: &mut RenderManager,
+        cascade: &CurrentCascade
     ) {
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.shadow_render(view_proj, display, target));
+            .for_each(|object| object.shadow_render(render, cascade));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.shadow_render_children(view_proj, display, target));
+            .for_each(|object| object.shadow_render_children(render, cascade));
     }
 
     fn destroy_system(&mut self) {

@@ -4,8 +4,8 @@ use raw_window_handle::HasRawWindowHandle;
 use crate::{
     game::game_main,
     managers::{
-        self, assets::{get_full_asset_path, AssetManager}, input::InputManager, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{self, RenderManager, ShadowTextures}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
-    }, objects::{camera_position::CameraPosition, character_controller::CharacterController},
+        self, assets::{get_full_asset_path, AssetManager}, input::InputManager, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{CurrentCascade, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
+    }, objects::character_controller::CharacterController,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use glam::Vec2;
@@ -111,20 +111,28 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                 systems::ui_render(ctx);
                             });
 
-                            let render = framework.render.unwrap();
+                            {
+                                let render = framework.render.as_mut().unwrap();
 
-                            set_listener_transform(
-                                &framework.al.as_ref().unwrap(),
-                                render.get_camera_position(),
-                                render.get_camera_front(),
-                            );
+                                set_listener_transform(
+                                    &framework.al.as_ref().unwrap(),
+                                    render.get_camera_position(),
+                                    render.get_camera_front(),
+                                );
 
-                            let mut target = display.draw();
-                            render.draw();
-                            systems::render(&mut framework);
-                            render.debug_draw();
-                            render.finish_render();
-                            egui_glium.paint(&display, &mut target);
+                                render.draw();
+                            }
+
+                            systems::shadow_render(framework.render.as_mut().unwrap(), &CurrentCascade::Closest);
+                            systems::shadow_render(framework.render.as_mut().unwrap(), &CurrentCascade::Furthest);
+                            systems::render(&mut framework); // Don't mind me, beautiful Rust code going on here
+
+                            {
+                                let render = framework.render.as_mut().unwrap();
+                                render.debug_draw();
+                                egui_glium.paint(&render.display, render.target.as_mut().unwrap());
+                                render.finish_render();
+                            }
 
                             frames_count += 1;
                         },
@@ -136,10 +144,10 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                         WindowEvent::Resized(size) => {
                             win_w = size.width;
                             win_h = size.height;
-                            display.resize(size.into());
+                            framework.render.as_mut().unwrap().display.resize(size.into());
                             //window.request_inner_size(size);
 
-                            framework.render.unwrap().aspect_ratio = win_w as f32 / win_h as f32;
+                            framework.render.as_mut().unwrap().aspect_ratio = win_w as f32 / win_h as f32;
                         }
                         _ => (),
                     }
@@ -172,7 +180,7 @@ pub fn start_game_without_render() {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
-        render: RenderManager::default()
+        render: None
     };
 
 
@@ -194,13 +202,24 @@ pub fn start_game_without_render() {
 fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.delta_time = delta_time;
 
-    render::update();
+    if let Some(render) = &mut framework.render {
+        render.update();
+    }
     framework.physics.update();
     networking::update(delta_time);
     framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
+    // Render to the closest cascade
+    systems::render(framework);
+    // Render to the furthest cascade
+    systems::render(framework);
+    // Render normally
+    systems::render(framework);
     framework.navigation.create_grids();
+    if let Some(render) = &mut framework.render {
+        render.finish_render();
+    }
 
     framework.input.update();
 }
@@ -308,10 +327,6 @@ impl Framework {
 
     pub fn delta_time(&self) -> Duration {
         self.delta_time
-    }
-
-    pub fn new_camera_position_object(name: &str) -> CameraPosition {
-        CameraPosition::new(name)
     }
 
     pub fn set_global_system_value(&mut self, key: &str, value: Vec<SystemValue>) {

@@ -3,16 +3,15 @@ use crate::{
     managers::{
         self,
         physics::{BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-        render::{self, Cascades, ShadowTextures},
+        render::{self, CurrentCascade, RenderManager},
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
 use egui_glium::egui_winit::egui::Ui;
-use glam::{Mat4, Vec3};
-use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
+use glam::Vec3;
+use glium::framebuffer::SimpleFrameBuffer;
 use serde::{Deserialize, Serialize};
 
-pub mod camera_position;
 pub mod character_controller;
 pub mod empty_object;
 pub mod model_object;
@@ -73,7 +72,10 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn shadow_render(
         &mut self,
-        _framework: &mut Framework
+        /*_framework: &mut Framework,
+        _target: &mut SimpleFrameBuffer*/
+        _render: &mut RenderManager,
+        _current_cascade: &CurrentCascade
     ) {
     }
 
@@ -147,26 +149,22 @@ pub trait Object: std::fmt::Debug + Downcast {
 
     fn render_children(
         &mut self,
-        display: &Display<WindowSurface>,
-        target: &mut Frame,
-        cascades: &Cascades,
-        shadow_texture: &ShadowTextures,
+        framework: &mut Framework
     ) {
         self.children_list_mut().iter_mut().for_each(|child| {
-            child.render(display, target, cascades, shadow_texture);
-            child.render_children(display, target, cascades, shadow_texture);
+            child.render(framework);
+            child.render_children(framework);
         });
     }
 
     fn shadow_render_children(
         &mut self,
-        view_proj: &Mat4,
-        display: &Display<WindowSurface>,
-        target: &mut SimpleFrameBuffer,
+        render: &mut RenderManager,
+        current_cascade: &CurrentCascade
     ) {
         self.children_list_mut().iter_mut().for_each(|child| {
-            child.shadow_render(&view_proj, display, target);
-            child.shadow_render_children(&view_proj, display, target);
+            child.shadow_render(render, &current_cascade);
+            child.shadow_render_children(render, &current_cascade);
         });
     }
 
@@ -178,7 +176,9 @@ pub trait Object: std::fmt::Debug + Downcast {
                     if let Some(mut render_collider) = body.render_collider_type {
                         let transform = self.global_transform();
                         render_collider.set_transform(transform.position, transform.rotation);
-                        render::add_collider_to_draw(render_collider);
+                        if let Some(render) = &mut framework.render {
+                            render.add_collider_to_draw(render_collider)
+                        };
                     }
                 }
 

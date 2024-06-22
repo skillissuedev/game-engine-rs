@@ -1,5 +1,4 @@
 use glam::Vec2;
-use glium::{glutin::surface::WindowSurface, Display};
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{framework::Framework, managers::{
@@ -117,29 +116,6 @@ impl Object for NavigationGround {
             .field("object_type", &self.object_type())
             .field("children", &self.children_list())
             .finish()
-    }
-
-    fn render(
-        &mut self,
-        _: &Display<WindowSurface>,
-        _: &mut glium::Frame,
-        _: &crate::managers::render::Cascades,
-        _: &crate::managers::render::ShadowTextures,
-    ) {
-    }
-
-    fn shadow_render(
-        &mut self,
-        _: &glam::Mat4,
-        _: &Display<WindowSurface>,
-        _: &mut glium::framebuffer::SimpleFrameBuffer,
-    ) {}
-
-    fn add_child(&mut self, mut object: Box<dyn Object>) {
-        object.set_parent_transform(self.global_transform());
-        dbg!(object.object_id());
-        self.children_list_mut().push(object);
-        self.children_list_mut().last_mut().unwrap().start();
     }
 }
 

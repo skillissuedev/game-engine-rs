@@ -7,7 +7,7 @@ use crate::{
     }, framework::Framework, managers::{
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
-        render::{self, Cascades, ShadowTextures, Vertex},
+        render::{self, CurrentCascade, RenderManager, Vertex},
     }
 };
 use egui_glium::egui_winit::egui::ComboBox;
@@ -198,22 +198,22 @@ impl Object for MasterInstancedModelObject {
 
     fn render(
         &mut self,
-        display: &Display<WindowSurface>,
-        target: &mut glium::Frame,
-        cascades: &Cascades,
-        shadow_texture: &ShadowTextures,
+        framework: &mut Framework
     ) {
+        let render = framework.render.as_mut()
+            .expect("wtf there are no display in a framework and it's still calling render() in a system?");
+
         if self.error {
             return;
         }
         if !self.started {
-            self.start_mesh(display);
+            self.start_mesh(&render.display);
         }
 
-        let closest_shadow_view_proj_cols = cascades.closest_view_proj.to_cols_array_2d();
-        let furthest_shadow_view_proj_cols = cascades.furthest_view_proj.to_cols_array_2d();
+        let closest_shadow_view_proj_cols = render.cascades.closest_view_proj.to_cols_array_2d();
+        let furthest_shadow_view_proj_cols = render.cascades.furthest_view_proj.to_cols_array_2d();
 
-        let matrices = match render::get_instance_positions(&self.name) {
+        let matrices = match render.get_instance_positions(&self.name) {
             Some(matrices) => matrices,
             None => {
                 return
@@ -227,7 +227,7 @@ impl Object for MasterInstancedModelObject {
                 model: matrix.to_cols_array_2d(),
             });
         }
-        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
 
 
 
@@ -236,7 +236,7 @@ impl Object for MasterInstancedModelObject {
             let object = &self.model_asset.objects[i];
 
             let indices = IndexBuffer::new(
-                display,
+                &render.display,
                 glium::index::PrimitiveType::TrianglesList,
                 &object.indices,
             );
@@ -263,18 +263,18 @@ impl Object for MasterInstancedModelObject {
 
             let texture_option = self.texture.as_ref();
 
-            let empty_texture = glium::texture::Texture2d::empty(display, 1, 1).unwrap();
+            let empty_texture = glium::texture::Texture2d::empty(&render.display, 1, 1).unwrap();
             let texture: &glium::texture::Texture2d;
             match texture_option {
                 Some(tx) => texture = tx,
                 None => texture = &empty_texture,
             }
 
-            let joints = UniformBuffer::new(display, self.get_joints_transforms()).unwrap();
+            let joints = UniformBuffer::new(&render.display, self.get_joints_transforms()).unwrap();
             let inverse_bind_mats =
-                UniformBuffer::new(display, self.model_asset.joints_inverse_bind_mats).unwrap();
+                UniformBuffer::new(&render.display, self.model_asset.joints_inverse_bind_mats).unwrap();
 
-            let camera_position: [f32; 3] = framework.render.get_camera_position().into();
+            let camera_position: [f32; 3] = render.get_camera_position().into();
 
 
             let sampler_behaviour = glium::uniforms::SamplerBehavior {
@@ -289,15 +289,15 @@ impl Object for MasterInstancedModelObject {
             };
 
             let uniforms = uniform! {
-                view: get_view_matrix().to_cols_array_2d(),
-                proj: get_projection_matrix().to_cols_array_2d(),
+                view: render.get_view_matrix().to_cols_array_2d(),
+                proj: render.get_projection_matrix().to_cols_array_2d(),
                 jointsMats: &joints,
                 jointsInverseBindMats: &inverse_bind_mats,
                 mesh: object.transform,
                 tex: Sampler(texture, sampler_behaviour),
-                lightPos: render::get_light_direction().to_array(),
-                closestShadowTexture: &shadow_texture.closest,
-                furthestShadowTexture: &shadow_texture.furthest,
+                lightPos: render.get_light_direction().to_array(),
+                closestShadowTexture: &render.shadow_textures.closest,
+                furthestShadowTexture: &render.shadow_textures.furthest,
                 closestShadowViewProj: [
                     closest_shadow_view_proj_cols[0],
                     closest_shadow_view_proj_cols[1],
@@ -325,7 +325,8 @@ impl Object for MasterInstancedModelObject {
                 ..Default::default()
             };
 
-            target
+            render.target.as_mut()
+                .expect("Target shouldn't be None here")
                 .draw(
                     (&self.vertex_buffer[i], per_instance_buffer.per_instance().unwrap()),
                     &indices.unwrap(),
@@ -339,19 +340,18 @@ impl Object for MasterInstancedModelObject {
 
     fn shadow_render(
         &mut self,
-        view_proj: &Mat4,
-        display: &Display<WindowSurface>,
-        target: &mut SimpleFrameBuffer,
+        render: &mut RenderManager,
+        current_cascade: &CurrentCascade
     ) {
         if !self.started {
-            self.start_mesh(display);
+            self.start_mesh(&render.display);
         }
 
         if self.error {
             return;
         }
 
-        let matrices = match render::get_instance_positions(&self.name) {
+        let matrices = match render.get_instance_positions(&self.name) {
             Some(matrices) => matrices,
             None => {
                 return
@@ -365,13 +365,13 @@ impl Object for MasterInstancedModelObject {
                 model: matrix.to_cols_array_2d(),
             });
         }
-        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
 
         for i in 0..self.model_asset.objects.len() {
             let object = &self.model_asset.objects[i];
 
             let indices = IndexBuffer::new(
-                display,
+                &render.display,
                 glium::index::PrimitiveType::TrianglesList,
                 &object.indices,
             );
@@ -393,7 +393,10 @@ impl Object for MasterInstancedModelObject {
             }
 
 
-            let view_proj_cols = view_proj.to_cols_array_2d();
+            let view_proj_cols = match current_cascade {
+                CurrentCascade::Closest => render.cascades.closest_view_proj.to_cols_array_2d(),
+                CurrentCascade::Furthest => render.cascades.furthest_view_proj.to_cols_array_2d(),
+            };
 
             let uniforms = uniform! {
                 view_proj: [
@@ -402,7 +405,7 @@ impl Object for MasterInstancedModelObject {
                     view_proj_cols[2],
                     view_proj_cols[3],
                 ],
-                lightPos: render::get_light_direction().to_array(),
+                lightPos: render.get_light_direction().to_array(),
             };
 
             let draw_params = glium::DrawParameters {
@@ -413,6 +416,11 @@ impl Object for MasterInstancedModelObject {
                 },
                 backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
                 ..Default::default()
+            };
+
+            let mut target = match current_cascade {
+                CurrentCascade::Closest => render.closest_shadow_fbo(),
+                CurrentCascade::Furthest => render.furthest_shadow_fbo(),
             };
 
             target

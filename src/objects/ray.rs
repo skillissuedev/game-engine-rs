@@ -115,10 +115,13 @@ impl Object for Ray {
 
     fn debug_render(&self, framework: &mut Framework) {
         if let DebugMode::Full = framework.debug_mode() {
-            render::add_ray_to_draw(RenderRay {
-                origin: self.global_transform().position,
-                direction: self.direction,
-            });
+            framework.render.as_mut()
+                .expect("No render but debug_render is still being called. pls fix").
+                add_ray_to_draw(RenderRay {
+                    origin: self.global_transform().position,
+                    direction: self.direction,
+                }
+            );
         }
     }
 }
