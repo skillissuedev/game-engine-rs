@@ -11,7 +11,7 @@ pub struct SavesManager {
 }
 
 impl SavesManager {
-    pub fn load_save(&mut self, framework: &mut Framework, save_name: &str) -> Result<(), ()> {
+    pub fn load_save(&mut self, save_name: &str) -> Result<HashMap<String, Vec<SystemValue>>, ()> {
         let save_file_path = "saves/".to_string() + save_name;
         let save_file_path = get_full_asset_path(&save_file_path);
 
@@ -33,15 +33,14 @@ impl SavesManager {
             }
         }
 
-        let values: Result<HashMap<&str, Vec<SystemValue>>, serde_json::Error> = serde_json::from_str(&json);
+        let values: Result<HashMap<String, Vec<SystemValue>>, serde_json::Error> = serde_json::from_str(&json);
         match values {
             Ok(values) => {
-                for (key, value) in values {
+                for (key, _) in &values {
                     self.save_system_values.push(key.into());
-                    framework.set_global_system_value(key, value);
                 };
                 self.current_save_file = Some(save_name.into());
-                Ok(())
+                Ok(values)
             },
             Err(err) => {
                 self.current_save_file = Some(save_name.into());
@@ -64,7 +63,7 @@ impl SavesManager {
         self.save_system_values.retain(|value| value != system_value_name);
     }
 
-    pub fn new_save(&mut self, framework: &mut Framework, save_name: &str) -> Result<(), io::Error> {
+    pub fn new_save(&mut self, save_name: &str, global_values: &HashMap<String, Vec<SystemValue>>) -> Result<(), io::Error> {
         let save_dir_path = "saves/";
         let save_dir_path = get_full_asset_path(save_dir_path);
 
@@ -83,19 +82,19 @@ impl SavesManager {
 
         println!("saves manager: save file '{}' created and used as current one!", save_name);
         self.current_save_file = Some(save_name.into());
-        self.save_game(framework);
+        self.save_game(global_values);
 
         Ok(())
     }
 
-    pub fn save_game(&mut self, framework: &mut Framework) {
+    pub fn save_game(&mut self, global_values: &HashMap<String, Vec<SystemValue>>) {
         let mut values_list: HashMap<&str, Vec<SystemValue>> = HashMap::new();
 
         for value_name in &self.save_system_values {
-            let value = framework.get_global_system_value(&value_name);
+            let value = global_values.get(value_name);//framework.get_global_system_value(&value_name);
             match value {
                 Some(value) => {
-                    values_list.insert(value_name, value);
+                    values_list.insert(value_name, value.to_vec());
                 },
                 None =>
                     debugger::warn(&format!("saves manager's save_game warning!\nfailed to get global system value '{}'", value_name)),

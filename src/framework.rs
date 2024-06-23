@@ -1,10 +1,10 @@
 use ez_al::EzAl;
 use glutin::surface::GlSurface;
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use crate::{
     game::game_main,
     managers::{
-        self, assets::{get_full_asset_path, AssetManager}, input::InputManager, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{CurrentCascade, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
+        self, assets::{get_full_asset_path, AssetManager}, debugger, input::InputManager, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{CurrentCascade, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
     }, objects::character_controller::CharacterController,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
@@ -50,14 +50,14 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     let mut now = std::time::Instant::now();
     let mut last_frame = std::time::Instant::now();
 
-    let al = EzAl::new().unwrap();
+    let al = EzAl::new().ok();
     let mut framework = Framework {
         debug_mode,
         delta_time: Duration::default(),
         system_globals: HashMap::new(),
         resolution: Vec2::new(1280.0, 720.0),
 
-        al: Some(al),
+        al,
         input: InputManager::default(),
         navigation: NavigationManager::default(),
         physics: PhysicsManager::default(),
@@ -72,10 +72,8 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     framework.navigation.update();
     game_main::start(&mut framework);
 
-    let mut win_w = window.inner_size().width;
-    let mut win_h = window.inner_size().height;
-
     event_loop.run(move |ev, window_target| {
+        dbg!(window_target.raw_display_handle());
         match ev {
             Event::AboutToWait => {
                 window.request_redraw();
@@ -115,7 +113,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                 let render = framework.render.as_mut().unwrap();
 
                                 set_listener_transform(
-                                    &framework.al.as_ref().unwrap(),
+                                    framework.al.as_ref().unwrap(),
                                     render.get_camera_position(),
                                     render.get_camera_front(),
                                 );
@@ -123,6 +121,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                 render.draw();
                             }
 
+                            println!("render!");
                             systems::shadow_render(framework.render.as_mut().unwrap(), &CurrentCascade::Closest);
                             systems::shadow_render(framework.render.as_mut().unwrap(), &CurrentCascade::Furthest);
                             systems::render(&mut framework); // Don't mind me, beautiful Rust code going on here
@@ -142,12 +141,11 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                             return;
                         }
                         WindowEvent::Resized(size) => {
-                            win_w = size.width;
-                            win_h = size.height;
+                            framework.resolution = Vec2::new(size.width as f32, size.height as f32);
                             framework.render.as_mut().unwrap().display.resize(size.into());
-                            //window.request_inner_size(size);
+                            let _ = window.request_inner_size(size);
 
-                            framework.render.as_mut().unwrap().aspect_ratio = win_w as f32 / win_h as f32;
+                            framework.render.as_mut().unwrap().aspect_ratio = size.width as f32 / size.height as f32;
                         }
                         _ => (),
                     }
@@ -239,11 +237,6 @@ pub enum DebugMode {
     None,
     ShowFps,
     Full,
-}
-
-pub struct GameSettings {
-    master_volume: u8,
-    shadowmap_size: u32,
 }
 
 // Glium's SimpleWindowBuilder's build function with a few changes 
@@ -352,5 +345,37 @@ impl Framework {
         mask: Option<CollisionGroups>
     ) -> CharacterController {
         CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
+    }
+
+    pub fn load_save(&mut self, save_name: &str) -> Result<(), ()> {
+        match self.saves.load_save(save_name) {
+            Ok(save_values) => {
+                for (key, value) in save_values {
+                    self.set_global_system_value(&key, value);
+                }
+            },
+            Err(_) => {
+                debugger::error("Framework error!\nFailed to load save.");
+                return Err(())
+            },
+        }
+
+        Ok(())
+    }
+
+    pub fn register_save_value(&mut self, system_value_name: &str) {
+        self.saves.register_save_value(system_value_name)
+    }
+
+    pub fn unregister_save_value(&mut self, system_value_name: &str) {
+        self.saves.unregister_save_value(system_value_name)
+    }
+
+    pub fn new_save(&mut self, save_name: &str) -> Result<(), std::io::Error> {
+        self.saves.new_save(save_name, &self.system_globals)
+    }
+
+    pub fn save_game(&mut self) {
+        self.saves.save_game(&self.system_globals)
     }
 }

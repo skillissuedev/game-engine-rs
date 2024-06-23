@@ -44,6 +44,9 @@ opt-level = 3
 [profile.dev.package.glutin]
 opt-level = 3
 
+[profile.dev.package.winit]
+opt-level = 3
+
 [profile.dev.package.egui_glium]
 opt-level = 3
 

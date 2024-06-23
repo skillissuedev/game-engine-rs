@@ -469,6 +469,9 @@ impl RenderManager {
 
     pub fn draw(&mut self) {
         //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
+        let mut target = self.display.draw();
+        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
+        self.target = Some(target);
         let display = &self.display;
         let shadow_textures = &self.shadow_textures;
 
@@ -645,7 +648,7 @@ impl RenderManager {
     pub fn finish_render(&mut self) {
         let target = self.target.take();
         if let Some(target) = target {
-            target.finish();
+            target.finish().unwrap();
         }
     }
 
@@ -791,8 +794,6 @@ impl RenderManager {
     }
 
     pub fn prepare_for_normal_render(&mut self) {
-        let mut target = self.display.draw();
-        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
     }
 
     pub fn closest_shadow_fbo(&self) -> SimpleFrameBuffer<'_> {
