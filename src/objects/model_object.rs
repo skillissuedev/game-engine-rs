@@ -3,17 +3,16 @@ use crate::{
     assets::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
         shader_asset::ShaderAsset,
-        texture_asset::TextureAsset,
     }, framework::Framework, managers::{
-        debugger::{self, error, warn},
+        debugger::{error, warn},
         physics::ObjectBodyParameters,
-        render::{self, Cascades, CurrentCascade, RenderManager, ShadowTextures, Vertex},
+        render::{CurrentCascade, RenderManager, Vertex},
     }, math_utils::deg_to_rad
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, uniform, uniforms::{
+    glutin::surface::WindowSurface, uniform, uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
     }, Display, IndexBuffer, Program, Surface, VertexBuffer
 };
@@ -31,8 +30,7 @@ pub struct ModelObject {
     pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
     pub shader_asset: ShaderAsset,
-    pub texture_asset: Option<TextureAsset>,
-    texture: Option<glium::texture::Texture2d>,
+    pub texture_asset_id: Option<String>,
     vertex_buffer: Vec<VertexBuffer<Vertex>>,
     programs: Vec<Program>,
     shadow_programs: Vec<Program>,
@@ -45,7 +43,7 @@ impl ModelObject {
     pub fn new(
         name: &str,
         asset: ModelAsset,
-        texture_asset: Option<TextureAsset>,
+        texture_asset_id: Option<String>,
         shader_asset: ShaderAsset,
     ) -> Self {
         let mut nodes_transforms: Vec<NodeTransform> = vec![];
@@ -75,9 +73,8 @@ impl ModelObject {
             parent_transform: None,
             model_asset: asset,
             groups: vec![],
-            texture_asset,
+            texture_asset_id,
             shader_asset,
-            texture: None,
             vertex_buffer: vec![],
             programs: vec![],
             shadow_programs: vec![],
@@ -176,7 +173,7 @@ impl Object for ModelObject {
         ui.heading("ModelObject parameters");
         ui.label(&format!("error: {}", self.error));
         ui.label(&format!("model asset: {}", self.model_asset.path));
-        ui.label(&format!("texture asset: {}", self.texture_asset.is_some()));
+        ui.label(&format!("texture asset: {}", self.texture_asset_id.is_some()));
 
         let anim_name = self.inspector_anim_name.clone();
         ComboBox::from_label("animation")
@@ -255,13 +252,23 @@ impl Object for ModelObject {
             let mvp: Mat4 = setup_mat_result.mvp;
             let model: Mat4 = setup_mat_result.model;
 
-            let texture_option = self.texture.as_ref();
-
-            let empty_texture = glium::texture::Texture2d::empty(&render.display, 1, 1).unwrap();
             let texture: &glium::texture::Texture2d;
-            match texture_option {
-                Some(tx) => texture = tx,
-                None => texture = &empty_texture,
+            match self.texture_asset_id.as_ref() {
+                Some(texture_id) => {
+                    match framework.assets.get_texture_asset(texture_id, &render) {
+                        Some(texture_asset) => texture = &texture_asset.texture,
+                        None => {
+                            texture = &framework.assets
+                                .get_texture_asset("default", &render)
+                                .expect("Failed to get 'default' texture asset from preloaded assets!")
+                                .texture
+                        },
+                    };
+                },
+                None => texture = &framework.assets
+                    .get_texture_asset("default", &render)
+                    .expect("Failed to get 'default' texture asset from preloaded assets!")
+                    .texture,
             }
             let mvp_cols = mvp.to_cols_array_2d();
             let model_cols = model.to_cols_array_2d();
@@ -682,55 +689,6 @@ impl ModelObject {
                 }
             }
         }
-
-        if self.texture_asset.is_some() {
-            let asset = self.texture_asset.as_ref().unwrap();
-            let image = glium::texture::RawImage2d::from_raw_rgba(
-                asset.image_raw.clone(),
-                asset.image_dimensions,
-            );
-            let texture = glium::texture::texture2d::Texture2d::new(display, image);
-
-            match texture {
-                Ok(tx) => self.texture = Some(tx),
-                Err(err) => {
-                    error(&format!(
-                        "ModelObject error:\ntexture creating error!\nErr: {}",
-                        err
-                    ));
-                    self.texture = None;
-                }
-            }
-        } else {
-            let asset_result = TextureAsset::default_texture();
-            match asset_result {
-                Ok(asset) => {
-                    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
-                        &asset.image_raw,
-                        asset.image_dimensions,
-                    );
-                    let texture = glium::texture::texture2d::Texture2d::new(display, image);
-
-                    match texture {
-                        Ok(tx) => self.texture = Some(tx),
-                        Err(err) => {
-                            error(&format!(
-                                "ModelObject error:\ntexture creating error!\nErr: {}",
-                                err
-                            ));
-                            self.texture = None;
-                        }
-                    }
-                }
-                Err(err) => {
-                    debugger::error(&format!(
-                        "model object({}) - failed to open a default texture.\nerror: {:?}",
-                        self.name, err
-                    ));
-                    self.texture = None;
-                }
-            }
-        };
 
         self.started = true;
     }

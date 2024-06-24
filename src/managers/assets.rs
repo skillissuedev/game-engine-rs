@@ -1,6 +1,6 @@
 use crate::assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset};
 
-use super::debugger::{error, crash};
+use super::{debugger::{crash, error}, render::RenderManager};
 use std::{collections::HashMap, env};
 
 #[derive(Default)]
@@ -71,6 +71,13 @@ impl AssetManager {
             },
         }
     }
+
+    pub fn get_texture_asset(&self, asset_id: &str, render: &RenderManager) -> Option<&TextureAsset> {
+        match self.loaded_texture_assets.get(asset_id) {
+            Some(texture_asset) => Some(&texture_asset),
+            None => None,
+        }
+    }
 }
 
 pub fn get_full_asset_path(path: &str) -> String {
@@ -108,5 +115,6 @@ pub fn get_full_asset_path(path: &str) -> String {
 
 #[derive(Debug)]
 pub enum AssetManagerError {
-    AssetAlreadyLoaded
+    AssetAlreadyLoaded,
+    AssetCreationError
 }

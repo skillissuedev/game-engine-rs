@@ -2,16 +2,15 @@ use ez_al::EzAl;
 use glutin::surface::GlSurface;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use crate::{
-    game::game_main,
-    managers::{
-        self, assets::{get_full_asset_path, AssetManager}, debugger, input::InputManager, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{CurrentCascade, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
-    }, objects::character_controller::CharacterController,
+    assets::{model_asset::ModelAsset, texture_asset::TextureAsset}, game::game_main, managers::{
+        self, assets::{get_full_asset_path, AssetManager}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{CurrentCascade, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
+    }, objects::character_controller::CharacterController
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use glam::Vec2;
 use glium::{glutin::{context::NotCurrentGlContext, display::{GetGlDisplay, GlDisplay}}, Display};
 use once_cell::sync::Lazy;
-use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::{EventLoop, EventLoopBuilder}, window::{CursorGrabMode, WindowBuilder}};
+use winit::{dpi::PhysicalSize, event::{Event, MouseButton, WindowEvent}, event_loop::{EventLoop, EventLoopBuilder}, keyboard::KeyCode, window::{CursorGrabMode, WindowBuilder}};
 use std::{
     collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
@@ -301,10 +300,10 @@ pub struct Framework {
     pub resolution: Vec2,
 
     pub al: Option<EzAl>,
-    pub input: InputManager,
+    pub input: InputManager, // done
     pub navigation: NavigationManager,
     pub physics: PhysicsManager,
-    pub saves: SavesManager,
+    pub saves: SavesManager, // done
     pub assets: AssetManager,
     pub render: Option<RenderManager>
 }
@@ -347,6 +346,7 @@ impl Framework {
         CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
     }
 
+    // SavesManager
     pub fn load_save(&mut self, save_name: &str) -> Result<(), ()> {
         match self.saves.load_save(save_name) {
             Ok(save_values) => {
@@ -377,5 +377,76 @@ impl Framework {
 
     pub fn save_game(&mut self) {
         self.saves.save_game(&self.system_globals)
+    }
+
+    // InputManager
+    pub fn new_bind_keyboard(&mut self, bind_name: &str, keys: Vec<&str>) {
+        let mut input_event_types = Vec::new(); 
+        for key in keys {
+            match serde_json::from_str::<KeyCode>(&key.replace("\"", "")) {
+                Ok(key) => input_event_types.push(input::InputEventType::Key(key)),
+                Err(error) => debugger::error(
+                    &format!(
+                        "Framework's new_bind_keyboard error!\nFailed to deserialize a keycode from a string\nSee all avaliable keycodes here: {}\nserde_json error: {}",
+                        "https://docs.rs/winit/0.29.10/i686-pc-windows-msvc/winit/keyboard/enum.KeyCode.html",
+                        error
+                    )
+                ),
+            }
+        }
+        self.input.new_bind(bind_name, input_event_types);
+    }
+
+    pub fn new_bind_mouse(&mut self, bind_name: &str, buttons: Vec<&str>) {
+        let mut input_event_types = Vec::new(); 
+        for button in buttons {
+            match serde_json::from_str::<MouseButton>(&button.replace("\"", "")) {
+                Ok(key) => input_event_types.push(input::InputEventType::Mouse(key)),
+                Err(error) => debugger::error(
+                    &format!(
+                        "Framework's new_bind_mouse error!\nFailed to deserialize a mouse button from a string\nSee all avaliable values here: {}\nserde_json error: {}",
+                        "https://docs.rs/winit/0.29.10/i686-pc-windows-msvc/winit/event/enum.MouseButton.html",
+                        error
+                    )
+                ),
+            }
+        }
+        self.input.new_bind(bind_name, input_event_types);
+    }
+
+    pub fn is_bind_pressed(&self, bind_name: &str) -> bool {
+        self.input.is_bind_pressed(bind_name)
+    }
+
+    pub fn is_bind_down(&self, bind_name: &str) -> bool {
+        self.input.is_bind_down(bind_name)
+    }
+
+    pub fn is_bind_released(&self, bind_name: &str) -> bool {
+        self.input.is_bind_released(bind_name)
+    }
+
+    pub fn mouse_position_from_center(&self) -> Vec2 {
+        self.input.mouse_position_from_center()
+    }
+
+    pub fn mouse_delta(&self) -> Vec2 {
+        self.input.mouse_delta()
+    }
+
+    pub fn is_mouse_locked(&self) -> bool {
+        self.input.is_mouse_locked()
+    }
+
+    pub fn set_mouse_locked(&mut self, lock: bool) {
+        self.input.set_mouse_locked(lock)
+    }
+
+    pub fn preload_model_asset(&mut self, asset_id: String, gltf_path: &str) -> Result<(), ()> {
+        ModelAsset::preload_model_asset_from_gltf(self, &asset_id, gltf_path)
+    }
+
+    pub fn preload_texture_asset(&mut self, asset_id: String, texture_path: &str) -> Result<(), ()> {
+        TextureAsset::preload_texture_asset(self, asset_id, texture_path)
     }
 }
