@@ -72,9 +72,16 @@ impl AssetManager {
         }
     }
 
-    pub fn get_texture_asset(&self, asset_id: &str, render: &RenderManager) -> Option<&TextureAsset> {
+    pub fn get_texture_asset(&self, asset_id: &str) -> Option<&TextureAsset> {
         match self.loaded_texture_assets.get(asset_id) {
             Some(texture_asset) => Some(&texture_asset),
+            None => None,
+        }
+    }
+
+    pub fn get_model_asset(&self, asset_id: &str) -> Option<&ModelAsset> {
+        match self.loaded_model_assets.get(asset_id) {
+            Some(model_asset) => Some(&model_asset),
             None => None,
         }
     }

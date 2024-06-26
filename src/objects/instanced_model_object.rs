@@ -118,7 +118,7 @@ impl Object for InstancedModelObject {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("InstancedModelObject parameters");
         ui.label(format!("instance: {}", self.instance));
     }

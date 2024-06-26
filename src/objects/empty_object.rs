@@ -81,7 +81,7 @@ impl Object for EmptyObject {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui::Ui) {
         ui.heading("Some test UI stuff going on rn!");
     }
 
