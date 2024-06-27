@@ -206,7 +206,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                                                     match collider.clone().collider_type {
                                                         InspectorRenderColliderType::Ball => {
                                                             object.build_object_rigid_body(
-                                                                framework, 
+                                                                framework,
                                                                 None,
                                                                 Some(RenderColliderType::Ball(
                                                                     None, None, x, trigger,
@@ -218,7 +218,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                                                         }
                                                         InspectorRenderColliderType::Cuboid => {
                                                             object.build_object_rigid_body(
-                                                                framework, 
+                                                                framework,
                                                                 None,
                                                                 Some(RenderColliderType::Cuboid(
                                                                     None, None, x, y, z, trigger,
@@ -230,7 +230,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                                                         }
                                                         InspectorRenderColliderType::Capsule => {
                                                             object.build_object_rigid_body(
-                                                                framework, 
+                                                                framework,
                                                                 None,
                                                                 Some(RenderColliderType::Capsule(
                                                                     None, None, x, y, trigger,
@@ -242,7 +242,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                                                         }
                                                         InspectorRenderColliderType::Cylinder => {
                                                             object.build_object_rigid_body(
-                                                                framework, 
+                                                                framework,
                                                                 None,
                                                                 Some(RenderColliderType::Cylinder(
                                                                     None, None, x, y, trigger,
@@ -274,7 +274,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                         }
 
                         ui.separator();
-                        object.inspector_ui(ui);
+                        object.inspector_ui(framework, ui);
                     }
                     None => {
                         ui.heading(format!(

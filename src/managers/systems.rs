@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::{framework::Framework, objects::ObjectGroup, systems::System};
 use egui_glium::egui_winit::egui::Context;
-use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    debugger, networking, render::{Cascades, CurrentCascade, RenderManager, ShadowTextures}
+    assets::AssetManager,
+    debugger, networking,
+    render::{CurrentCascade, RenderManager},
 };
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
@@ -58,9 +58,7 @@ pub fn get_systems_iter<'a>() -> std::slice::Iter<'a, Box<dyn System>> {
     unsafe { SYSTEMS.iter() }
 }
 
-pub fn render(
-    framework: &mut Framework
-) {
+pub fn render(framework: &mut Framework) {
     unsafe {
         if networking::is_server() {
             for system in &mut SYSTEMS {
@@ -76,9 +74,7 @@ pub fn render(
     }
 }
 
-pub fn ui_render(
-    ctx: &Context,
-) {
+pub fn ui_render(ctx: &Context) {
     unsafe {
         for system in &mut SYSTEMS {
             system.ui_render(ctx);
@@ -86,11 +82,11 @@ pub fn ui_render(
     }
 }
 
-pub fn shadow_render(render: &mut RenderManager, cascade: &CurrentCascade) {
+pub fn shadow_render(render: &mut RenderManager, assets: &AssetManager, cascade: &CurrentCascade) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {
-                system.shadow_render_objects(render, cascade);
+                system.shadow_render_objects(render, assets, cascade);
             }
         }
     }
@@ -162,13 +158,14 @@ pub fn get_object_name_with_id(id: u128) -> Option<String> {
 
 pub fn get_value_in_system(system_id: &str, value_name: String) -> Option<SystemValue> {
     match get_system_mut_with_id(system_id) {
-        Some(system) => {
-            system.get_value(value_name)
-        },
+        Some(system) => system.get_value(value_name),
         None => {
-            debugger::error(&format!("failed to get the system '{}' to get the value '{}'", system_id, value_name));
+            debugger::error(&format!(
+                "failed to get the system '{}' to get the value '{}'",
+                system_id, value_name
+            ));
             None
-        },
+        }
     }
 }
 
@@ -185,5 +182,5 @@ pub enum SystemValue {
     UInt(u32),
     Float(f32),
     Vec3(f32, f32, f32),
-    Bool(bool)
+    Bool(bool),
 }

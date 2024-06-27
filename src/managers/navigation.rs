@@ -119,7 +119,11 @@ impl NavigationManager {
 
             let mut grid = PathingGrid::new(area_size_x as usize, area_size_z as usize, false);
 
-            for obstacle in self.navmesh_obstacles.get(navmesh_id).unwrap_or(&Vec::new()) {
+            for obstacle in self
+                .navmesh_obstacles
+                .get(navmesh_id)
+                .unwrap_or(&Vec::new())
+            {
                 let obstacle_size_x = obstacle.area_size[0];
                 let obstacle_size_z = obstacle.area_size[1];
 
@@ -170,8 +174,8 @@ impl NavigationManager {
 
             if (start_x >= navmesh_x1 && start_x <= navmesh_x2)
                 && (start_z >= navmesh_z1 && start_z <= navmesh_z2)
-                    && (finish_x >= navmesh_x1 && finish_x <= navmesh_x2)
-                    && (finish_z >= navmesh_z1 && finish_z <= navmesh_z2)
+                && (finish_x >= navmesh_x1 && finish_x <= navmesh_x2)
+                && (finish_z >= navmesh_z1 && finish_z <= navmesh_z2)
             {
                 match self.navmesh_grids.get(navmesh_id) {
                     Some(grid) => {
@@ -183,18 +187,16 @@ impl NavigationManager {
                         let grid_start = Point::new(grid_start_x as i32, grid_start_z as i32);
                         let grid_finish = Point::new(grid_finish_x as i32, grid_finish_z as i32);
                         match grid.get_path_single_goal(grid_start, grid_finish, false) {
-                            Some(path) => {
-                                match path.get(1) {
-                                    Some(point) => {
-                                        let point_x = (navmesh_x1 + point.x) as f32;
-                                        let point_z = (navmesh_z1 + point.y) as f32;
-                                        return Some(Vec2::new(point_x, point_z));
-                                    }
-                                    None => {
-                                        return None;
-                                    }
+                            Some(path) => match path.get(1) {
+                                Some(point) => {
+                                    let point_x = (navmesh_x1 + point.x) as f32;
+                                    let point_z = (navmesh_z1 + point.y) as f32;
+                                    return Some(Vec2::new(point_x, point_z));
                                 }
-                            }
+                                None => {
+                                    return None;
+                                }
+                            },
                             None => {
                                 return None;
                             }

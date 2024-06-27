@@ -1,13 +1,18 @@
-use crate::{framework::Framework, managers::{
-    debugger,
-    physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderColliderType},
-    render, systems,
-}};
-use glam::Vec3;
+use crate::{
+    framework::Framework,
+    managers::{
+        debugger,
+        physics::{
+            self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager,
+            RenderColliderType,
+        },
+        systems,
+    },
+};
 use rapier3d::{
     dynamics::{RigidBodyBuilder, RigidBodyHandle, RigidBodyType},
     geometry::{ActiveCollisionTypes, ColliderHandle, ColliderSet, CollisionEvent},
-    pipeline::{ActiveEvents, PhysicsPipeline},
+    pipeline::ActiveEvents,
 };
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -64,12 +69,11 @@ impl Trigger {
         let body = RigidBodyBuilder::new(RigidBodyType::Fixed).build();
 
         let body_handle = physics.rigid_body_set.insert(body);
-        let collider_handle = 
-            physics.collider_set.insert_with_parent(
-                collider,
-                body_handle,
-                &mut physics.rigid_body_set,
-            );
+        let collider_handle = physics.collider_set.insert_with_parent(
+            collider,
+            body_handle,
+            &mut physics.rigid_body_set,
+        );
 
         Trigger {
             name: name.to_string(),
@@ -140,7 +144,7 @@ impl Object for Trigger {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("Inspector parameters");
         ui.label("this object type is made specifically for servers so there's noting to change here ._.");
     }
@@ -162,13 +166,15 @@ impl std::fmt::Debug for Trigger {
 
 impl Trigger {
     pub fn is_intersecting(&self, physics: &PhysicsManager) -> bool {
-        let intersections_count = physics.narrow_phase
+        let intersections_count = physics
+            .narrow_phase
             .intersection_pairs_with(self.collider_handle)
             .count();
 
         match intersections_count {
             0 => {
-                let contact_count = physics.narrow_phase
+                let contact_count = physics
+                    .narrow_phase
                     .contact_pairs_with(self.collider_handle)
                     .count();
                 if contact_count > 0 {
@@ -182,8 +188,9 @@ impl Trigger {
     }
 
     pub fn is_intersecting_with_group(&self, physics: &PhysicsManager, group: ObjectGroup) -> bool {
-        let intersections_iter =
-            physics.narrow_phase.intersection_pairs_with(self.collider_handle);
+        let intersections_iter = physics
+            .narrow_phase
+            .intersection_pairs_with(self.collider_handle);
 
         let collider_set = &physics.collider_set;
 

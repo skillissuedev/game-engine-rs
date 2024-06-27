@@ -1,11 +1,14 @@
 use super::System;
 use crate::{
-    framework::Framework, managers::{
+    framework::Framework,
+    managers::{
         //framework.input.{self, is_mouse_locked, set_mouse_locked, InputEventType},
-        input::InputEventType, networking::Message, systems::{CallList, SystemValue}
-    }, objects::Object
+        input::InputEventType,
+        networking::Message,
+        systems::{CallList, SystemValue},
+    },
+    objects::Object,
 };
-use glam::Vec3;
 use winit::keyboard::KeyCode;
 
 pub struct PlayerManager {
@@ -24,38 +27,30 @@ impl PlayerManager {
 
 impl System for PlayerManager {
     fn client_start(&mut self, framework: &mut Framework) {
-        framework.input.new_bind(
-            "lock_mouse",
-            vec![InputEventType::Key(KeyCode::KeyL)],
-        );
-        framework.input.new_bind(
-            "forward",
-            vec![InputEventType::Key(KeyCode::KeyW)],
-        );
-        framework.input.new_bind(
-            "left",
-            vec![InputEventType::Key(KeyCode::KeyA)],
-        );
-        framework.input.new_bind(
-            "backwards",
-            vec![InputEventType::Key(KeyCode::KeyS)],
-        );
-        framework.input.new_bind(
-            "right",
-            vec![InputEventType::Key(KeyCode::KeyD)],
-        );
-        framework.input.new_bind(
-            "cam_up",
-            vec![InputEventType::Key(KeyCode::KeyQ)],
-        );
-        framework.input.new_bind(
-            "cam_down",
-            vec![InputEventType::Key(KeyCode::KeyE)],
-        );
+        framework
+            .input
+            .new_bind("lock_mouse", vec![InputEventType::Key(KeyCode::KeyL)]);
+        framework
+            .input
+            .new_bind("forward", vec![InputEventType::Key(KeyCode::KeyW)]);
+        framework
+            .input
+            .new_bind("left", vec![InputEventType::Key(KeyCode::KeyA)]);
+        framework
+            .input
+            .new_bind("backwards", vec![InputEventType::Key(KeyCode::KeyS)]);
+        framework
+            .input
+            .new_bind("right", vec![InputEventType::Key(KeyCode::KeyD)]);
+        framework
+            .input
+            .new_bind("cam_up", vec![InputEventType::Key(KeyCode::KeyQ)]);
+        framework
+            .input
+            .new_bind("cam_down", vec![InputEventType::Key(KeyCode::KeyE)]);
     }
 
-    fn server_start(&mut self, _: &mut Framework) {
-    }
+    fn server_start(&mut self, _: &mut Framework) {}
 
     fn client_update(&mut self, framework: &mut Framework) {
         /*//dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
@@ -173,12 +168,9 @@ impl System for PlayerManager {
         self.is_destroyed = is_destroyed;
     }
 
-    fn reg_message(&mut self, message: Message) {
-    }
+    fn reg_message(&mut self, message: Message) {}
 
     fn get_value(&mut self, value_name: String) -> Option<SystemValue> {
         None
     }
 }
-
-

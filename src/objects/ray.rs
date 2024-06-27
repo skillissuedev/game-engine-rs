@@ -1,9 +1,8 @@
 use crate::{
-    framework::{self, DebugMode, Framework},
+    framework::{DebugMode, Framework},
     managers::{
         self, debugger,
         physics::{CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderRay},
-        render,
         ui::Vec3Inspector,
     },
 };
@@ -99,7 +98,7 @@ impl Object for Ray {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("Ray parameters");
         ui.label("direction:");
         if let Some(new_dir) =
@@ -115,13 +114,14 @@ impl Object for Ray {
 
     fn debug_render(&self, framework: &mut Framework) {
         if let DebugMode::Full = framework.debug_mode() {
-            framework.render.as_mut()
-                .expect("No render but debug_render is still being called. pls fix").
-                add_ray_to_draw(RenderRay {
+            framework
+                .render
+                .as_mut()
+                .expect("No render but debug_render is still being called. pls fix")
+                .add_ray_to_draw(RenderRay {
                     origin: self.global_transform().position,
                     direction: self.direction,
-                }
-            );
+                });
         }
     }
 }
@@ -129,17 +129,17 @@ impl Object for Ray {
 impl Ray {
     pub fn is_intersecting(&self, physics: &PhysicsManager) -> bool {
         let global_transform = self.global_transform();
-        let toi = global_transform.position.distance(global_transform.position + self.direction);
+        let toi = global_transform
+            .position
+            .distance(global_transform.position + self.direction);
 
         let query_filter = QueryFilter::new().groups(InteractionGroups::new(
             CollisionGroups::Group1.bits().into(),
             self.mask.bits().into(),
         ));
 
-        let ray = rapier3d::geometry::Ray::new(
-            global_transform.position.into(),
-            self.direction.into()
-        );
+        let ray =
+            rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());
 
         //dbg!(toi);
         //dbg!(rotated_direction.normalize());
@@ -150,17 +150,17 @@ impl Ray {
 
     pub fn intersection_position(&self, physics: &PhysicsManager) -> Option<Vec3> {
         let global_transform = self.global_transform();
-        let toi = global_transform.position.distance(global_transform.position + self.direction);
+        let toi = global_transform
+            .position
+            .distance(global_transform.position + self.direction);
 
         let query_filter = QueryFilter::new().groups(InteractionGroups::new(
             CollisionGroups::Group1.bits().into(),
             self.mask.bits().into(),
         ));
 
-        let ray = rapier3d::geometry::Ray::new(
-            global_transform.position.into(),
-            self.direction.into(),
-        );
+        let ray =
+            rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());
 
         match physics.get_ray_intersaction_position(ray, toi, query_filter) {
             Some(pos) => Some(Vec3::new(-pos.x, pos.y, pos.z)),

@@ -24,19 +24,19 @@ use rapier3d::{
 const GRAVITY: Vector3<f32> = vector![0.0, -9.81, 0.0];
 
 pub struct PhysicsManager {
-    pub rigid_body_set: RigidBodySet,// = RigidBodySet::new()
-    pub collider_set: ColliderSet,// = Lazy::new(|| ColliderSet::new());
-    pub integration_parameters: IntegrationParameters,// = Lazy::new(|| {
+    pub rigid_body_set: RigidBodySet, // = RigidBodySet::new()
+    pub collider_set: ColliderSet,    // = Lazy::new(|| ColliderSet::new());
+    pub integration_parameters: IntegrationParameters, // = Lazy::new(|| {
     //IntegrationParameters::default()
-    pub physics_pipeline: PhysicsPipeline,// = Lazy::new(|| PhysicsPipeline::new());
-    pub island_manager: IslandManager,// = Lazy::new(|| IslandManager::new());
-    pub broad_phase: BroadPhase,// = Lazy::new(|| BroadPhase::new());
-    pub narrow_phase: NarrowPhase,// = Lazy::new(|| NarrowPhase::new());
-    pub impulse_joint_set: ImpulseJointSet,// = Lazy::new(|| ImpulseJointSet::new());
-    pub multibody_joint_set: MultibodyJointSet,// =
+    pub physics_pipeline: PhysicsPipeline, // = Lazy::new(|| PhysicsPipeline::new());
+    pub island_manager: IslandManager,     // = Lazy::new(|| IslandManager::new());
+    pub broad_phase: BroadPhase,           // = Lazy::new(|| BroadPhase::new());
+    pub narrow_phase: NarrowPhase,         // = Lazy::new(|| NarrowPhase::new());
+    pub impulse_joint_set: ImpulseJointSet, // = Lazy::new(|| ImpulseJointSet::new());
+    pub multibody_joint_set: MultibodyJointSet, // =
     //    Lazy::new(|| MultibodyJointSet::new());
-    pub ccd_solver: CCDSolver,// = Lazy::new(|| CCDSolver::new());
-    pub query_pipeline: QueryPipeline,// = Lazy::new(|| QueryPipeline::new());
+    pub ccd_solver: CCDSolver,         // = Lazy::new(|| CCDSolver::new());
+    pub query_pipeline: QueryPipeline, // = Lazy::new(|| QueryPipeline::new());
 }
 
 impl Default for PhysicsManager {
@@ -74,11 +74,12 @@ impl PhysicsManager {
             &(),
             &(),
         );
-        self.query_pipeline.update(&mut self.rigid_body_set, &mut self.collider_set);
+        self.query_pipeline
+            .update(&mut self.rigid_body_set, &mut self.collider_set);
 
         /*for i in RIGID_BODY_SET.iter() {
-          dbg!(i.1.translation());
-          }*/
+        dbg!(i.1.translation());
+        }*/
     }
 
     pub fn remove_rigid_body(&mut self, body_parameters: &mut ObjectBodyParameters) {
@@ -111,10 +112,9 @@ impl PhysicsManager {
             handle,
             &mut self.island_manager,
             &mut self.rigid_body_set,
-            false
+            false,
         );
     }
-
 
     pub fn new_rigid_body(
         &mut self,
@@ -155,13 +155,13 @@ impl PhysicsManager {
                     .rotation(transform.rotation.into())
                     .user_data(id)
                     .build();
-                }
+            }
             None => {
                 rigid_body = rigid_body_builder
                     .additional_mass(mass)
                     .user_data(id)
                     .build();
-                }
+            }
         }
 
         let collider_builder: ColliderBuilder;
@@ -190,26 +190,29 @@ impl PhysicsManager {
                 };
 
                 return body_parameters;
-            },
+            }
         }
 
         let mut collider = collider_builder
             .active_events(ActiveEvents::COLLISION_EVENTS)
             .active_collision_types(
                 ActiveCollisionTypes::default()
-                | ActiveCollisionTypes::FIXED_FIXED
-                | ActiveCollisionTypes::DYNAMIC_FIXED
-                | ActiveCollisionTypes::DYNAMIC_DYNAMIC
-                | ActiveCollisionTypes::DYNAMIC_KINEMATIC
-                | ActiveCollisionTypes::DYNAMIC_FIXED
-                | ActiveCollisionTypes::KINEMATIC_FIXED,
+                    | ActiveCollisionTypes::FIXED_FIXED
+                    | ActiveCollisionTypes::DYNAMIC_FIXED
+                    | ActiveCollisionTypes::DYNAMIC_DYNAMIC
+                    | ActiveCollisionTypes::DYNAMIC_KINEMATIC
+                    | ActiveCollisionTypes::DYNAMIC_FIXED
+                    | ActiveCollisionTypes::KINEMATIC_FIXED,
             )
             .build();
         collider.user_data = id;
 
         let rigid_body_handle = self.rigid_body_set.insert(rigid_body);
-        let collider_handle =
-            self.collider_set.insert_with_parent(collider, rigid_body_handle, &mut self.rigid_body_set);
+        let collider_handle = self.collider_set.insert_with_parent(
+            collider,
+            rigid_body_handle,
+            &mut self.rigid_body_set,
+        );
         let body_parameters = ObjectBodyParameters {
             rigid_body_handle: Some(rigid_body_handle),
             collider_handle: Some(collider_handle),
@@ -219,13 +222,14 @@ impl PhysicsManager {
         body_parameters
     }
 
-
     fn get_body(&mut self, handle: &RigidBodyHandle) -> Option<&mut RigidBody> {
         self.rigid_body_set.get_mut(*handle)
     }
 
-
-    pub fn get_body_transformations(&self, body_parameters: ObjectBodyParameters) -> Option<(Vec3, Vec3)> {
+    pub fn get_body_transformations(
+        &self,
+        body_parameters: ObjectBodyParameters,
+    ) -> Option<(Vec3, Vec3)> {
         if let Some(body) = body_parameters.rigid_body_handle {
             match self.rigid_body_set.get(body) {
                 Some(body) => {
@@ -237,8 +241,8 @@ impl PhysicsManager {
                 }
                 None => {
                     debugger::error(&format!(
-                            "get_body_transformations error\nfailed to get rigid body with handle {:?}",
-                            body_parameters.rigid_body_handle
+                        "get_body_transformations error\nfailed to get rigid body with handle {:?}",
+                        body_parameters.rigid_body_handle
                     ));
                     None
                 }
@@ -263,14 +267,14 @@ impl PhysicsManager {
                                                                        // POSITION
                 }
                 None => debugger::error(&format!(
-                        "set_body_transformations error\nfailed to get rigid body with handle {:?}",
-                        body_parameters.rigid_body_handle
+                    "set_body_transformations error\nfailed to get rigid body with handle {:?}",
+                    body_parameters.rigid_body_handle
                 )),
             }
         } else {
             debugger::error(&format!(
-                    "set_body_transformations error\nfailed to get rigid body with handle {:?}",
-                    body_parameters.rigid_body_handle
+                "set_body_transformations error\nfailed to get rigid body with handle {:?}",
+                body_parameters.rigid_body_handle
             ));
         }
     }
@@ -280,14 +284,14 @@ impl PhysicsManager {
             match self.rigid_body_set.get_mut(body) {
                 Some(body) => body.set_translation(position.into(), true),
                 None => debugger::error(&format!(
-                        "set_body_position error\nfailed to get rigid body with handle {:?}",
-                        body_parameters.rigid_body_handle
+                    "set_body_position error\nfailed to get rigid body with handle {:?}",
+                    body_parameters.rigid_body_handle
                 )),
             }
         } else {
             debugger::error(&format!(
-                    "set_body_position error\nfailed to get rigid body with handle {:?}",
-                    body_parameters.rigid_body_handle
+                "set_body_position error\nfailed to get rigid body with handle {:?}",
+                body_parameters.rigid_body_handle
             ));
         }
     }
@@ -304,8 +308,8 @@ impl PhysicsManager {
                 body.set_rotation(quat.into(), true);
             }
             None => debugger::error(&format!(
-                    "set_rigidbody_rotation error\nfailed to get rigid body with handle {:?}",
-                    body
+                "set_rigidbody_rotation error\nfailed to get rigid body with handle {:?}",
+                body
             )),
         }
     }
@@ -313,12 +317,10 @@ impl PhysicsManager {
     pub fn set_rigidbody_position(&mut self, body: RigidBodyHandle, position: Vec3) {
         match self.rigid_body_set.get_mut(body) {
             Some(body) => body.set_translation(position.into(), true),
-            None => debugger::error(
-                &format!(
-                    "set_rigidbody_position error\nfailed to get rigid body with handle {:?}",
-                    body
-                )
-            ),
+            None => debugger::error(&format!(
+                "set_rigidbody_position error\nfailed to get rigid body with handle {:?}",
+                body
+            )),
         }
     }
 
@@ -357,15 +359,15 @@ impl PhysicsManager {
                 }
                 None => {
                     debugger::error(&format!(
-                            "set_body_rotation error\nfailed to get rigid body with handle {:?}",
-                            body_parameters.rigid_body_handle
+                        "set_body_rotation error\nfailed to get rigid body with handle {:?}",
+                        body_parameters.rigid_body_handle
                     ));
                 }
             }
         } else {
             debugger::error(&format!(
-                    "set_body_rotation error\nfailed to get rigid body with handle {:?}",
-                    body_parameters.rigid_body_handle
+                "set_body_rotation error\nfailed to get rigid body with handle {:?}",
+                body_parameters.rigid_body_handle
             ));
         }
     }
@@ -381,16 +383,16 @@ impl PhysicsManager {
                 }
                 None => {
                     debugger::error(&format!(
-                            "get_body_rotation error\nfailed to get rigid body with handle {:?}",
-                            body_parameters.rigid_body_handle
+                        "get_body_rotation error\nfailed to get rigid body with handle {:?}",
+                        body_parameters.rigid_body_handle
                     ));
                     None
                 }
             }
         } else {
             debugger::error(&format!(
-                    "get_body_rotation error\nfailed to get rigid body with handle {:?}",
-                    body_parameters.rigid_body_handle
+                "get_body_rotation error\nfailed to get rigid body with handle {:?}",
+                body_parameters.rigid_body_handle
             ));
             None
         }
@@ -480,13 +482,13 @@ pub fn collider_type_to_render_collider(
             Some(RenderColliderType::Ball(None, None, *radius, is_sensor))
         }
         BodyColliderType::Cuboid(x, y, z) => Some(RenderColliderType::Cuboid(
-                None, None, *x, *y, *z, is_sensor,
+            None, None, *x, *y, *z, is_sensor,
         )),
         BodyColliderType::Capsule(radius, height) => Some(RenderColliderType::Capsule(
-                None, None, *radius, *height, is_sensor,
+            None, None, *radius, *height, is_sensor,
         )),
         BodyColliderType::Cylinder(radius, height) => Some(RenderColliderType::Cylinder(
-                None, None, *radius, *height, is_sensor,
+            None, None, *radius, *height, is_sensor,
         )),
         BodyColliderType::TriangleMesh(_) => None,
     }
@@ -637,11 +639,9 @@ pub fn collider_type_to_collider_builder(
     }
 
     collider_builder = collider_builder.solver_groups(InteractionGroups::new(
-            membership_groups.bits.into(),
-            filter_groups.bits.into(),
+        membership_groups.bits.into(),
+        filter_groups.bits.into(),
     ));
 
     collider_builder
 }
-
-

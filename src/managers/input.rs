@@ -1,8 +1,10 @@
 use super::debugger;
 use glam::Vec2;
-use winit::{event::{DeviceEvent, ElementState, MouseButton, WindowEvent}, keyboard::KeyCode};
 use std::collections::HashMap;
-
+use winit::{
+    event::{DeviceEvent, ElementState, MouseButton, WindowEvent},
+    keyboard::KeyCode,
+};
 
 #[derive(Default)]
 pub struct InputManager {
@@ -38,8 +40,10 @@ impl InputManager {
 
     pub fn reg_device_event(&mut self, event: &DeviceEvent) {
         match event {
-            DeviceEvent::MouseMotion { delta } => self.mouse_delta = Vec2::new(delta.0 as f32, delta.1 as f32),
-            _ => ()
+            DeviceEvent::MouseMotion { delta } => {
+                self.mouse_delta = Vec2::new(delta.0 as f32, delta.1 as f32)
+            }
+            _ => (),
         }
     }
 
@@ -49,7 +53,7 @@ impl InputManager {
                 device_id: _,
                 //input,
                 is_synthetic: _,
-                event: input
+                event: input,
             } => {
                 self.binds.iter().for_each(|bind_events| {
                     for bind_ev in bind_events.1 {
@@ -97,7 +101,10 @@ impl InputManager {
                     }
                 }
             }
-            WindowEvent::CursorMoved { device_id: _, position } => {
+            WindowEvent::CursorMoved {
+                device_id: _,
+                position,
+            } => {
                 self.mouse_position = Vec2::new(position.x as f32, position.y as f32);
             }
             WindowEvent::Resized(new_size) => {
@@ -184,7 +191,6 @@ impl InputManager {
     pub fn set_mouse_locked(&mut self, lock: bool) {
         self.is_mouse_locked = lock
     }
-
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

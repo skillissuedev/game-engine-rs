@@ -26,11 +26,11 @@ fn main() {
             Some(arg_seed) => {
                 println!("New save seed is {}", arg_seed);
                 seed = arg_seed;
-            },
+            }
             None => {
                 println!("New save seed isn't specified. Setting a random one.");
                 seed = rand::thread_rng().gen_range(1..u32::MAX);
-            },
+            }
         }
 
         //set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(seed)]);
@@ -62,16 +62,12 @@ fn main() {
         ip = Ipv4Addr::new(127, 0, 0, 1);
     }
     println!("Connecting to {}:7777", ip);
-    managers::networking::new_client(
-        std::net::IpAddr::V4(ip),
-        7777,
-    ).unwrap();
+    managers::networking::new_client(std::net::IpAddr::V4(ip), 7777).unwrap();
 
     match get_current_networking_mode() {
         managers::networking::NetworkingMode::Server(_) => (),
         managers::networking::NetworkingMode::Client(_) => (),
-        managers::networking::NetworkingMode::Disconnected(_) => {
-        }
+        managers::networking::NetworkingMode::Disconnected(_) => {}
     }
 
     if args.debug {
@@ -92,6 +88,6 @@ struct Args {
     pub new_save_seed: Option<u32>,
     #[arg(long)]
     pub new_save_name: Option<String>,
-    #[arg(long="connect")]
-    pub ip: Option<Ipv4Addr>
+    #[arg(long = "connect")]
+    pub ip: Option<Ipv4Addr>,
 }

@@ -1,5 +1,9 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{framework::Framework, managers::{debugger, physics::ObjectBodyParameters}, math_utils::deg_vec_to_rad};
+use crate::{
+    framework::Framework,
+    managers::{debugger, physics::ObjectBodyParameters},
+    math_utils::deg_vec_to_rad,
+};
 use glam::{Mat4, Quat};
 
 #[derive(Debug)]
@@ -11,15 +15,11 @@ pub struct InstancedModelObject {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    instance: String
+    instance: String,
 }
 
 impl InstancedModelObject {
-    pub fn new(
-        name: &str,
-        instance: &str
-    ) -> Self {
-
+    pub fn new(name: &str, instance: &str) -> Self {
         InstancedModelObject {
             transform: Transform::default(),
             children: vec![],
@@ -28,7 +28,7 @@ impl InstancedModelObject {
             groups: vec![],
             body: None,
             id: gen_object_id(),
-            instance: instance.into()
+            instance: instance.into(),
         }
     }
 }
@@ -44,7 +44,9 @@ impl InstancedModelObject {
 
         let rotation_quat = Quat::from_euler(
             glam::EulerRot::XYZ,
-            rotation_vector.x, rotation_vector.y, rotation_vector.z
+            rotation_vector.x,
+            rotation_vector.y,
+            rotation_vector.z,
         );
 
         let transform =
@@ -55,8 +57,6 @@ impl InstancedModelObject {
         //let proj = render::get_projection_matrix();
 
         //let mvp = proj * view * transform;
-
-
     }
 }
 

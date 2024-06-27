@@ -1,6 +1,9 @@
 use std::fs::read_to_string;
 
-use crate::{framework::Framework, managers::{assets::get_full_asset_path, debugger::error}};
+use crate::{
+    framework::Framework,
+    managers::{assets::get_full_asset_path, debugger::error},
+};
 
 pub static mut DEFAULT_VERTEX_SHADER_PATH: &str = "shaders/default.vert";
 pub static mut DEFAULT_FRAGMENT_SHADER_PATH: &str = "shaders/default.frag";
@@ -82,17 +85,25 @@ impl ShaderAsset {
         Ok(asset)
     }
 
-    pub fn preload_shader_asset(framework: &mut Framework, asset_id: String, path: ShaderAssetPath) -> Result<(), ()> {
+    pub fn preload_shader_asset(
+        framework: &mut Framework,
+        asset_id: String,
+        path: ShaderAssetPath,
+    ) -> Result<(), ()> {
         match Self::load_from_file(&path) {
-            Ok(asset) => 
+            Ok(asset) => {
                 if let Err(err) = framework.assets.preload_shader_asset(asset_id, asset) {
-                    error(&format!("Failed to preload the ShaderAsset!\nAssetManager error: {:?}\nPath: {:?}", err, path));
-                    return Err(())
-                },
+                    error(&format!(
+                        "Failed to preload the ShaderAsset!\nAssetManager error: {:?}\nPath: {:?}",
+                        err, path
+                    ));
+                    return Err(());
+                }
+            }
             Err(err) => {
                 error(&format!("Failed to preload the ShaderAsset!\nFailed to load the asset\nError: {:?}\nPath: {:?}", err, path));
-                return Err(())
-            },
+                return Err(());
+            }
         }
         Ok(())
     }

@@ -1,18 +1,26 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
     assets::{
-        model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
+        model_asset::{self, Animation, AnimationChannel, AnimationChannelType},
         shader_asset::ShaderAsset,
-    }, framework::Framework, managers::{
-        assets::AssetManager, debugger::{error, warn}, physics::ObjectBodyParameters, render::{CurrentCascade, RenderManager, Vertex}
-    }
+    },
+    framework::Framework,
+    managers::{
+        assets::{AssetManager, ModelAssetId, TextureAssetId},
+        debugger::{error, warn},
+        physics::ObjectBodyParameters,
+        render::{CurrentCascade, RenderManager},
+    },
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    glutin::surface::WindowSurface, implement_vertex, uniform, uniforms::{
+    glutin::surface::WindowSurface,
+    implement_vertex, uniform,
+    uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    }, Display, IndexBuffer, Program, Surface, VertexBuffer
+    },
+    Display, IndexBuffer, Program, Surface,
 };
 use std::time::Instant;
 
@@ -25,11 +33,11 @@ pub struct MasterInstancedModelObject {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    pub model_asset_id: String,
+    pub model_asset_id: ModelAssetId,
     pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
     pub shader_asset: ShaderAsset,
-    pub texture_asset_id: Option<String>,
+    pub texture_asset_id: Option<TextureAssetId>,
     programs: Vec<Program>,
     shadow_programs: Vec<Program>,
     started: bool,
@@ -41,8 +49,8 @@ impl MasterInstancedModelObject {
     pub fn new(
         name: &str,
         framework: &mut Framework,
-        model_asset_id: String,
-        texture_asset_id: Option<String>,
+        model_asset_id: ModelAssetId,
+        texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
     ) -> Self {
         let mut nodes_transforms: Vec<NodeTransform> = vec![];
@@ -91,9 +99,14 @@ impl MasterInstancedModelObject {
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
                 }
-            },
+            }
             None => {
-                error(&format!("Failed to create a new MasterInstancedModelObject\nFailed to get ModelAsset!\nModelAsset id = {}", model_asset_id));
+                error(&format!(
+                        "Failed to create a new MasterInstancedModelObject\nFailed to get ModelAsset!\nModelAsset id = {}",
+                        model_asset_id.get_id()
+                    )
+                );
+
                 MasterInstancedModelObject {
                     transform: Transform::default(),
                     nodes_transforms,
@@ -129,12 +142,7 @@ impl Object for MasterInstancedModelObject {
         self.update_animation();
         if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
             for node in &asset.root_nodes {
-                set_nodes_global_transform(
-                    &node,
-                    &asset.nodes,
-                    None,
-                    &mut self.nodes_transforms,
-                );
+                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
             }
         }
     }
@@ -187,11 +195,21 @@ impl Object for MasterInstancedModelObject {
         &self.id
     }
 
-    fn inspector_ui(&mut self, framework: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(
+        &mut self,
+        framework: &mut Framework,
+        ui: &mut egui_glium::egui_winit::egui::Ui,
+    ) {
         ui.heading("MasterInstancedModelObject parameters");
         ui.label(&format!("error: {}", self.error));
-        ui.label(&format!("model asset's id: {}", self.model_asset_id));
-        ui.label(&format!("texture asset: {}", self.texture_asset_id.is_some()));
+        ui.label(&format!(
+            "model asset's id: {}",
+            self.model_asset_id.get_id()
+        ));
+        ui.label(&format!(
+            "texture asset: {}",
+            self.texture_asset_id.is_some()
+        ));
 
         let anim_name = self.inspector_anim_name.clone();
         ComboBox::from_label("animation")
@@ -208,7 +226,7 @@ impl Object for MasterInstancedModelObject {
 
         ui.horizontal(|ui| {
             if ui.button("play animation").clicked() {
-                let _ = self.play_animation(&anim_name);
+                let _ = self.play_animation(framework, &anim_name);
             }
             ui.checkbox(&mut self.animation_settings.looping, "loop");
             if ui.button("stop").clicked() {
@@ -226,18 +244,16 @@ impl Object for MasterInstancedModelObject {
         &mut self.groups
     }
 
-    fn render(
-        &mut self,
-        framework: &mut Framework
-    ) {
-        let render = framework.render.as_mut()
-            .expect("wtf there are no display in a framework and it's still calling render() in a system?");
+    fn render(&mut self, framework: &mut Framework) {
+        let render = framework.render.as_mut().expect(
+            "wtf there are no display in a framework and it's still calling render() in a system?",
+        );
 
         if self.error {
             return;
         }
         if !self.started {
-            self.start_mesh(&render.display);
+            self.start_mesh(&render.display, &framework.assets);
         }
 
         let closest_shadow_view_proj_cols = render.cascades.closest_view_proj.to_cols_array_2d();
@@ -245,21 +261,17 @@ impl Object for MasterInstancedModelObject {
 
         let matrices = match render.get_instance_positions(&self.name) {
             Some(matrices) => matrices,
-            None => {
-                return
-            },
+            None => return,
         };
         let mut per_instance_data = Vec::new();
-
 
         for matrix in matrices {
             per_instance_data.push(Instance {
                 model: matrix.to_cols_array_2d(),
             });
         }
-        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
-
-
+        let per_instance_buffer =
+            glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
 
         //dbg!(&self.model_asset.objects);
         if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
@@ -294,32 +306,38 @@ impl Object for MasterInstancedModelObject {
                 //let mvp: Mat4 = setup_mat_result.mvp;
                 //let model: Mat4 = setup_mat_result.model;
 
-
                 let texture: &glium::texture::Texture2d;
                 match self.texture_asset_id.as_ref() {
                     Some(texture_id) => {
                         match framework.assets.get_texture_asset(texture_id) {
                             Some(texture_asset) => texture = &texture_asset.texture,
-                            None => {
-                                texture = &framework.assets
-                                    .get_texture_asset("default")
-                                    .expect("Failed to get 'default' texture asset from preloaded assets!")
-                                    .texture
-                            },
+                            None => texture = &framework
+                                .assets
+                                .get_default_texture_asset()
+                                .expect(
+                                    "Failed to get 'default' texture asset from preloaded assets!",
+                                )
+                                .texture,
                         };
-                    },
-                    None => texture = &framework.assets
-                        .get_texture_asset("default")
-                        .expect("Failed to get 'default' texture asset from preloaded assets!")
-                        .texture,
+                    }
+                    None => {
+                        texture = &framework
+                            .assets
+                            .get_default_texture_asset()
+                            .expect("Failed to get 'default' texture asset from preloaded assets!")
+                            .texture
+                    }
                 }
 
-                let joints = UniformBuffer::new(&render.display, self.get_joints_transforms()).unwrap();
+                let joints = UniformBuffer::new(
+                    &render.display,
+                    self.get_joints_transforms(&framework.assets),
+                )
+                .unwrap();
                 let inverse_bind_mats =
                     UniformBuffer::new(&render.display, asset.joints_inverse_bind_mats).unwrap();
 
                 let camera_position: [f32; 3] = render.get_camera_position().into();
-
 
                 let sampler_behaviour = glium::uniforms::SamplerBehavior {
                     minify_filter: MinifySamplerFilter::Nearest,
@@ -369,7 +387,9 @@ impl Object for MasterInstancedModelObject {
                     ..Default::default()
                 };
 
-                render.target.as_mut()
+                render
+                    .target
+                    .as_mut()
                     .expect("Target shouldn't be None here")
                     .draw(
                         (vertex_buffer, per_instance_buffer.per_instance().unwrap()),
@@ -379,7 +399,7 @@ impl Object for MasterInstancedModelObject {
                         &draw_params,
                     )
                     .unwrap();
-                }
+            }
         }
     }
 
@@ -387,10 +407,10 @@ impl Object for MasterInstancedModelObject {
         &mut self,
         render: &mut RenderManager,
         assets: &AssetManager,
-        current_cascade: &CurrentCascade
+        current_cascade: &CurrentCascade,
     ) {
         if !self.started {
-            self.start_mesh(&render.display);
+            self.start_mesh(&render.display, assets);
         }
 
         if self.error {
@@ -399,19 +419,17 @@ impl Object for MasterInstancedModelObject {
 
         let matrices = match render.get_instance_positions(&self.name) {
             Some(matrices) => matrices,
-            None => {
-                return
-            },
+            None => return,
         };
         let mut per_instance_data = Vec::new();
-
 
         for matrix in matrices {
             per_instance_data.push(Instance {
                 model: matrix.to_cols_array_2d(),
             });
         }
-        let per_instance_buffer = glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
+        let per_instance_buffer =
+            glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
 
         if let Some(asset) = assets.get_model_asset(&self.model_asset_id) {
             let vertex_buffers = &asset.vertex_buffers.as_ref().unwrap();
@@ -441,10 +459,11 @@ impl Object for MasterInstancedModelObject {
                     }
                 }
 
-
                 let view_proj_cols = match current_cascade {
                     CurrentCascade::Closest => render.cascades.closest_view_proj.to_cols_array_2d(),
-                    CurrentCascade::Furthest => render.cascades.furthest_view_proj.to_cols_array_2d(),
+                    CurrentCascade::Furthest => {
+                        render.cascades.furthest_view_proj.to_cols_array_2d()
+                    }
                 };
 
                 let uniforms = uniform! {
@@ -463,7 +482,8 @@ impl Object for MasterInstancedModelObject {
                         write: true,
                         ..Default::default()
                     },
-                    backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+                    backface_culling:
+                        glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
                     ..Default::default()
                 };
 
@@ -481,7 +501,7 @@ impl Object for MasterInstancedModelObject {
                         &draw_params,
                     )
                     .unwrap();
-                }
+            }
         }
     }
 }
@@ -502,8 +522,16 @@ impl MasterInstancedModelObject {
         }
     }
 
-    pub fn play_animation(&mut self, anim_name: &str) -> Result<(), ModelObjectError> {
-        let anim_option = self.model_asset.find_animation(anim_name);
+    pub fn play_animation(
+        &mut self,
+        framework: &mut Framework,
+        anim_name: &str,
+    ) -> Result<(), ModelObjectError> {
+        let asset = framework
+            .assets
+            .get_model_asset(&self.model_asset_id)
+            .expect("Failed to play the animation! Failed to get the asset.");
+        let anim_option = asset.find_animation(anim_name);
 
         match anim_option {
             Some(animation) => {
@@ -519,9 +547,13 @@ impl MasterInstancedModelObject {
         }
     }
 
-    fn get_joints_transforms(&self) -> [[[f32; 4]; 4]; 128] {
+    fn get_joints_transforms(&self, assets: &AssetManager) -> [[[f32; 4]; 4]; 128] {
+        let asset = assets
+            .get_model_asset(&self.model_asset_id)
+            .expect("Failed to play the animation! Failed to get the asset.");
+
         let mut joints_vec: Vec<&NodeTransform> = Vec::new();
-        for joint in &self.model_asset.joints {
+        for joint in &asset.joints {
             for node_transform in &self.nodes_transforms {
                 if node_transform.node_id == joint.node_index {
                     joints_vec.push(node_transform);
@@ -596,8 +628,9 @@ impl MasterInstancedModelObject {
         }
     }
 
-    fn start_mesh(&mut self, display: &Display<WindowSurface>) {
+    fn start_mesh(&mut self, display: &Display<WindowSurface>, assets: &AssetManager) {
         let shadow_shader = ShaderAsset::load_shadow_shader();
+
         let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
             shadow_shader
         } else {
@@ -606,69 +639,56 @@ impl MasterInstancedModelObject {
             return;
         };
 
-        for i in &self.model_asset.objects {
-            let vertex_buffer = VertexBuffer::new(display, &i.vertices);
-            match vertex_buffer {
-                Ok(buff) => self.vertex_buffer.push(buff),
-                Err(err) => {
-                    error(&format!(
-                        "Mesh object error:\nvertex buffer creation error!\nErr: {}",
-                        err
-                    ));
-                    self.error = true;
-                    //panic!();
-                    return;
-                }
-            }
-        }
-
         let vertex_shader_source = &self.shader_asset.vertex_shader_source;
         let fragment_shader_source = &self.shader_asset.fragment_shader_source;
 
         let vertex_shadow_shader_src = &shadow_shader.vertex_shader_source;
         let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
 
-        for _ in &self.model_asset.objects {
-            let program = Program::from_source(
-                display,
-                &vertex_shader_source,
-                &fragment_shader_source,
-                None,
-            );
+        let asset = assets.get_model_asset(&self.model_asset_id);
+        if let Some(asset) = asset {
+            for _ in &asset.objects {
+                let program = Program::from_source(
+                    display,
+                    &vertex_shader_source,
+                    &fragment_shader_source,
+                    None,
+                );
 
-            let shadow_program = Program::from_source(
-                display,
-                &vertex_shadow_shader_src,
-                &fragment_shadow_shader_src,
-                None,
-            );
+                let shadow_program = Program::from_source(
+                    display,
+                    &vertex_shadow_shader_src,
+                    &fragment_shadow_shader_src,
+                    None,
+                );
 
-            match shadow_program {
-                Ok(prog) => self.shadow_programs.push(prog),
-                Err(err) => {
-                    error(&format!(
-                        "MasterInstancedModelObject error:\nprogram creation error(shadow)!\nErr: {}",
-                        err
-                    ));
-                    self.error = true;
-                    return;
+                match program {
+                    Ok(prog) => self.programs.push(prog),
+                    Err(err) => {
+                        error(&format!(
+                            "ModelObject error:\nprogram creation error!\nErr: {}",
+                            err
+                        ));
+                        self.error = true;
+                        return;
+                    }
+                }
+
+                match shadow_program {
+                    Ok(prog) => self.shadow_programs.push(prog),
+                    Err(err) => {
+                        error(&format!(
+                            "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
+                            err
+                        ));
+                        self.error = true;
+                        return;
+                    }
                 }
             }
 
-            match program {
-                Ok(prog) => self.programs.push(prog),
-                Err(err) => {
-                    error(&format!(
-                        "MasterInstancedModelObject error:\nprogram creation error!\nErr: {}",
-                        err
-                    ));
-                    self.error = true;
-                    return;
-                }
-            }
+            self.started = true;
         }
-
-        self.started = true;
     }
 }
 

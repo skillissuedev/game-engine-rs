@@ -1,18 +1,46 @@
-use ez_al::EzAl;
-use glutin::surface::GlSurface;
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use crate::{
-    assets::{model_asset::ModelAsset, texture_asset::TextureAsset}, game::game_main, managers::{
-        self, assets::{get_full_asset_path, AssetManager}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, CollisionGroups, PhysicsManager}, render::{CurrentCascade, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}
-    }, objects::character_controller::CharacterController
+    assets::{model_asset::ModelAsset, texture_asset::TextureAsset},
+    game::game_main,
+    managers::{
+        self,
+        assets::{get_full_asset_path, AssetManager},
+        debugger,
+        input::{self, InputManager},
+        navigation::NavigationManager,
+        networking,
+        physics::{self, CollisionGroups, PhysicsManager},
+        render::{CurrentCascade, RenderManager},
+        saves::SavesManager,
+        sound::set_listener_transform,
+        systems::{self, SystemValue},
+    },
+    objects::character_controller::CharacterController,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
+use ez_al::EzAl;
 use glam::Vec2;
-use glium::{glutin::{context::NotCurrentGlContext, display::{GetGlDisplay, GlDisplay}}, Display};
+use glium::{
+    glutin::{
+        context::NotCurrentGlContext,
+        display::{GetGlDisplay, GlDisplay},
+    },
+    Display,
+};
+use glutin::surface::GlSurface;
 use once_cell::sync::Lazy;
-use winit::{dpi::PhysicalSize, event::{Event, MouseButton, WindowEvent}, event_loop::{EventLoop, EventLoopBuilder}, keyboard::KeyCode, window::{CursorGrabMode, WindowBuilder}};
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use std::{
-    collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
+    collections::HashMap,
+    fs,
+    num::NonZeroU32,
+    time::{Duration, Instant},
+};
+use winit::{
+    dpi::PhysicalSize,
+    event::{Event, MouseButton, WindowEvent},
+    event_loop::{EventLoop, EventLoopBuilder},
+    keyboard::KeyCode,
+    window::{CursorGrabMode, WindowBuilder},
 };
 
 static FONT: Lazy<Vec<u8>> =
@@ -24,7 +52,8 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .expect("Event loop building failed");
     let (window, display) = new_window(&event_loop);
 
-    let mut egui_glium = egui_glium::EguiGlium::new(egui::ViewportId(Id::new(0)), &display, &window, &event_loop);
+    let mut egui_glium =
+        egui_glium::EguiGlium::new(egui::ViewportId(Id::new(0)), &display, &window, &event_loop);
 
     let mut fps = 0;
 
@@ -62,7 +91,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
-        render: Some(RenderManager::new(display))
+        render: Some(RenderManager::new(display)),
     };
     framework.set_debug_mode(debug_mode);
 
@@ -71,95 +100,124 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
     framework.navigation.update();
     game_main::start(&mut framework);
 
-    event_loop.run(move |ev, window_target| {
-        dbg!(window_target.raw_display_handle());
-        match ev {
-            Event::AboutToWait => {
-                window.request_redraw();
-            },
-            Event::DeviceEvent { device_id: _, event } => framework.input.reg_device_event(&event),
-            Event::WindowEvent { window_id: _, event } => {
-                let event_response = egui_glium.on_event(&window, &event);
-                if event_response.consumed == false {
-                    framework.input.reg_event(&event);
+    event_loop
+        .run(move |ev, window_target| {
+            dbg!(window_target.raw_display_handle());
+            match ev {
+                Event::AboutToWait => {
+                    window.request_redraw();
+                }
+                Event::DeviceEvent {
+                    device_id: _,
+                    event,
+                } => framework.input.reg_device_event(&event),
+                Event::WindowEvent {
+                    window_id: _,
+                    event,
+                } => {
+                    let event_response = egui_glium.on_event(&window, &event);
+                    if event_response.consumed == false {
+                        framework.input.reg_event(&event);
 
-                    match event {
-                        WindowEvent::RedrawRequested => {
-                            let time_since_last_frame = last_frame.elapsed();
-                            last_frame = Instant::now();
-                            update_game(&mut framework, time_since_last_frame);
+                        match event {
+                            WindowEvent::RedrawRequested => {
+                                let time_since_last_frame = last_frame.elapsed();
+                                last_frame = Instant::now();
+                                update_game(&mut framework, time_since_last_frame);
 
-                            if framework.input.is_mouse_locked() {
-                                let _ = window.set_cursor_grab(CursorGrabMode::Locked);
-                            } else {
-                                let _ = window.set_cursor_grab(CursorGrabMode::None);
-                            }
-
-                            egui_glium.run(&window, |ctx| {
-                                match framework.debug_mode() {
-                                    DebugMode::None => (),
-                                    _ => {
-                                        Window::new("inspector").show(ctx, |ui| {
-                                            managers::ui::draw_inspector(&mut framework, ui, &fps, &mut ui_state);
-                                        });
-                                    }
+                                if framework.input.is_mouse_locked() {
+                                    let _ = window.set_cursor_grab(CursorGrabMode::Locked);
+                                } else {
+                                    let _ = window.set_cursor_grab(CursorGrabMode::None);
                                 }
 
-                                systems::ui_render(ctx);
-                            });
+                                egui_glium.run(&window, |ctx| {
+                                    match framework.debug_mode() {
+                                        DebugMode::None => (),
+                                        _ => {
+                                            Window::new("inspector").show(ctx, |ui| {
+                                                managers::ui::draw_inspector(
+                                                    &mut framework,
+                                                    ui,
+                                                    &fps,
+                                                    &mut ui_state,
+                                                );
+                                            });
+                                        }
+                                    }
 
-                            {
-                                let render = framework.render.as_mut().unwrap();
+                                    systems::ui_render(ctx);
+                                });
 
-                                set_listener_transform(
-                                    framework.al.as_ref().unwrap(),
-                                    render.get_camera_position(),
-                                    render.get_camera_front(),
+                                {
+                                    let render = framework.render.as_mut().unwrap();
+
+                                    set_listener_transform(
+                                        framework.al.as_ref().unwrap(),
+                                        render.get_camera_position(),
+                                        render.get_camera_front(),
+                                    );
+
+                                    render.draw();
+                                }
+
+                                println!("render!");
+                                systems::shadow_render(
+                                    framework.render.as_mut().unwrap(),
+                                    &framework.assets,
+                                    &CurrentCascade::Closest,
                                 );
+                                systems::shadow_render(
+                                    framework.render.as_mut().unwrap(),
+                                    &framework.assets,
+                                    &CurrentCascade::Furthest,
+                                );
+                                systems::render(&mut framework); // Don't mind me, beautiful Rust code going on here
 
-                                render.draw();
+                                {
+                                    let render = framework.render.as_mut().unwrap();
+                                    render.debug_draw();
+                                    egui_glium
+                                        .paint(&render.display, render.target.as_mut().unwrap());
+                                    render.finish_render();
+                                }
+
+                                frames_count += 1;
                             }
-
-                            println!("render!");
-                            systems::shadow_render(framework.render.as_mut().unwrap(), &CurrentCascade::Closest);
-                            systems::shadow_render(framework.render.as_mut().unwrap(), &CurrentCascade::Furthest);
-                            systems::render(&mut framework); // Don't mind me, beautiful Rust code going on here
-
-                            {
-                                let render = framework.render.as_mut().unwrap();
-                                render.debug_draw();
-                                egui_glium.paint(&render.display, render.target.as_mut().unwrap());
-                                render.finish_render();
+                            WindowEvent::CloseRequested => {
+                                window_target.exit();
+                                networking::disconnect();
+                                return;
                             }
+                            WindowEvent::Resized(size) => {
+                                framework.resolution =
+                                    Vec2::new(size.width as f32, size.height as f32);
+                                framework
+                                    .render
+                                    .as_mut()
+                                    .unwrap()
+                                    .display
+                                    .resize(size.into());
+                                let _ = window.request_inner_size(size);
 
-                            frames_count += 1;
-                        },
-                        WindowEvent::CloseRequested => {
-                            window_target.exit();
-                            networking::disconnect();
-                            return;
+                                framework.render.as_mut().unwrap().aspect_ratio =
+                                    size.width as f32 / size.height as f32;
+                            }
+                            _ => (),
                         }
-                        WindowEvent::Resized(size) => {
-                            framework.resolution = Vec2::new(size.width as f32, size.height as f32);
-                            framework.render.as_mut().unwrap().display.resize(size.into());
-                            let _ = window.request_inner_size(size);
-
-                            framework.render.as_mut().unwrap().aspect_ratio = size.width as f32 / size.height as f32;
-                        }
-                        _ => (),
                     }
                 }
+                _ => (),
             }
-            _ => (),
-        }
 
-        if let Some(new_fps) = get_fps(&now, &frames_count) {
-            fps = new_fps;
-            window.set_title(&format!("projectbaldej: {fps} fps"));
-            frames_count = 0;
-            now = Instant::now();
-        }
-    }).unwrap();
+            if let Some(new_fps) = get_fps(&now, &frames_count) {
+                fps = new_fps;
+                window.set_title(&format!("projectbaldej: {fps} fps"));
+                frames_count = 0;
+                now = Instant::now();
+            }
+        })
+        .unwrap();
 }
 
 pub fn start_game_without_render() {
@@ -177,9 +235,8 @@ pub fn start_game_without_render() {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
-        render: None
+        render: None,
     };
-
 
     game_main::start(&mut framework);
 
@@ -230,7 +287,6 @@ fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
     None
 }
 
-
 #[derive(Clone, Copy)]
 pub enum DebugMode {
     None,
@@ -238,9 +294,14 @@ pub enum DebugMode {
     Full,
 }
 
-// Glium's SimpleWindowBuilder's build function with a few changes 
+// Glium's SimpleWindowBuilder's build function with a few changes
 // https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
-fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, Display<glutin::surface::WindowSurface>) {
+fn new_window<T>(
+    event_loop: &winit::event_loop::EventLoop<T>,
+) -> (
+    winit::window::Window,
+    Display<glutin::surface::WindowSurface>,
+) {
     // First we start by opening a new Window
     let window_builder = WindowBuilder::new()
         .with_title("projectbaldej")
@@ -256,13 +317,12 @@ fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window
             // Just use the first configuration since we don't have any special preferences here
             configs.next().unwrap()
         })
-    .unwrap();
+        .unwrap();
     let window = window.unwrap();
 
     // Now we get the window size to use as the initial size of the Surface
     let (width, height): (u32, u32) = window.inner_size().into();
-    let attrs =
-        glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
+    let attrs = glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
         .build(
             window.raw_window_handle(),
             NonZeroU32::new(width).unwrap(),
@@ -276,8 +336,8 @@ fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window
             .create_window_surface(&gl_config, &attrs)
             .unwrap()
     };
-    let context_attributes = glutin::context::ContextAttributesBuilder::new()
-        .build(Some(window.raw_window_handle()));
+    let context_attributes =
+        glutin::context::ContextAttributesBuilder::new().build(Some(window.raw_window_handle()));
     let current_context = Some(unsafe {
         gl_config
             .display()
@@ -285,9 +345,11 @@ fn new_window<T>(event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window
             .expect("failed to create context")
     })
     .unwrap()
-        .make_current(&surface)
+    .make_current(&surface)
+    .unwrap();
+    surface
+        .set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait)
         .unwrap();
-    surface.set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait).unwrap();
     let display = Display::from_context_surface(current_context, surface).unwrap();
 
     (window, display)
@@ -305,7 +367,7 @@ pub struct Framework {
     pub physics: PhysicsManager,
     pub saves: SavesManager, // done
     pub assets: AssetManager,
-    pub render: Option<RenderManager>
+    pub render: Option<RenderManager>,
 }
 
 impl Framework {
@@ -332,16 +394,16 @@ impl Framework {
     pub fn get_global_system_value(&self, key: &str) -> Option<Vec<SystemValue>> {
         match self.system_globals.get(key) {
             Some(value) => Some(value.clone()),
-            None => None
+            None => None,
         }
     }
 
     pub fn new_character_controller_object(
         &mut self,
-        name: &str, 
-        shape: physics::BodyColliderType, 
-        membership_groups: Option<CollisionGroups>, 
-        mask: Option<CollisionGroups>
+        name: &str,
+        shape: physics::BodyColliderType,
+        membership_groups: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
     ) -> CharacterController {
         CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
     }
@@ -353,11 +415,11 @@ impl Framework {
                 for (key, value) in save_values {
                     self.set_global_system_value(&key, value);
                 }
-            },
+            }
             Err(_) => {
                 debugger::error("Framework error!\nFailed to load save.");
-                return Err(())
-            },
+                return Err(());
+            }
         }
 
         Ok(())
@@ -381,7 +443,7 @@ impl Framework {
 
     // InputManager
     pub fn new_bind_keyboard(&mut self, bind_name: &str, keys: Vec<&str>) {
-        let mut input_event_types = Vec::new(); 
+        let mut input_event_types = Vec::new();
         for key in keys {
             match serde_json::from_str::<KeyCode>(&key.replace("\"", "")) {
                 Ok(key) => input_event_types.push(input::InputEventType::Key(key)),
@@ -398,7 +460,7 @@ impl Framework {
     }
 
     pub fn new_bind_mouse(&mut self, bind_name: &str, buttons: Vec<&str>) {
-        let mut input_event_types = Vec::new(); 
+        let mut input_event_types = Vec::new();
         for button in buttons {
             match serde_json::from_str::<MouseButton>(&button.replace("\"", "")) {
                 Ok(key) => input_event_types.push(input::InputEventType::Mouse(key)),
@@ -446,7 +508,11 @@ impl Framework {
         ModelAsset::preload_model_asset_from_gltf(self, &asset_id, gltf_path)
     }
 
-    pub fn preload_texture_asset(&mut self, asset_id: String, texture_path: &str) -> Result<(), ()> {
+    pub fn preload_texture_asset(
+        &mut self,
+        asset_id: String,
+        texture_path: &str,
+    ) -> Result<(), ()> {
         TextureAsset::preload_texture_asset(self, asset_id, texture_path)
     }
 }

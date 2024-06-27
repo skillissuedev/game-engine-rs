@@ -1,12 +1,17 @@
-use std::path::Path;
-use crate::{framework::Framework, managers::{
-    assets::get_full_asset_path, debugger::{self, error, warn}, render::{RenderManager, Vertex}
-}};
+use crate::{
+    framework::Framework,
+    managers::{
+        assets::get_full_asset_path,
+        debugger::{self, error, warn},
+        render::{RenderManager, Vertex},
+    },
+};
 use data_url::DataUrl;
 use glam::Mat4;
 use glium::VertexBuffer;
 use gltf::Gltf;
 use splines::{Key, Spline};
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct Object {
@@ -40,7 +45,7 @@ pub struct ModelAsset {
     pub animations: Vec<Animation>,
     pub joints_mats: [[[f32; 4]; 4]; 128],
     pub joints_inverse_bind_mats: [[[f32; 4]; 4]; 128],
-    pub vertex_buffers: Option<Vec<VertexBuffer<Vertex>>>
+    pub vertex_buffers: Option<Vec<VertexBuffer<Vertex>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +72,10 @@ pub enum AnimationChannelType {
 }
 
 impl ModelAsset {
-    pub fn from_gltf(path: &str, render: Option<&RenderManager>) -> Result<ModelAsset, ModelAssetError> {
+    pub fn from_gltf(
+        path: &str,
+        render: Option<&RenderManager>,
+    ) -> Result<ModelAsset, ModelAssetError> {
         let full_path = get_full_asset_path(path);
         let gltf_result = Gltf::open(&full_path);
         let gltf: Gltf;
@@ -328,8 +336,8 @@ impl ModelAsset {
                         Ok(buff) => vertex_buffers_vector.push(buff),
                         Err(err) => {
                             error(&format!(
-                                    "ModelAsset error:\nVertex buffer creation error!\nErr: {}",
-                                    err
+                                "ModelAsset error:\nVertex buffer creation error!\nErr: {}",
+                                err
                             ));
                             return Err(ModelAssetError::VertexBufferCreationError);
                         }
@@ -337,9 +345,8 @@ impl ModelAsset {
                 }
                 vertex_buffers = Some(vertex_buffers_vector);
             }
-            None => vertex_buffers = None
+            None => vertex_buffers = None,
         }
-
 
         Ok(ModelAsset {
             path: path.into(),
@@ -350,11 +357,15 @@ impl ModelAsset {
             root_nodes,
             joints_mats: joints_vec_to_array(joints.clone()),
             joints_inverse_bind_mats: joints_vec_to_inverse_mat_array(joints.clone()),
-            vertex_buffers
+            vertex_buffers,
         })
     }
 
-    pub fn preload_model_asset_from_gltf(framework: &mut Framework, asset_id: &str, path: &str) -> Result<(), ()> {
+    pub fn preload_model_asset_from_gltf(
+        framework: &mut Framework,
+        asset_id: &str,
+        path: &str,
+    ) -> Result<(), ()> {
         let asset = match &framework.render {
             Some(render) => Self::from_gltf(path, Some(render)),
             None => Self::from_gltf(path, None),
@@ -363,14 +374,20 @@ impl ModelAsset {
         match asset {
             Ok(asset) => {
                 if let Err(err) = framework.assets.preload_model_asset(asset_id.into(), asset) {
-                    debugger::error(&format!("Failed to preload the ModelAsset!\nAssetManager error\nErr: {:?}", err));
-                    return Err(())
+                    debugger::error(&format!(
+                        "Failed to preload the ModelAsset!\nAssetManager error\nErr: {:?}",
+                        err
+                    ));
+                    return Err(());
                 }
-            },
+            }
             Err(err) => {
-                debugger::error(&format!("Failed to preload the ModelAsset!\nFailed to load the asset\nErr: {:?}", err));
-                return Err(())
-            },
+                debugger::error(&format!(
+                    "Failed to preload the ModelAsset!\nFailed to load the asset\nErr: {:?}",
+                    err
+                ));
+                return Err(());
+            }
         }
         Ok(())
     }

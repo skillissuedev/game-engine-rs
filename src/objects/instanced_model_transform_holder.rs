@@ -1,11 +1,10 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{framework::Framework, managers::{
-    debugger, physics::ObjectBodyParameters, render::{self, Cascades, ShadowTextures}
-}, math_utils::deg_vec_to_rad};
-use glam::{Mat4, Quat};
-use glium::{
-    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display
+use crate::{
+    framework::Framework,
+    managers::{debugger, physics::ObjectBodyParameters},
+    math_utils::deg_vec_to_rad,
 };
+use glam::{Mat4, Quat};
 
 #[derive(Debug)]
 pub struct InstancedModelTransformHolder {
@@ -17,16 +16,11 @@ pub struct InstancedModelTransformHolder {
     id: u128,
     groups: Vec<ObjectGroup>,
     instance: String,
-    mats: Vec<Mat4>
+    mats: Vec<Mat4>,
 }
 
 impl InstancedModelTransformHolder {
-    pub fn new(
-        name: &str,
-        instance: &str,
-        transforms: Vec<Transform>
-    ) -> Self {
-
+    pub fn new(name: &str, instance: &str, transforms: Vec<Transform>) -> Self {
         InstancedModelTransformHolder {
             transform: Transform::default(),
             children: vec![],
@@ -50,7 +44,9 @@ impl InstancedModelTransformHolder {
 
         let rotation_quat = Quat::from_euler(
             glam::EulerRot::XYZ,
-            rotation_vector.x, rotation_vector.y, rotation_vector.z
+            rotation_vector.x,
+            rotation_vector.y,
+            rotation_vector.z,
         );
 
         let transform =
@@ -62,8 +58,11 @@ impl InstancedModelTransformHolder {
         self.mats = Self::transforms_to_mats(transforms);
     }
 
-    fn transforms_to_mats(transforms: Vec<Transform>) -> Vec<Mat4> { 
-        transforms.iter().map(|tr| Self::setup_mat(tr)).collect::<Vec<Mat4>>()
+    fn transforms_to_mats(transforms: Vec<Transform>) -> Vec<Mat4> {
+        transforms
+            .iter()
+            .map(|tr| Self::setup_mat(tr))
+            .collect::<Vec<Mat4>>()
     }
 }
 
@@ -125,7 +124,7 @@ impl Object for InstancedModelTransformHolder {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("InstancedModelObject parameters");
         ui.label(format!("instance: {}", self.instance));
     }

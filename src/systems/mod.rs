@@ -1,15 +1,19 @@
 pub mod main_system;
-pub mod world_generator;
 pub mod player_manager;
+pub mod world_generator;
 
 use crate::{
-    framework::Framework, managers::{
-        debugger, networking::{self, Message, MessageReliability, NetworkError}, render::{Cascades, CurrentCascade, RenderManager, ShadowTextures}, systems::{register_object_id_name, register_object_id_system, CallList, SystemValue}
-    }, objects::Object
+    framework::Framework,
+    managers::{
+        assets::AssetManager,
+        debugger,
+        networking::{self, Message, MessageReliability, NetworkError},
+        render::{CurrentCascade, RenderManager},
+        systems::{register_object_id_name, register_object_id_system, CallList, SystemValue},
+    },
+    objects::Object,
 };
 use egui_glium::egui_winit::egui::Context;
-use glam::Mat4;
-use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, Display, Frame};
 
 pub trait System {
     fn client_start(&mut self, framework: &mut Framework);
@@ -80,10 +84,7 @@ pub trait System {
             .for_each(|object| object.update_children(framework));
     }
 
-    fn render_objects(
-        &mut self,
-        framework: &mut Framework
-    ) {
+    fn render_objects(&mut self, framework: &mut Framework) {
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.render(framework));
@@ -98,14 +99,15 @@ pub trait System {
     fn shadow_render_objects(
         &mut self,
         render: &mut RenderManager,
-        cascade: &CurrentCascade
+        assets: &AssetManager,
+        cascade: &CurrentCascade,
     ) {
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.shadow_render(render, cascade));
+            .for_each(|object| object.shadow_render(render, assets, cascade));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.shadow_render_children(render, cascade));
+            .for_each(|object| object.shadow_render_children(render, assets, cascade));
     }
 
     fn destroy_system(&mut self) {
@@ -129,10 +131,13 @@ pub trait System {
             }
 
             if object.delete_child(framework, name) == true {
-                return
+                return;
             }
         }
-        debugger::warn(&format!("Failed to delete object \"{}\". An object with such name wasn't found", name));
+        debugger::warn(&format!(
+            "Failed to delete object \"{}\". An object with such name wasn't found",
+            name
+        ));
     }
 
     fn add_object(&mut self, object: Box<dyn Object>) {

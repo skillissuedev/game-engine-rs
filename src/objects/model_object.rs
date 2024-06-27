@@ -3,16 +3,25 @@ use crate::{
     assets::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
         shader_asset::ShaderAsset,
-    }, framework::Framework, managers::{
-        assets::AssetManager, debugger::{self, error, warn}, physics::ObjectBodyParameters, render::{CurrentCascade, RenderManager}
-    }, math_utils::deg_to_rad
+    },
+    framework::Framework,
+    managers::{
+        assets::{AssetManager, ModelAssetId, TextureAssetId},
+        debugger::{self, error, warn},
+        physics::ObjectBodyParameters,
+        render::{CurrentCascade, RenderManager},
+    },
+    math_utils::deg_to_rad,
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    glutin::surface::WindowSurface, uniform, uniforms::{
+    glutin::surface::WindowSurface,
+    uniform,
+    uniforms::{
         MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    }, Display, IndexBuffer, Program, Surface
+    },
+    Display, IndexBuffer, Program, Surface,
 };
 use std::time::Instant;
 
@@ -25,11 +34,11 @@ pub struct ModelObject {
     id: u128,
     groups: Vec<ObjectGroup>,
     //pub model_asset: ModelAsset,
-    pub model_asset_id: String,
+    pub model_asset_id: ModelAssetId,
     pub nodes_transforms: Vec<NodeTransform>,
     pub animation_settings: CurrentAnimationSettings,
     pub shader_asset: ShaderAsset,
-    pub texture_asset_id: Option<String>,
+    pub texture_asset_id: Option<TextureAssetId>,
     //vertex_buffer: Vec<VertexBuffer<Vertex>>,
     programs: Vec<Program>,
     shadow_programs: Vec<Program>,
@@ -42,8 +51,8 @@ impl ModelObject {
     pub fn new(
         name: &str,
         framework: &mut Framework,
-        model_asset_id: String,
-        texture_asset_id: Option<String>,
+        model_asset_id: ModelAssetId,
+        texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
     ) -> Self {
         let mut nodes_transforms: Vec<NodeTransform> = vec![];
@@ -91,9 +100,9 @@ impl ModelObject {
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
                 }
-            },
+            }
             None => {
-                debugger::error(&format!("Failed to create a new ModelObject\nFailed to get ModelAsset!\nModelAsset id = {}", model_asset_id));
+                debugger::error(&format!("Failed to create a new ModelObject\nFailed to get ModelAsset!\nModelAsset id = {:?}", model_asset_id));
                 ModelObject {
                     transform: Transform::default(),
                     nodes_transforms,
@@ -117,7 +126,7 @@ impl ModelObject {
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
                 }
-            },
+            }
         }
     }
 }
@@ -143,12 +152,7 @@ impl Object for ModelObject {
         self.update_animation();
         if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
             for node in &asset.root_nodes {
-                set_nodes_global_transform(
-                    &node,
-                    &asset.nodes,
-                    None,
-                    &mut self.nodes_transforms,
-                );
+                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
             }
         }
     }
@@ -201,11 +205,21 @@ impl Object for ModelObject {
         &self.id
     }
 
-    fn inspector_ui(&mut self, framework: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(
+        &mut self,
+        framework: &mut Framework,
+        ui: &mut egui_glium::egui_winit::egui::Ui,
+    ) {
         ui.heading("ModelObject parameters");
         ui.label(&format!("error: {}", self.error));
-        ui.label(&format!("model asset's id: {}", self.model_asset_id));
-        ui.label(&format!("texture asset: {}", self.texture_asset_id.is_some()));
+        ui.label(&format!(
+            "model asset's id: {}",
+            self.model_asset_id.get_id()
+        ));
+        ui.label(&format!(
+            "texture asset: {}",
+            self.texture_asset_id.is_some()
+        ));
 
         let anim_name = self.inspector_anim_name.clone();
         ComboBox::from_label("animation")
@@ -240,12 +254,10 @@ impl Object for ModelObject {
         &mut self.groups
     }
 
-    fn render(
-        &mut self,
-        framework: &mut Framework
-    ) {
-        let render = framework.render.as_mut()
-            .expect("wtf there are no display in a framework and it's still calling render() in a system?");
+    fn render(&mut self, framework: &mut Framework) {
+        let render = framework.render.as_mut().expect(
+            "wtf there are no display in a framework and it's still calling render() in a system?",
+        );
 
         if self.error {
             return;
@@ -294,24 +306,29 @@ impl Object for ModelObject {
                     Some(texture_id) => {
                         match framework.assets.get_texture_asset(texture_id) {
                             Some(texture_asset) => texture = &texture_asset.texture,
-                            None => {
-                                texture = &framework.assets
-                                    .get_texture_asset("default")
-                                    .expect("Failed to get 'default' texture asset from preloaded assets!")
-                                    .texture
-                            },
+                            None => texture = &framework
+                                .assets
+                                .get_default_texture_asset()
+                                .expect(
+                                    "Failed to get default texture asset from preloaded assets!",
+                                )
+                                .texture,
                         };
-                    },
-                    None => texture = &framework.assets
-                        .get_texture_asset("default")
-                        .expect("Failed to get 'default' texture asset from preloaded assets!")
-                        .texture,
+                    }
+                    None => {
+                        texture = &framework
+                            .assets
+                            .get_default_texture_asset()
+                            .expect("Failed to get default texture asset from preloaded assets!")
+                            .texture
+                    }
                 }
 
                 let mvp_cols = mvp.to_cols_array_2d();
                 let model_cols = model.to_cols_array_2d();
 
-                let joints = UniformBuffer::new(&render.display, self.get_joints_transforms(asset)).unwrap();
+                let joints =
+                    UniformBuffer::new(&render.display, self.get_joints_transforms(asset)).unwrap();
                 let inverse_bind_mats =
                     UniformBuffer::new(&render.display, asset.joints_inverse_bind_mats).unwrap();
                 let camera_position: [f32; 3] = render.get_camera_position().into();
@@ -406,8 +423,9 @@ impl Object for ModelObject {
 
         let asset = assets.get_model_asset(&self.model_asset_id);
         if let Some(asset) = asset {
-            let vertex_buffers = asset.vertex_buffers.as_ref()
-                .expect("Asset's vertex buffer's vector is None! Probably running in a server mode");
+            let vertex_buffers = asset.vertex_buffers.as_ref().expect(
+                "Asset's vertex buffer's vector is None! Probably running in a server mode",
+            );
 
             for i in 0..asset.objects.len() {
                 let object = &asset.objects[i];
@@ -440,7 +458,9 @@ impl Object for ModelObject {
                 let model_cols = model.to_cols_array_2d();
                 let view_proj_cols = match current_cascade {
                     CurrentCascade::Closest => render.cascades.closest_view_proj.to_cols_array_2d(),
-                    CurrentCascade::Furthest => render.cascades.furthest_view_proj.to_cols_array_2d(),
+                    CurrentCascade::Furthest => {
+                        render.cascades.furthest_view_proj.to_cols_array_2d()
+                    }
                 };
 
                 let uniforms = uniform! {
@@ -465,7 +485,8 @@ impl Object for ModelObject {
                         write: true,
                         ..Default::default()
                     },
-                    backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+                    backface_culling:
+                        glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
                     ..Default::default()
                 };
 
@@ -474,20 +495,22 @@ impl Object for ModelObject {
                     CurrentCascade::Furthest => render.furthest_shadow_fbo(),
                 };
 
-                target.draw(
-                    &vertex_buffers[i],
-                    &indices.unwrap(),
-                    &self.shadow_programs[i],
-                    &uniforms,
-                    &draw_params,
-                ).unwrap();
+                target
+                    .draw(
+                        &vertex_buffers[i],
+                        &indices.unwrap(),
+                        &self.shadow_programs[i],
+                        &uniforms,
+                        &draw_params,
+                    )
+                    .unwrap();
             }
         }
     }
 }
 
 impl ModelObject {
-    pub fn get_asset_id(&self) -> &String {
+    pub fn get_asset_id(&self) -> &ModelAssetId {
         &self.model_asset_id
     }
 
@@ -506,8 +529,14 @@ impl ModelObject {
         }
     }
 
-    pub fn play_animation(&mut self, anim_name: &str, framework: &mut Framework) -> Result<(), ModelObjectError> {
-        let asset = framework.assets.get_model_asset(&self.model_asset_id)
+    pub fn play_animation(
+        &mut self,
+        anim_name: &str,
+        framework: &mut Framework,
+    ) -> Result<(), ModelObjectError> {
+        let asset = framework
+            .assets
+            .get_model_asset(&self.model_asset_id)
             .expect("Failed to play the animation! Failed to get the asset.");
         let anim_option = asset.find_animation(anim_name);
 
@@ -522,7 +551,7 @@ impl ModelObject {
                 Ok(())
             }
             None => Err(ModelObjectError::AnimationNotFound),
-        } 
+        }
     }
 
     fn get_joints_transforms(&self, asset: &ModelAsset) -> [[[f32; 4]; 4]; 128] {
@@ -603,7 +632,11 @@ impl ModelObject {
         }
     }
 
-    fn setup_mat(&self, render: &RenderManager, node_transform: &NodeTransform) -> SetupMatrixResult {
+    fn setup_mat(
+        &self,
+        render: &RenderManager,
+        node_transform: &NodeTransform,
+    ) -> SetupMatrixResult {
         match node_transform.global_transform {
             Some(_) => (),
             None => {
@@ -705,8 +738,8 @@ impl ModelObject {
                     Ok(prog) => self.programs.push(prog),
                     Err(err) => {
                         error(&format!(
-                                "ModelObject error:\nprogram creation error!\nErr: {}",
-                                err
+                            "ModelObject error:\nprogram creation error!\nErr: {}",
+                            err
                         ));
                         self.error = true;
                         return;
@@ -717,8 +750,8 @@ impl ModelObject {
                     Ok(prog) => self.shadow_programs.push(prog),
                     Err(err) => {
                         error(&format!(
-                                "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
-                                err
+                            "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
+                            err
                         ));
                         self.error = true;
                         return;

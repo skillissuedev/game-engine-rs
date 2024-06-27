@@ -1,6 +1,11 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
-    assets::sound_asset::SoundAsset, framework::Framework, managers::{debugger::{self, warn}, physics::ObjectBodyParameters}
+    assets::sound_asset::SoundAsset,
+    framework::Framework,
+    managers::{
+        debugger::{self, warn},
+        physics::ObjectBodyParameters,
+    },
 };
 use core::f32;
 use ez_al::{SoundError, SoundSource, SoundSourceType};
@@ -9,7 +14,7 @@ use std::fmt::Debug;
 
 enum SoundEmitterAsset {
     Asset(SoundAsset),
-    AssetPath(String)
+    AssetPath(String),
 }
 
 pub struct SoundEmitter {
@@ -27,7 +32,7 @@ pub struct SoundEmitter {
     emitter_type: SoundSourceType,
     error: bool,
     looping: bool,
-    max_distance: f32
+    max_distance: f32,
 }
 
 impl SoundEmitter {
@@ -47,11 +52,15 @@ impl SoundEmitter {
             emitter_type,
             error: false,
             looping: false,
-            max_distance: 50.0
+            max_distance: 50.0,
         }
     }
-    
-    pub fn new_from_path(name: &str, asset_path: String, emitter_type: SoundSourceType) -> SoundEmitter {
+
+    pub fn new_from_path(
+        name: &str,
+        asset_path: String,
+        emitter_type: SoundSourceType,
+    ) -> SoundEmitter {
         SoundEmitter {
             name: name.to_string(),
             asset: SoundEmitterAsset::AssetPath(asset_path),
@@ -67,7 +76,7 @@ impl SoundEmitter {
             emitter_type,
             error: false,
             looping: false,
-            max_distance: 50.0
+            max_distance: 50.0,
         }
     }
 
@@ -110,11 +119,11 @@ impl SoundEmitter {
             }
             SoundSourceType::Positional => Some(self.max_distance),
         }
-
     }
 
     pub fn update_sound_transforms(&mut self, sound_position: Vec3) {
-        let _ = self.source
+        let _ = self
+            .source
             .as_mut()
             .expect("update_sound_transforms failed, shouldn't be happening")
             .update(sound_position.into());
@@ -131,31 +140,37 @@ impl Object for SoundEmitter {
                     let source;
                     if let Some(al) = &framework.al {
                         match &self.asset {
-                            SoundEmitterAsset::Asset(asset) => 
-                                source = SoundSource::new(al, &asset.wav, self.emitter_type.clone()),
+                            SoundEmitterAsset::Asset(asset) => {
+                                source = SoundSource::new(al, &asset.wav, self.emitter_type.clone())
+                            }
                             SoundEmitterAsset::AssetPath(path) => {
                                 let asset = SoundAsset::from_wav(&framework, &path);
                                 match asset {
-                                    Ok(asset) => 
-                                        source = SoundSource::new(al, &asset.wav, self.emitter_type.clone()),
+                                    Ok(asset) => {
+                                        source = SoundSource::new(
+                                            al,
+                                            &asset.wav,
+                                            self.emitter_type.clone(),
+                                        )
+                                    }
                                     Err(err) => {
                                         debugger::error(&format!("SoundEmitter error!\nFailed to load a SoundAsset.\nPath: {}\nError: {:?}", path, err));
                                         self.error = true;
-                                        return
-                                    },
+                                        return;
+                                    }
                                 }
-                            },
+                            }
                         }
 
                         match source {
                             Ok(source) => {
                                 self.source = Some(source);
-                            },
+                            }
                             Err(err) => {
                                 debugger::error(&format!("SoundEmitter error!\nFailed to create a SoundSource.\nError: {:?}", err));
                                 self.error = true;
                                 ()
-                            },
+                            }
                         }
                     } else {
                         debugger::error(&format!("SoundEmitter error!\nFramework's al value = None, probably running without render!"));
@@ -221,7 +236,7 @@ impl Object for SoundEmitter {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("SoundEmitter parameters");
 
         let mut looping = self.is_looping();

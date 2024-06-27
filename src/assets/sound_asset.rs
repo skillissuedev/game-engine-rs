@@ -1,6 +1,9 @@
 use ez_al::WavAsset;
 
-use crate::{framework::Framework, managers::{assets::get_full_asset_path, debugger}};
+use crate::{
+    framework::Framework,
+    managers::{assets::get_full_asset_path, debugger},
+};
 
 pub struct SoundAsset {
     pub wav: WavAsset,
@@ -23,17 +26,25 @@ impl SoundAsset {
         }
     }
 
-    pub fn preload_sound_asset_from_wav(framework: &mut Framework, asset_id: String, path: &str) -> Result<(), ()> {
+    pub fn preload_sound_asset_from_wav(
+        framework: &mut Framework,
+        asset_id: String,
+        path: &str,
+    ) -> Result<(), ()> {
         match Self::from_wav(framework, path) {
-            Ok(asset) => 
+            Ok(asset) => {
                 if let Err(err) = framework.assets.preload_sound_asset(asset_id, asset) {
-                    debugger::error(&format!("Failed to preload the SoundAsset!\nAssetManager error: {:?}\nPath: {}", err, path));
-                    return Err(())
-                },
+                    debugger::error(&format!(
+                        "Failed to preload the SoundAsset!\nAssetManager error: {:?}\nPath: {}",
+                        err, path
+                    ));
+                    return Err(());
+                }
+            }
             Err(err) => {
                 debugger::error(&format!("Failed to preload the SoundAsset!\nFailed to load the asset\nError: {:?}\nPath: {}", err, path));
-                return Err(())
-            },
+                return Err(());
+            }
         }
         Ok(())
     }

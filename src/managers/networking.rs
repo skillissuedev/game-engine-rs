@@ -71,7 +71,12 @@ pub struct Message {
     pub contents: MessageContents,
 }
 impl Message {
-    pub fn new_from_server(receiver: MessageReceiver, contents: MessageContents, system_id: String, message_id: String) -> Self {
+    pub fn new_from_server(
+        receiver: MessageReceiver,
+        contents: MessageContents,
+        system_id: String,
+        message_id: String,
+    ) -> Self {
         Message {
             message_type: MessageType::FromServer(receiver),
             system_id,
@@ -80,7 +85,11 @@ impl Message {
         }
     }
 
-    pub fn new_from_client(contents: MessageContents, system_id: String, message_id: String) -> Self {
+    pub fn new_from_client(
+        contents: MessageContents,
+        system_id: String,
+        message_id: String,
+    ) -> Self {
         Message {
             message_type: MessageType::FromClient(unsafe { CLIENT_ID.to_string() }),
             system_id,
@@ -99,7 +108,7 @@ pub enum MessageContents {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageType {
     FromServer(MessageReceiver),
-    FromClient(String)
+    FromClient(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -227,19 +236,24 @@ impl ServerHandle {
         };
 
         match message.message_type {
-            MessageType::FromServer(receiver) => {
-                match receiver {
-                    MessageReceiver::Everybody => self.server.broadcast_message(renet_message_reliability, message_bytes_vec),
-                    MessageReceiver::EverybodyExcept(client_id) => self.server.broadcast_message_except(
+            MessageType::FromServer(receiver) => match receiver {
+                MessageReceiver::Everybody => self
+                    .server
+                    .broadcast_message(renet_message_reliability, message_bytes_vec),
+                MessageReceiver::EverybodyExcept(client_id) => {
+                    self.server.broadcast_message_except(
                         client_id,
                         renet_message_reliability,
                         message_bytes_vec,
-                    ),
-                    MessageReceiver::OneClient(client_id) => 
-                        self.server.send_message(client_id, renet_message_reliability, message_bytes_vec)
+                    )
                 }
-            }, 
-            _ => ()
+                MessageReceiver::OneClient(client_id) => self.server.send_message(
+                    client_id,
+                    renet_message_reliability,
+                    message_bytes_vec,
+                ),
+            },
+            _ => (),
         };
 
         Ok(())
@@ -423,9 +437,7 @@ fn set_network_event(event: NetworkEvent) {
 }
 
 pub fn get_network_events() -> Vec<NetworkEvent> {
-    unsafe {
-        CURRENT_NETWORK_EVENTS.clone()
-    }
+    unsafe { CURRENT_NETWORK_EVENTS.clone() }
 }
 
 fn generate_client_id() -> u64 {

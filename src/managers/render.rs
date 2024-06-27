@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
+use super::physics::{RenderColliderType, RenderRay};
 use crate::math_utils::deg_to_rad;
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
-    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program, Surface, VertexBuffer
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex,
+    index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program,
+    Surface, VertexBuffer,
 };
-use super::physics::{RenderColliderType, RenderRay};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -107,7 +109,6 @@ const CUBE_INDICES_LIST: [u32; 36] = [
     0, 3, 1, 5,
 ];
 
-
 struct SunCamera {
     pub view: Mat4,
     pub proj: Mat4,
@@ -153,7 +154,11 @@ impl SunCamera {
         )
     }
 
-    fn get_sun_camera_view_matrix(light_dir: Vec3, corners: &CameraCorners, additional_y: Option<f32>) -> Mat4 {
+    fn get_sun_camera_view_matrix(
+        light_dir: Vec3,
+        corners: &CameraCorners,
+        additional_y: Option<f32>,
+    ) -> Mat4 {
         //let direction = get_light_direction().normalize();
         let view_center = corners.get_center();
         let view_up = Vec3::new(0.0, 1.0, 0.0);
@@ -167,7 +172,7 @@ impl SunCamera {
 
         let sun_camera_position =
             light_dir + view_center + Vec3::new(0.0, 20.0, 0.0) + additional_y; //Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
-                                                                                            //dbg!(&sun_camera_position);
+                                                                                //dbg!(&sun_camera_position);
 
         let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
 
@@ -175,7 +180,7 @@ impl SunCamera {
     }
 
     pub fn new(
-        fov: f32, 
+        fov: f32,
         aspect_ratio: f32,
         light_dir: Vec3,
         view: Mat4,
@@ -234,28 +239,36 @@ impl CameraCorners {
         vec3_frustum_corners
     }
 
-    pub fn get_camera_proj(fov: f32, aspect_ratio: f32, mut start_distance: f32, end_distance: Option<f32>) -> Mat4 {
+    pub fn get_camera_proj(
+        fov: f32,
+        aspect_ratio: f32,
+        mut start_distance: f32,
+        end_distance: Option<f32>,
+    ) -> Mat4 {
         start_distance += 0.01;
         let end_distance = match end_distance {
             Some(distance) => distance,
             None => 500.0,
         };
         //dbg!(start_distance, end_distance);
-        Mat4::perspective_rh_gl(
-            fov,
-            aspect_ratio,
-            start_distance,
-            end_distance,
-        )
+        Mat4::perspective_rh_gl(fov, aspect_ratio, start_distance, end_distance)
     }
 
     /*pub fn get_sun_eye(&self) -> Vec3 {
         Vec3::new(self.min_x, self.max_y, self.min_z)
     }*/
 
-    pub fn new(fov: f32, aspect_ratio: f32, start_distance: f32, end_distance: Option<f32>, view: Mat4) -> CameraCorners {
-        let corners =
-            Self::get_camera_corners(Self::get_camera_proj(fov, aspect_ratio, start_distance, end_distance), view);
+    pub fn new(
+        fov: f32,
+        aspect_ratio: f32,
+        start_distance: f32,
+        end_distance: Option<f32>,
+        view: Mat4,
+    ) -> CameraCorners {
+        let corners = Self::get_camera_corners(
+            Self::get_camera_proj(fov, aspect_ratio, start_distance, end_distance),
+            view,
+        );
         //dbg!(&corners);
 
         let mut min_x = 0.0;
@@ -314,7 +327,11 @@ pub struct ShadowTextures {
 }
 
 impl ShadowTextures {
-    pub fn new(display: &Display<WindowSurface>, closest_size: u32, furthest_size: u32) -> ShadowTextures {
+    pub fn new(
+        display: &Display<WindowSurface>,
+        closest_size: u32,
+        furthest_size: u32,
+    ) -> ShadowTextures {
         let closest =
             glium::texture::DepthTexture2d::empty(display, closest_size, closest_size).unwrap(); // 1st Cascade
         let furthest =
@@ -347,16 +364,19 @@ impl RenderManager {
             &display,
             include_str!("../assets/ray_shader.vert"),
             include_str!("../assets/ray_shader.frag"),
-            None
-        ).unwrap();
+            None,
+        )
+        .unwrap();
         let collider_cuboid_shader = Program::from_source(
             &display,
             include_str!("../assets/collider_shader.vert"),
             include_str!("../assets/collider_shader.frag"),
             None,
-        ).unwrap();
+        )
+        .unwrap();
         let collider_cuboid_vertex_buffer = VertexBuffer::new(&display, &CUBE_VERTS_LIST).unwrap();
-        let collider_cuboid_index_buffer = IndexBuffer::new(&display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap();
+        let collider_cuboid_index_buffer =
+            IndexBuffer::new(&display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap();
         let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
         /*let mut closest_shadow_fbo =
             SimpleFrameBuffer::depth_only(&display, &shadow_textures.closest).unwrap();
@@ -433,13 +453,18 @@ impl RenderManager {
         let front = Vec3 {
             x: -self.camera_location.rotation.y.to_radians().sin()
                 * self.camera_location.rotation.x.to_radians().cos(),
-                y: -(self.camera_location.rotation.x).to_radians().sin(),
-                z: -(self.camera_location.rotation.y).to_radians().cos()
-                    * -(self.camera_location.rotation.x).to_radians().cos(),
+            y: -(self.camera_location.rotation.x).to_radians().sin(),
+            z: -(self.camera_location.rotation.y).to_radians().cos()
+                * -(self.camera_location.rotation.x).to_radians().cos(),
         };
         self.camera_location.front = front.normalize();
-        self.camera_location.right = self.camera_location.front.cross(DEFAULT_UP_VECTOR).normalize(); 
-        self.camera_location.up  = self.camera_location
+        self.camera_location.right = self
+            .camera_location
+            .front
+            .cross(DEFAULT_UP_VECTOR)
+            .normalize();
+        self.camera_location.up = self
+            .camera_location
             .right
             .cross(self.camera_location.front)
             .normalize();
@@ -487,7 +512,12 @@ impl RenderManager {
 
         let view = self.get_view_matrix();
         self.update_camera_vectors();
-        self.cascades = Cascades::new(self.get_camera_fov(), self.aspect_ratio, self.get_light_direction(), view);
+        self.cascades = Cascades::new(
+            self.get_camera_fov(),
+            self.aspect_ratio,
+            self.get_light_direction(),
+            view,
+        );
     }
 
     /// Call only after drawing everything.
@@ -516,14 +546,10 @@ impl RenderManager {
             let index_buffer = &self.collider_cuboid_index_buffer;
             let shader = &self.collider_cuboid_shader;
 
-            self.target.as_mut().unwrap() // drawing solid semi-transparent cuboid
-                .draw(
-                    vert_buffer,
-                    index_buffer,
-                    shader,
-                    &uniforms,
-                    &draw_params,
-                )
+            self.target
+                .as_mut()
+                .unwrap() // drawing solid semi-transparent cuboid
+                .draw(vert_buffer, index_buffer, shader, &uniforms, &draw_params)
                 .unwrap();
         });
         self.render_colliders.clear();
@@ -611,7 +637,7 @@ impl RenderManager {
                     joints: [0.0, 0.0, 0.0, 0.0],
                     weights: [0.0, 0.0, 0.0, 0.0],
                 },
-                ];
+            ];
 
             let indices: [u32; 48] = [
                 0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0,
@@ -624,12 +650,15 @@ impl RenderManager {
 
             let vert_buffer = VertexBuffer::new(&self.display, &verts_list)
                 .expect("failed to create vertex buffer while debug rendering rays");
-            let index_buffer = IndexBuffer::new(&self.display, PrimitiveType::TriangleFan, &indices)
-                .expect("failed to create index buffer while debug rendering rays");
+            let index_buffer =
+                IndexBuffer::new(&self.display, PrimitiveType::TriangleFan, &indices)
+                    .expect("failed to create index buffer while debug rendering rays");
 
             let shader = &self.ray_shader;
 
-            self.target.as_mut().unwrap() // drawing solid semi-transparent cuboid
+            self.target
+                .as_mut()
+                .unwrap() // drawing solid semi-transparent cuboid
                 .draw(
                     &vert_buffer,
                     &index_buffer,
@@ -638,11 +667,8 @@ impl RenderManager {
                     &draw_params,
                 )
                 .unwrap();
-
-            }
-        );
+        });
         self.render_rays.clear();
-
     }
 
     pub fn finish_render(&mut self) {
@@ -652,7 +678,10 @@ impl RenderManager {
         }
     }
 
-    pub fn calculate_collider_mvp_and_sensor(&self, collider: &RenderColliderType) -> ([[f32; 4]; 4], bool) {
+    pub fn calculate_collider_mvp_and_sensor(
+        &self,
+        collider: &RenderColliderType,
+    ) -> ([[f32; 4]; 4], bool) {
         let view = self.get_view_matrix();
         let proj = self.get_projection_matrix();
 
@@ -763,7 +792,6 @@ impl RenderManager {
         self.render_rays.push(ray);
     }
 
-
     pub fn update(&mut self) {
         self.instanced_positions.clear();
     }
@@ -772,8 +800,9 @@ impl RenderManager {
         match self.instanced_positions.get_mut(instance) {
             Some(positions) => positions.push(position),
             None => {
-                self.instanced_positions.insert(instance.into(), vec![position]);
-            },
+                self.instanced_positions
+                    .insert(instance.into(), vec![position]);
+            }
         }
     }
 
@@ -781,8 +810,9 @@ impl RenderManager {
         match self.instanced_positions.get_mut(instance) {
             Some(instanced_positions) => instanced_positions.extend(positions.iter()),
             None => {
-                self.instanced_positions.insert(instance.into(), positions.to_owned());
-            },
+                self.instanced_positions
+                    .insert(instance.into(), positions.to_owned());
+            }
         }
     }
 
@@ -793,8 +823,7 @@ impl RenderManager {
         }
     }
 
-    pub fn prepare_for_normal_render(&mut self) {
-    }
+    pub fn prepare_for_normal_render(&mut self) {}
 
     pub fn closest_shadow_fbo(&self) -> SimpleFrameBuffer<'_> {
         let mut closest_shadow_fbo =
@@ -815,5 +844,5 @@ impl RenderManager {
 
 pub enum CurrentCascade {
     Closest,
-    Furthest
+    Furthest,
 }

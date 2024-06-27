@@ -1,11 +1,10 @@
 use glam::Vec2;
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{framework::Framework, managers::{
-    debugger,
-    navigation::NavMeshDimensions,
-    physics::ObjectBodyParameters,
-}};
+use crate::{
+    framework::Framework,
+    managers::{debugger, navigation::NavMeshDimensions, physics::ObjectBodyParameters},
+};
 
 //#[derive(Debug)]
 pub struct NavigationGround {
@@ -41,7 +40,9 @@ impl Object for NavigationGround {
         let pos = self.global_transform().position;
         self.dimensions.set_position(Vec2::new(pos.x, pos.z));
 
-        framework.navigation.add_navmesh(*self.object_id(), self.dimensions.clone());
+        framework
+            .navigation
+            .add_navmesh(*self.object_id(), self.dimensions.clone());
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -105,7 +106,7 @@ impl Object for NavigationGround {
         None
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("NavigationGround parameters");
         ui.label("this object type is made specifically for servers so there's noting to change here ._.");
     }

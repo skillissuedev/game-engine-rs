@@ -1,6 +1,6 @@
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
-    framework::{self, Framework},
+    framework::Framework,
     managers::{
         debugger,
         physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager},
@@ -104,10 +104,9 @@ impl Object for CharacterController {
                 self.last_path_point = None;
             } else {
                 let target = movement.target;
-                let next_pos = framework.navigation.find_next_path_point(
-                    Vec2::new(pos.x, pos.z),
-                    Vec2::new(target.x, target.z),
-                );
+                let next_pos = framework
+                    .navigation
+                    .find_next_path_point(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z));
                 //dbg!(self.local_transform());
                 //dbg!(next_pos);
                 match next_pos {
@@ -226,11 +225,14 @@ impl CharacterController {
                 );
 
                 let object_position = self.local_transform().position
-                    + Vec3::new(movement.translation.x, movement.translation.y, movement.translation.z);
+                    + Vec3::new(
+                        movement.translation.x,
+                        movement.translation.y,
+                        movement.translation.z,
+                    );
                 self.set_position(framework, object_position, false);
                 new_position = Some(object_position);
-            }
-            else {
+            } else {
                 debugger::error(
                     "CharacterController's move_controller error!\nfailed to get collider",
                 );

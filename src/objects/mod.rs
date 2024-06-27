@@ -1,7 +1,10 @@
 use crate::{
     framework::{self, Framework},
     managers::{
-        self, assets::AssetManager, physics::{BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType}, render::{CurrentCascade, RenderManager}
+        self,
+        assets::AssetManager,
+        physics::{BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
+        render::{CurrentCascade, RenderManager},
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
@@ -11,10 +14,10 @@ use serde::{Deserialize, Serialize};
 
 pub mod character_controller;
 pub mod empty_object;
-pub mod model_object;
 pub mod instanced_model_object;
-pub mod master_instanced_model_object;
 pub mod instanced_model_transform_holder;
+pub mod master_instanced_model_object;
+pub mod model_object;
 pub mod nav_obstacle;
 pub mod navmesh;
 pub mod ray;
@@ -61,11 +64,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         None
     }
 
-    fn render(
-        &mut self,
-        _framework: &mut Framework
-    ) {
-    }
+    fn render(&mut self, _framework: &mut Framework) {}
 
     fn shadow_render(
         &mut self,
@@ -73,7 +72,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         _target: &mut SimpleFrameBuffer*/
         _render: &mut RenderManager,
         _assets: &AssetManager,
-        _current_cascade: &CurrentCascade
+        _current_cascade: &CurrentCascade,
     ) {
     }
 
@@ -126,7 +125,8 @@ pub trait Object: std::fmt::Debug + Downcast {
                 return;
             }
 
-            let position_and_rotation_option = framework.physics.get_body_transformations(parameters);
+            let position_and_rotation_option =
+                framework.physics.get_body_transformations(parameters);
 
             if let Some((pos, rot)) = position_and_rotation_option {
                 self.set_position(framework, pos, false);
@@ -145,10 +145,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         });
     }
 
-    fn render_children(
-        &mut self,
-        framework: &mut Framework
-    ) {
+    fn render_children(&mut self, framework: &mut Framework) {
         self.children_list_mut().iter_mut().for_each(|child| {
             child.render(framework);
             child.render_children(framework);
@@ -158,11 +155,12 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn shadow_render_children(
         &mut self,
         render: &mut RenderManager,
-        current_cascade: &CurrentCascade
+        assets: &AssetManager,
+        current_cascade: &CurrentCascade,
     ) {
         self.children_list_mut().iter_mut().for_each(|child| {
-            child.shadow_render(render, &current_cascade);
-            child.shadow_render_children(render, &current_cascade);
+            child.shadow_render(render, assets, &current_cascade);
+            child.shadow_render_children(render, assets, &current_cascade);
         });
     }
 
@@ -188,7 +186,12 @@ pub trait Object: std::fmt::Debug + Downcast {
         }
     }
 
-    fn set_position(&mut self, framework: &mut Framework, position: Vec3, set_rigid_body_position: bool) {
+    fn set_position(
+        &mut self,
+        framework: &mut Framework,
+        position: Vec3,
+        set_rigid_body_position: bool,
+    ) {
         let mut transform = self.local_transform();
         transform.position = position;
         self.set_local_transform(transform);
@@ -200,7 +203,12 @@ pub trait Object: std::fmt::Debug + Downcast {
         }
     }
 
-    fn set_rotation(&mut self, framework: &mut Framework, rotation: Vec3, set_rigid_body_rotation: bool) {
+    fn set_rotation(
+        &mut self,
+        framework: &mut Framework,
+        rotation: Vec3,
+        set_rigid_body_rotation: bool,
+    ) {
         let mut transform = self.local_transform();
         transform.rotation = rotation;
         self.set_local_transform(transform);
@@ -324,7 +332,6 @@ impl From<String> for ObjectGroup {
         ObjectGroup(value)
     }
 }
-
 
 impl ObjectGroup {
     pub fn as_raw(&self) -> &str {

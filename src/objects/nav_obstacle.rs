@@ -1,6 +1,7 @@
-use crate::{framework::Framework, managers::{
-    navigation::{self, NavMeshObstacleTransform}, physics::ObjectBodyParameters,
-}};
+use crate::{
+    framework::Framework,
+    managers::{navigation::NavMeshObstacleTransform, physics::ObjectBodyParameters},
+};
 use glam::{Vec2, Vec3};
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -43,7 +44,9 @@ impl Object for NavObstacle {
         let position = self.global_transform().position;
         let position_xz = Vec2::new(position.x, position.z);
         let size_xz = Vec2::new(self.size.x, self.size.z);
-        framework.navigation.add_obstacle(NavMeshObstacleTransform::new(position_xz, size_xz));
+        framework
+            .navigation
+            .add_obstacle(NavMeshObstacleTransform::new(position_xz, size_xz));
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -94,16 +97,12 @@ impl Object for NavObstacle {
         &self.id
     }
 
-    fn inspector_ui(&mut self, ui: &mut egui_glium::egui_winit::egui::Ui) {
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("NavObstacle parameters");
         ui.label("this object type is made specifically for servers so there's noting to change here ._.");
     }
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         &mut self.groups
-    }
-
-    fn call(&mut self, name: &str, args: Vec<&str>) -> Option<String> {
-        None
     }
 }
