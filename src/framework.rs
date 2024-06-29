@@ -1,24 +1,24 @@
 use crate::{
-    assets::{model_asset::ModelAsset, texture_asset::TextureAsset},
+    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
     game::game_main,
     managers::{
         self,
-        assets::{get_full_asset_path, AssetManager},
+        assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId},
         debugger,
         input::{self, InputManager},
         navigation::NavigationManager,
         networking,
-        physics::{self, CollisionGroups, PhysicsManager},
+        physics::{self, BodyColliderType, CollisionGroups, PhysicsManager},
         render::{CurrentCascade, RenderManager},
         saves::SavesManager,
         sound::set_listener_transform,
         systems::{self, SystemValue},
     },
-    objects::character_controller::CharacterController,
+    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform},
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
-use ez_al::EzAl;
-use glam::Vec2;
+use ez_al::{EzAl, SoundSourceType};
+use glam::{Vec2, Vec3};
 use glium::{
     glutin::{
         context::NotCurrentGlContext,
@@ -361,13 +361,14 @@ pub struct Framework {
     pub system_globals: HashMap<String, Vec<SystemValue>>,
     pub resolution: Vec2,
 
-    pub al: Option<EzAl>,
-    pub input: InputManager, // done
-    pub navigation: NavigationManager,
-    pub physics: PhysicsManager,
-    pub saves: SavesManager, // done
-    pub assets: AssetManager,
-    pub render: Option<RenderManager>,
+    pub al: Option<EzAl>, // done + api is not required
+    pub input: InputManager, // done + api is ready
+    pub navigation: NavigationManager, // done + api is not required
+    pub physics: PhysicsManager, // done + api is not required
+    pub saves: SavesManager, // done + api is ready
+    pub assets: AssetManager, // done + api is ready
+    pub render: Option<RenderManager>, // done + api is not required
+    // todo: networking??
 }
 
 impl Framework {
@@ -396,16 +397,6 @@ impl Framework {
             Some(value) => Some(value.clone()),
             None => None,
         }
-    }
-
-    pub fn new_character_controller_object(
-        &mut self,
-        name: &str,
-        shape: physics::BodyColliderType,
-        membership_groups: Option<CollisionGroups>,
-        mask: Option<CollisionGroups>,
-    ) -> CharacterController {
-        CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
     }
 
     // SavesManager
@@ -504,15 +495,114 @@ impl Framework {
         self.input.set_mouse_locked(lock)
     }
 
+    // AssetManager
     pub fn preload_model_asset(&mut self, asset_id: String, gltf_path: &str) -> Result<(), ()> {
         ModelAsset::preload_model_asset_from_gltf(self, &asset_id, gltf_path)
     }
 
-    pub fn preload_texture_asset(
-        &mut self,
-        asset_id: String,
-        texture_path: &str,
-    ) -> Result<(), ()> {
+    pub fn preload_sound_asset(&mut self, asset_id: String, wav_path: &str) -> Result<(), ()> {
+        SoundAsset::preload_sound_asset_from_wav(self, asset_id, wav_path)
+    }
+
+    pub fn preload_texture_asset(&mut self, asset_id: String, texture_path: &str) -> Result<(), ()> {
         TextureAsset::preload_texture_asset(self, asset_id, texture_path)
+    }
+
+    pub fn get_model_asset(&self, asset_id: &str) -> Option<ModelAssetId> {
+        self.assets.get_model_asset_id(asset_id)
+    }
+
+    pub fn get_texture_asset(&self, asset_id: &str) -> Option<TextureAssetId> {
+        self.assets.get_texture_asset_id(asset_id)
+    }
+
+    pub fn get_sound_asset(&self, asset_id: &str) -> Option<SoundAssetId> {
+        self.assets.get_sound_asset_id(asset_id)
+    }
+
+    // new objects
+    pub fn new_character_controller_object(
+        &mut self,
+        name: &str,
+        shape: physics::BodyColliderType,
+        membership_groups: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
+    ) -> CharacterController {
+        CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
+    }
+
+    pub fn new_empty_object(
+        &mut self,
+        name: &str,
+    ) -> EmptyObject {
+        EmptyObject::new(name)
+    }
+
+    pub fn new_instanced_model_object(
+        &mut self,
+        name: &str,
+        instance: &str,
+    ) -> InstancedModelObject {
+        InstancedModelObject::new(name, instance)
+    }
+
+    pub fn new_instanced_model_transform_holder(
+        &mut self,
+        name: &str,
+        instance: &str,
+        transforms: Vec<Transform>
+    ) -> InstancedModelTransformHolder {
+        InstancedModelTransformHolder::new(name, instance, transforms)
+    }
+
+    pub fn new_master_instanced_model_object(
+        &mut self,
+        name: &str,
+        model_asset_id: ModelAssetId,
+        texture_asset_id: Option<TextureAssetId>,
+        shader_asset: ShaderAsset,
+    ) -> MasterInstancedModelObject {
+        MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+    }
+
+    pub fn new_model_object(
+        &mut self,
+        name: &str,
+        model_asset_id: ModelAssetId,
+        texture_asset_id: Option<TextureAssetId>,
+        shader_asset: ShaderAsset,
+    ) -> ModelObject {
+        ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+    }
+
+    pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {
+        NavObstacle::new(name, size)
+    }
+
+    pub fn new_navigation_ground(&mut self, name: &str, size: Vec3) -> NavigationGround {
+        NavigationGround::new(name, Vec2::new(size.x, size.z))
+    }
+
+    pub fn new_ray(&mut self, name: &str, direction: Vec3, mask: Option<CollisionGroups>) -> Ray {
+        Ray::new(name, direction, mask)
+    }
+
+    pub fn new_sound_emitter(&mut self, name: &str, asset_id: SoundAssetId, is_positional: bool) -> SoundEmitter {
+        let emitter_type = match is_positional {
+            true => SoundSourceType::Positional,
+            false => SoundSourceType::Simple,
+        };
+
+        SoundEmitter::new(name, self, asset_id, emitter_type)
+    }
+
+    pub fn new_trigger(
+        &mut self, 
+        name: &str,
+        membership_group: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
+        collider: BodyColliderType,
+    ) -> Trigger {
+        Trigger::new(&mut self.physics, name, membership_group, mask, collider)
     }
 }

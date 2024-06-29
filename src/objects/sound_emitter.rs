@@ -3,8 +3,7 @@ use crate::{
     assets::sound_asset::SoundAsset,
     framework::Framework,
     managers::{
-        debugger::{self, warn},
-        physics::ObjectBodyParameters,
+        assets::SoundAssetId, debugger::{self, warn}, physics::ObjectBodyParameters
     },
 };
 use core::f32;
@@ -12,69 +11,55 @@ use ez_al::{SoundError, SoundSource, SoundSourceType};
 use glam::Vec3;
 use std::fmt::Debug;
 
-enum SoundEmitterAsset {
-    Asset(SoundAsset),
-    AssetPath(String),
-}
-
 pub struct SoundEmitter {
     name: String,
-    asset: SoundEmitterAsset,
     transform: Transform,
     parent_transform: Option<Transform>,
     children: Vec<Box<dyn Object>>,
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    pub source_type: SoundSourceType,
+    emitter_type: SoundSourceType,
     pub source: Option<SoundSource>,
     max_distance_inspector: Option<String>,
-    emitter_type: SoundSourceType,
-    error: bool,
     looping: bool,
     max_distance: f32,
 }
 
 impl SoundEmitter {
-    pub fn new(name: &str, asset: SoundAsset, emitter_type: SoundSourceType) -> SoundEmitter {
-        SoundEmitter {
-            name: name.to_string(),
-            asset: SoundEmitterAsset::Asset(asset),
-            transform: Transform::default(),
-            parent_transform: None,
-            children: vec![],
-            body: None,
-            id: gen_object_id(),
-            groups: vec![],
-            source_type: emitter_type,
-            source: None,
-            max_distance_inspector: None,
-            emitter_type,
-            error: false,
-            looping: false,
-            max_distance: 50.0,
-        }
-    }
+    pub fn new(name: &str, framework: &mut Framework, asset: SoundAssetId, emitter_type: SoundSourceType) -> SoundEmitter {
+        let mut source_option = None;
+        if let Some(al) = &framework.al {
+            match framework.assets.get_sound_asset(&asset) {
+                Some(asset) => {
+                    match SoundSource::new(al, &asset.wav, emitter_type) {
+                        Ok(source) => source_option = Some(source),
+                        Err(err) => {
+                            debugger::error(&format!("SoundEmitter error!\nFailed to create a SoundSource.\nError: {:?}", err));
+                        }
+                    }
+                },
+                None => {
+                    debugger::error(&format!("SoundEmitter error!\nFailed to load a SoundAsset\nId: {}", asset.get_id()));
+                },
+            }
 
-    pub fn new_from_path(
-        name: &str,
-        asset_path: String,
-        emitter_type: SoundSourceType,
-    ) -> SoundEmitter {
+        } else {
+            debugger::error(&format!("SoundEmitter error!\nFramework's al value = None, probably running without render!"));
+            ()
+        }
+
         SoundEmitter {
             name: name.to_string(),
-            asset: SoundEmitterAsset::AssetPath(asset_path),
             transform: Transform::default(),
             parent_transform: None,
             children: vec![],
             body: None,
             id: gen_object_id(),
             groups: vec![],
-            source_type: emitter_type,
-            source: None,
-            max_distance_inspector: None,
             emitter_type,
-            error: false,
+            source: source_option,
+            max_distance_inspector: None,
             looping: false,
             max_distance: 50.0,
         }
@@ -89,17 +74,15 @@ impl SoundEmitter {
     }
 
     pub fn play_sound(&mut self) {
-        if !self.error {
-            if let Some(source) = &mut self.source {
-                source.play_sound();
-            }
+        if let Some(source) = &mut self.source {
+            source.play_sound();
         } else {
             debugger::error("SoundEmitter error!\nFailed to call play_sound, because of an error in this object");
         }
     }
 
     pub fn set_max_distance(&mut self, distance: f32) -> Result<(), SoundError> {
-        match self.source_type {
+        match self.emitter_type {
             SoundSourceType::Simple => {
                 warn("tried to set max distance when emitter type is simple");
                 Err(SoundError::WrongSoundSourceType)
@@ -112,7 +95,7 @@ impl SoundEmitter {
     }
 
     pub fn get_max_distance(&mut self) -> Option<f32> {
-        match self.source_type {
+        match self.emitter_type {
             SoundSourceType::Simple => {
                 warn("tried to get max distance when emitter type is simple");
                 None
@@ -133,59 +116,13 @@ impl SoundEmitter {
 impl Object for SoundEmitter {
     fn start(&mut self) {}
 
-    fn update(&mut self, framework: &mut Framework) {
-        if self.error == false {
-            match &mut self.source {
-                None => {
-                    let source;
-                    if let Some(al) = &framework.al {
-                        match &self.asset {
-                            SoundEmitterAsset::Asset(asset) => {
-                                source = SoundSource::new(al, &asset.wav, self.emitter_type.clone())
-                            }
-                            SoundEmitterAsset::AssetPath(path) => {
-                                let asset = SoundAsset::from_wav(&framework, &path);
-                                match asset {
-                                    Ok(asset) => {
-                                        source = SoundSource::new(
-                                            al,
-                                            &asset.wav,
-                                            self.emitter_type.clone(),
-                                        )
-                                    }
-                                    Err(err) => {
-                                        debugger::error(&format!("SoundEmitter error!\nFailed to load a SoundAsset.\nPath: {}\nError: {:?}", path, err));
-                                        self.error = true;
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-
-                        match source {
-                            Ok(source) => {
-                                self.source = Some(source);
-                            }
-                            Err(err) => {
-                                debugger::error(&format!("SoundEmitter error!\nFailed to create a SoundSource.\nError: {:?}", err));
-                                self.error = true;
-                                ()
-                            }
-                        }
-                    } else {
-                        debugger::error(&format!("SoundEmitter error!\nFramework's al value = None, probably running without render!"));
-                        self.error = true;
-                        ()
-                    }
-                }
-                Some(source) => {
-                    source.set_looping(self.looping);
-                    if let SoundSourceType::Positional = source.source_type {
-                        source.set_max_distance(self.max_distance);
-                    }
-                    self.update_sound_transforms(self.global_transform().position);
-                }
+    fn update(&mut self, _: &mut Framework) {
+        if let Some(source) = &mut self.source {
+            source.set_looping(self.looping);
+            if let SoundSourceType::Positional = source.source_type {
+                let _ = source.set_max_distance(self.max_distance);
             }
+            self.update_sound_transforms(self.global_transform().position);
         }
     }
 
@@ -245,8 +182,8 @@ impl Object for SoundEmitter {
 
         let mut set_distance_string: Option<String> = None;
         let mut cancel = false;
-        ui.label(format!("source type is {:?}", self.source_type));
-        if let SoundSourceType::Positional = self.source_type {
+        ui.label(format!("source type is {:?}", self.emitter_type));
+        if let SoundSourceType::Positional = self.emitter_type {
             match &mut self.max_distance_inspector {
                 Some(distance) => {
                     ui.label("max distance:");
@@ -309,7 +246,7 @@ impl Debug for SoundEmitter {
             .field("transform", &self.transform)
             .field("parent_transform", &self.parent_transform)
             .field("children", &self.children)
-            .field("emitter_type", &self.source_type)
+            .field("emitter_type", &self.emitter_type)
             .field("looping", &self.is_looping())
             .finish()
     }

@@ -91,6 +91,34 @@ impl AssetManager {
         }
     }
 
+    pub fn get_model_asset_id(&self, id: &str) -> Option<ModelAssetId> {
+        match self.loaded_model_assets.get(id) {
+            Some(_) => Some(ModelAssetId { id: id.into() }),
+            None => None,
+        }
+    }
+
+    pub fn get_texture_asset_id(&self, id: &str) -> Option<TextureAssetId> {
+        match self.loaded_texture_assets.get(id) {
+            Some(_) => Some(TextureAssetId { id: id.into() }),
+            None => None,
+        }
+    }
+
+    pub fn get_sound_asset_id(&self, id: &str) -> Option<SoundAssetId> {
+        match self.loaded_sound_assets.get(id) {
+            Some(_) => Some(SoundAssetId { id: id.into() }),
+            None => None,
+        }
+    }
+
+    pub fn get_sound_asset(&self, asset_id: &SoundAssetId) -> Option<&SoundAsset> {
+        match self.loaded_sound_assets.get(asset_id.get_id()) {
+            Some(sound_asset) => Some(&sound_asset),
+            None => None,
+        }
+    }
+
     pub fn get_texture_asset(&self, asset_id: &TextureAssetId) -> Option<&TextureAsset> {
         match self.loaded_texture_assets.get(asset_id.get_id()) {
             Some(texture_asset) => Some(&texture_asset),
