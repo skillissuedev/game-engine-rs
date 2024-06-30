@@ -11,7 +11,7 @@ use crate::{
     }, framework, managers::{
         self, debugger, input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, saves, systems::{self, SystemValue}
     }, objects::{
-        camera_position::CameraPosition, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
+        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
     }, systems::System
 };
 use ez_al::SoundSourceType;
@@ -25,6 +25,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         let lua = SYSTEMS_LUA_VMS.get_mut(&system_id).unwrap();
         let _ = lua.globals().set("current_parent", None::<String>);
 
+        /*
         // creating some functions
         let system_id_for_functions = system_id.clone();
         let set_current_parent = lua.create_function(move |lua, name: String| {
@@ -1540,7 +1541,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 "failed to create a function multiple_new_model_objects in system {}\nerror: {}",
                 system_id, err
             )),
-        }
+        }*/
     }
 }
 
@@ -1560,3 +1561,4 @@ fn add_to_system_or_parent(lua: &Lua, system: &mut Box<dyn System>, object: Box<
     }
     system.add_object(object);
 }
+

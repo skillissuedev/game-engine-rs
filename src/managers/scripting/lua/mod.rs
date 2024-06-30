@@ -1,12 +1,12 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::ModelAsset, framework::Framework, managers::{
-        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
+    assets::{model_asset::ModelAsset, sound_asset::SoundAsset}, framework::{DebugMode, Framework}, managers::{
+        assets, debugger, networking::{Message, MessageContents}, physics::{self, BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{CallList, SystemValue}
     }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use glam::Vec3;
-use mlua::{Error, FromLua, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
+use mlua::{Error, FromLua, Function, IntoLua, Lua, LuaOptions, StdLib, UserData, Value};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, fs};
 
@@ -66,11 +66,14 @@ impl LuaSystem {
 }
 
 impl System for LuaSystem {
-    fn client_start(&mut self, _: &mut Framework) {
+    fn client_start(&mut self, framework: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "client_start");
+                let _ = lua.scope(|scope| {
+                    let framework_obj = scope.create_userdata_ref_mut(framework);
+                    call_lua_function(self.system_id(), &lua, "client_start")
+                });
             }
             None => debugger::error("lua system client_start function error\ncan't get lua vm reference"),
         }
@@ -283,6 +286,7 @@ impl UserData for ObjectHandle {
     fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {}
 
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        /*
         // methods that work for all objects:
         methods.add_method("children_list", |_, this, (): ()| {
             match systems::get_system_mut_with_id(&this.system_id) {
@@ -1160,6 +1164,7 @@ impl UserData for ObjectHandle {
             Ok(())
         });
         // i could've used a macro
+        */
     }
 }
 
@@ -1339,4 +1344,266 @@ impl<'lua> IntoLua<'lua> for SystemValue {
     }
 }
 
+impl<'lua> IntoLua<'lua> for DebugMode {
+    fn into_lua(self, lua: &'lua Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
+        match self {
+            DebugMode::None =>
+                Ok("None".into_lua(lua)?),
+            DebugMode::ShowFps =>
+                Ok("ShowFps".into_lua(lua)?),
+            DebugMode::Full =>
+                Ok("Full".into_lua(lua)?),
+        }
+    }
+}
+
 impl UserData for ModelAsset {}
+
+impl UserData for Framework {
+    fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(_: &mut F) {}
+
+    fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("debug_mode", |lua, framework, (): _| framework.debug_mode().into_lua(lua));
+        methods.add_method_mut("set_debug_mode", 
+            |_, framework, debug_mode: String| {
+                match debug_mode.as_str() {
+                    "None" => framework.set_debug_mode(DebugMode::None),
+                    "ShowFps" => framework.set_debug_mode(DebugMode::ShowFps),
+                    "Full" => framework.set_debug_mode(DebugMode::Full),
+                    _ => debugger::error("Lua framework set_debug_mode error!\nAcceptable values are 'None', 'ShowFps', 'Full'")
+                }
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("set_global_system_value", 
+            |_, framework, (key, value): (String, Vec<SystemValue>)| {
+                framework.set_global_system_value(&key, value);
+                Ok(())
+            }
+        );
+
+        methods.add_method("get_global_system_value", 
+            |_, framework, key: String| {
+                Ok(framework.get_global_system_value(&key))
+            }
+        );
+
+        methods.add_method_mut("load_save",
+            |_, framework, save_name: String| {
+                framework.load_save(&save_name);
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("register_save_value",
+            |_, framework, system_value_name: String| {
+                framework.register_save_value(&system_value_name);
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("unregister_save_value",
+            |_, framework, system_value_name: String| {
+                framework.unregister_save_value(&system_value_name);
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("new_save",
+            |_, framework, save_name: String| {
+                framework.new_save(&save_name);
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("save_game",
+            |_, framework, _: ()| {
+                framework.save_game();
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("new_bind_keyboard",
+            |_, framework, (name, keys): (String, Vec<String>)| {
+                let keys: Vec<&str> = keys.iter().map(|key| key.as_str()).collect();
+                framework.new_bind_keyboard(&name, keys);
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("new_bind_mouse",
+            |_, framework, (name, buttons): (String, Vec<String>)| {
+                let buttons: Vec<&str> = buttons.iter().map(|key| key.as_str()).collect();
+                framework.new_bind_mouse(&name, buttons);
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("is_bind_pressed",
+            |_, framework, name: String| {
+                Ok(framework.is_bind_pressed(&name))
+            }
+        );
+
+        methods.add_method_mut("is_bind_down",
+            |_, framework, name: String| {
+                Ok(framework.is_bind_down(&name))
+            }
+        );
+
+        methods.add_method_mut("is_bind_released",
+            |_, framework, name: String| {
+                Ok(framework.is_bind_released(&name))
+            }
+        );
+
+        methods.add_method_mut("mouse_position_from_center",
+            |_, framework, _: ()| {
+                let position = framework.mouse_position_from_center();
+                Ok(vec![position.x, position.y])
+            }
+        );
+
+        methods.add_method_mut("mouse_delta",
+            |_, framework, _: ()| {
+                let delta = framework.mouse_delta();
+                Ok(vec![delta.x, delta.y])
+            }
+        );
+
+        methods.add_method_mut("is_mouse_locked",
+            |_, framework, _: ()| {
+                Ok(framework.is_mouse_locked())
+            }
+        );
+
+        methods.add_method_mut("set_mouse_locked",
+            |_, framework, lock: bool| {
+                Ok(framework.set_mouse_locked(lock))
+            }
+        );
+
+        methods.add_method_mut("set_mouse_locked",
+            |_, framework, lock: bool| {
+                Ok(framework.set_mouse_locked(lock))
+            }
+        );
+
+        methods.add_method_mut("preload_model_asset",
+            |_, framework, (asset_id, gltf_path): (String, String)| {
+                match framework.preload_model_asset(asset_id.clone(), &gltf_path) {
+                    Ok(_) => println!("Preloaded ModelAsset with id '{}'!", asset_id),
+                    Err(_) => println!("Failed to preload ModelAsset with id '{}'!", asset_id),
+                }
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("preload_sound_asset",
+            |_, framework, (asset_id, wav_path): (String, String)| {
+                match framework.preload_sound_asset(asset_id.clone(), &wav_path) {
+                    Ok(_) => println!("Preloaded SoundAsset with id '{}'!", asset_id),
+                    Err(_) => println!("Failed to preload SoundAsset with id '{}'!", asset_id),
+                }
+                Ok(())
+            }
+        );
+
+        methods.add_method_mut("preload_texture_asset",
+            |_, framework, (asset_id, path): (String, String)| {
+                match framework.preload_texture_asset(asset_id.clone(), &path) {
+                    Ok(_) => println!("Preloaded TextureAsset with id '{}'!", asset_id),
+                    Err(_) => println!("Failed to preload TextureAsset with id '{}'!", asset_id),
+                }
+                Ok(())
+            }
+        );
+    }
+    /*
+    pub fn new_character_controller_object(
+        &mut self,
+        name: &str,
+        shape: physics::BodyColliderType,
+        membership_groups: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
+    ) -> CharacterController {
+        CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
+    }
+
+    pub fn new_empty_object(
+        &mut self,
+        name: &str,
+    ) -> EmptyObject {
+        EmptyObject::new(name)
+    }
+
+    pub fn new_instanced_model_object(
+        &mut self,
+        name: &str,
+        instance: &str,
+    ) -> InstancedModelObject {
+        InstancedModelObject::new(name, instance)
+    }
+
+    pub fn new_instanced_model_transform_holder(
+        &mut self,
+        name: &str,
+        instance: &str,
+        transforms: Vec<Transform>
+    ) -> InstancedModelTransformHolder {
+        InstancedModelTransformHolder::new(name, instance, transforms)
+    }
+
+    pub fn new_master_instanced_model_object(
+        &mut self,
+        name: &str,
+        model_asset_id: ModelAssetId,
+        texture_asset_id: Option<TextureAssetId>,
+        shader_asset: ShaderAsset,
+    ) -> MasterInstancedModelObject {
+        MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+    }
+
+    pub fn new_model_object(
+        &mut self,
+        name: &str,
+        model_asset_id: ModelAssetId,
+        texture_asset_id: Option<TextureAssetId>,
+        shader_asset: ShaderAsset,
+    ) -> ModelObject {
+        ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+    }
+
+    pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {
+        NavObstacle::new(name, size)
+    }
+
+    pub fn new_navigation_ground(&mut self, name: &str, size: Vec3) -> NavigationGround {
+        NavigationGround::new(name, Vec2::new(size.x, size.z))
+    }
+
+    pub fn new_ray(&mut self, name: &str, direction: Vec3, mask: Option<CollisionGroups>) -> Ray {
+        Ray::new(name, direction, mask)
+    }
+
+    pub fn new_sound_emitter(&mut self, name: &str, asset_id: SoundAssetId, is_positional: bool) -> SoundEmitter {
+        let emitter_type = match is_positional {
+            true => SoundSourceType::Positional,
+            false => SoundSourceType::Simple,
+        };
+
+        SoundEmitter::new(name, self, asset_id, emitter_type)
+    }
+
+    pub fn new_trigger(
+        &mut self, 
+        name: &str,
+        membership_group: Option<CollisionGroups>,
+        mask: Option<CollisionGroups>,
+        collider: BodyColliderType,
+    ) -> Trigger {
+        Trigger::new(&mut self.physics, name, membership_group, mask, collider)
+    }
+    */
+}
