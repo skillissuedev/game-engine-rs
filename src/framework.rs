@@ -28,12 +28,9 @@ use glium::{
 };
 use glutin::surface::GlSurface;
 use once_cell::sync::Lazy;
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
+use raw_window_handle::HasRawWindowHandle;
 use std::{
-    collections::HashMap,
-    fs,
-    num::NonZeroU32,
-    time::{Duration, Instant},
+    collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
 use winit::{
     dpi::PhysicalSize,
@@ -43,10 +40,12 @@ use winit::{
     window::{CursorGrabMode, WindowBuilder},
 };
 
+pub static mut FRAMEWORK_POINTER: usize = 0;
 static FONT: Lazy<Vec<u8>> =
     Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
 
 pub fn start_game_with_render(debug_mode: DebugMode) {
+    dbg!(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf"));
     let event_loop: EventLoop<_> = EventLoopBuilder::new()
         .build()
         .expect("Event loop building failed");
@@ -93,16 +92,26 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         assets: AssetManager::default(),
         render: Some(RenderManager::new(display)),
     };
+
     framework.set_debug_mode(debug_mode);
 
     //render::init(&display);
 
     framework.navigation.update();
+    unsafe {
+        let ptr = &mut framework as *mut Framework;
+        FRAMEWORK_POINTER = ptr as usize;
+    };
+
     game_main::start(&mut framework);
 
     event_loop
         .run(move |ev, window_target| {
-            dbg!(window_target.raw_display_handle());
+            unsafe {
+                let ptr = &mut framework as *mut Framework;
+                FRAMEWORK_POINTER = ptr as usize;
+            };
+
             match ev {
                 Event::AboutToWait => {
                     window.request_redraw();
@@ -161,7 +170,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                     render.draw();
                                 }
 
-                                println!("render!");
+                                //println!("render!");
                                 systems::shadow_render(
                                     framework.render.as_mut().unwrap(),
                                     &framework.assets,
@@ -246,6 +255,10 @@ pub fn start_game_without_render() {
     for tick in clock {
         match tick {
             chron::clock::Tick::Update => {
+                unsafe {
+                    let ptr = &mut framework as *mut Framework;
+                    FRAMEWORK_POINTER = ptr as usize;
+                };
                 update_game(&mut framework, tickrate_tick);
             }
             chron::clock::Tick::Render { interpolation: _ } => {}
@@ -287,7 +300,7 @@ fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
     None
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum DebugMode {
     None,
     ShowFps,

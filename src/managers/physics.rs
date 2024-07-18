@@ -76,10 +76,6 @@ impl PhysicsManager {
         );
         self.query_pipeline
             .update(&mut self.rigid_body_set, &mut self.collider_set);
-
-        /*for i in RIGID_BODY_SET.iter() {
-        dbg!(i.1.translation());
-        }*/
     }
 
     pub fn remove_rigid_body(&mut self, body_parameters: &mut ObjectBodyParameters) {

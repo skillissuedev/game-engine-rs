@@ -8,7 +8,7 @@ use crate::{
         shader_asset::{ShaderAsset, ShaderAssetPath},
         sound_asset::SoundAsset,
         texture_asset::TextureAsset,
-    }, framework, managers::{
+    }, framework::Framework, managers::{
         self, debugger, input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, saves, systems::{self, SystemValue}
     }, objects::{
         character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
@@ -16,7 +16,7 @@ use crate::{
 };
 use ez_al::SoundSourceType;
 use glam::{Vec2, Vec3};
-use mlua::Lua;
+use mlua::{AnyUserData, AnyUserDataExt, Error, Lua, UserData};
 use winit::{event::MouseButton, keyboard::KeyCode};
 
 pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
@@ -25,8 +25,6 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         let lua = SYSTEMS_LUA_VMS.get_mut(&system_id).unwrap();
         let _ = lua.globals().set("current_parent", None::<String>);
 
-        /*
-        // creating some functions
         let system_id_for_functions = system_id.clone();
         let set_current_parent = lua.create_function(move |lua, name: String| {
             if let Err(err) = lua.globals().set("current_parent", Some(name)) {
@@ -35,6 +33,207 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                     system_id_for_functions, err
                 ));
             }
+            Ok(())
+        });
+
+        match set_current_parent {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("set_current_parent", func) {
+                    debugger::error(&format!("failed to add a function set_current_parent as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function set_current_parent in system {}\nerror: {}",
+                system_id, err
+            )),
+        }
+
+        /*
+        let system_id_for_functions = system_id.clone();
+        let new_character_controller = lua.create_function_mut(move |lua, (name, shape, membership_groups, mask, size_x, size_y, size_z, framework):
+            (String, String, Option<u32>, Option<u32>, f32, f32, f32, AnyUserData)| {
+                let collider = match shape.as_str() {
+                    "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
+                    "Capsule" => BodyColliderType::Capsule(size_x, size_y),
+                    "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
+                    "Ball" => BodyColliderType::Ball(size_x),
+                    _ => {
+                        // error here
+                        BodyColliderType::Capsule(size_x, size_y)
+                    }
+                };
+
+                let membership_groups = match membership_groups {
+                    Some(groups) => Some(CollisionGroups::from(groups)),
+                    None => None,
+                };
+
+                let mask = match mask {
+                    Some(groups) => Some(CollisionGroups::from(groups)),
+                    None => None,
+                };
+                //dbg!(&framework);
+                let framework_ptr: Result<usize, Error> = framework.call_method("get_ptr", ());
+
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let mut framework = framework_ptr.read();
+                        dbg!(framework_ptr);
+                        dbg!(framework_ptr.is_null());
+                        dbg!(framework.input.is_bind_pressed("just write false pls"));
+                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                        match system_option {
+                            Some(system) => {
+                                let object = CharacterController::new(&mut framework.physics, &name, collider, membership_groups, mask);
+                                add_to_system_or_parent(lua, system, Box::new(object));
+                            },
+                            None => debugger::error("Lua error!\nFailed to call new_character_controller: system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_character_controller: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
+                }
+                Ok(())
+            }
+        );
+
+        match new_character_controller {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_character_controller", func) {
+                    debugger::error(&format!("failed to add a function new_character_controller as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                "failed to create a function new_character_controller in system {}\nerror: {}",
+                system_id, err
+            )),
+        }*/
+        let system_id_for_functions = system_id.clone();
+        let new_character_controller = lua.create_function_mut(move |lua, (name, shape, membership_groups, mask, size_x, size_y, size_z, framework):
+            (String, String, Option<u32>, Option<u32>, f32, f32, f32, AnyUserData)| {
+                let collider = match shape.as_str() {
+                    "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
+                    "Capsule" => BodyColliderType::Capsule(size_x, size_y),
+                    "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
+                    "Ball" => BodyColliderType::Ball(size_x),
+                    _ => {
+                        // error here
+                        BodyColliderType::Capsule(size_x, size_y)
+                    }
+                };
+
+                let membership_groups = match membership_groups {
+                    Some(groups) => Some(CollisionGroups::from(groups)),
+                    None => None,
+                };
+
+                let mask = match mask {
+                    Some(groups) => Some(CollisionGroups::from(groups)),
+                    None => None,
+                };
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                        match system_option {
+                            Some(system) => {
+                                let object =
+                                    framework.new_character_controller_object(&name, collider, membership_groups, mask);
+                                add_to_system_or_parent(lua, system, Box::new(object));
+                            },
+                            None => debugger::error("Lua error!\nFailed to call new_character_controller: system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_character_controller: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
+                }
+                Ok(())
+            }
+        );
+
+        match new_character_controller {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_character_controller", func) {
+                    debugger::error(&format!("failed to add a function new_character_controller as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                    "failed to create a function new_character_controller in system {}\nerror: {}",
+                    system_id, err
+            )),
+        }
+
+        let system_id_for_functions = system_id.clone();
+        let new_empty_object = 
+            lua.create_function_mut(move |lua, (name, framework): (String, AnyUserData)| {
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                        match system_option {
+                            Some(system) => {
+                                let object = framework.new_empty_object(&name);
+                                add_to_system_or_parent(lua, system, Box::new(object));
+                            },
+                            None => debugger::error("Lua error!\nFailed to call new_empty_object: system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_empty_object: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
+                }
+                Ok(())
+            }
+        );
+
+        match new_empty_object {
+            Ok(func) => {
+                if let Err(err) = lua.globals().set("new_empty_object", func) {
+                    debugger::error(&format!("failed to add a function new_empty_object as a lua global in system {}\nerror: {}", system_id, err));
+                }
+            }
+            Err(err) => debugger::error(&format!(
+                    "failed to create a function new_empty_object in system {}\nerror: {}",
+                    system_id, err
+            )),
+        }
+
+        /*
+        // creating some functions
+        let system_id_for_functions = system_id.clone();
+        let set_current_parent = lua.create_function(move |lua, name: String| {
+        if let Err(err) = lua.globals().set("current_parent", Some(name)) {
+        debugger::error(&format!(
+        "lua error: failed to set current_parent! system: {}\nerr: {:?}",
+        system_id_for_functions, err
+        ));
+        }
             Ok(())
         });
 

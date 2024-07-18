@@ -1,14 +1,13 @@
 pub mod lua_functions;
 use crate::{
-    assets::{model_asset::ModelAsset, sound_asset::SoundAsset}, framework::{DebugMode, Framework}, managers::{
-        assets, debugger, networking::{Message, MessageContents}, physics::{self, BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{CallList, SystemValue}
-    }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
+    assets::model_asset::ModelAsset, framework::{DebugMode, Framework}, managers::{
+        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{CallList, SystemValue}
+    }, systems::System
 };
 use crate::objects::Object;
-use glam::Vec3;
-use mlua::{Error, FromLua, Function, IntoLua, Lua, LuaOptions, StdLib, UserData, Value};
+use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, ptr::addr_of_mut};
 
 static mut SYSTEMS_LUA_VMS: Lazy<HashMap<String, Lua>> = Lazy::new(|| HashMap::new()); // String is system's id and Lua is it's vm
 
@@ -70,40 +69,37 @@ impl System for LuaSystem {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = lua.scope(|scope| {
-                    let framework_obj = scope.create_userdata_ref_mut(framework);
-                    call_lua_function(self.system_id(), &lua, "client_start")
-                });
+                let _ = call_lua_function(self.system_id(), &lua, "client_start", Some(framework));
             }
             None => debugger::error("lua system client_start function error\ncan't get lua vm reference"),
         }
     }
 
-    fn server_start(&mut self, _: &mut Framework) {
+    fn server_start(&mut self, framework: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_start");
+                let _ = call_lua_function(self.system_id(), &lua, "server_start", Some(framework));
             }
             None => debugger::error("lua system server_start function error\ncan't get lua vm reference"),
         }
     }
 
-    fn client_update(&mut self, _: &mut Framework) {
+    fn client_update(&mut self, framework: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "client_update");
+                let _ = call_lua_function(self.system_id(), &lua, "client_update", Some(framework));
             }
             None => debugger::error("lua system client_update function error\ncan't get lua vm reference"),
         }
     }
 
-    fn server_update(&mut self, _: &mut Framework) {
+    fn server_update(&mut self, framework: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_update");
+                let _ = call_lua_function(self.system_id(), &lua, "server_update", Some(framework));
             }
             None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
         }
@@ -113,9 +109,9 @@ impl System for LuaSystem {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_render");
+                let _ = call_lua_function(self.system_id(), &lua, "server_render", None);
             }
-            None => debugger::error("lua system server_update function error\ncan't get lua vm reference"),
+            None => debugger::error("lua system server_render function error\ncan't get lua vm reference"),
         }
     }
 
@@ -123,7 +119,7 @@ impl System for LuaSystem {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "client_render");
+                let _ = call_lua_function(self.system_id(), &lua, "client_render", None);
             }
             None => debugger::error("lua system client_render function error\ncan't get lua vm reference"),
         }
@@ -133,7 +129,7 @@ impl System for LuaSystem {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, call_id);
+                let _ = call_lua_function(self.system_id(), &lua, "call", None);
             }
             None => debugger::error(&format!(
                 "lua system call function error(call_id: {})\ncan't get lua vm reference",
@@ -238,30 +234,76 @@ fn lua_vm_ref_mut<'a>(system_id: String) -> Option<&'a mut Lua> {
     unsafe { SYSTEMS_LUA_VMS.get_mut(&system_id) }
 }
 
-fn call_lua_function(system_id: &str, lua: &Lua, function_name: &str) -> Result<(), mlua::Error> {
-    let function_result: Result<Function, mlua::Error> = lua.globals().get(function_name);
+fn call_lua_function(system_id: &str, lua: &Lua, function_name: &str, framework: Option<&mut Framework>) {
+    let _ = lua.scope(|scope| {
+        let framework_userdata = match framework {
+            Some(framework) => Some(scope.create_userdata_ref_mut(framework)),
+            None => None
+        };
 
-    match function_result {
-        Ok(func) => {
-            let call_result: Result<(), mlua::Error> = Function::call(&func, ());
-            if let Err(err) = call_result {
-                debugger::error(&format!(
-                    "lua error when calling '{}' in system {}\nerror: {}",
-                    function_name, system_id, err
-                ));
-                return Err(err);
+        if let Some(framework_userdata) = framework_userdata {
+            match framework_userdata {
+                Ok(framework_userdata) => {
+                    let function_result: Result<Function, mlua::Error> = lua.globals().get(function_name);
+
+                    match function_result {
+                        Ok(func) => {
+                            let call_result: Result<(), Error> = Function::call(&func, framework_userdata);
+
+                            if let Err(err) = call_result {
+                                debugger::error(
+                                    &format!(
+                                        "lua error when calling '{}' in system {}\nerror: {}",
+                                        function_name, system_id, err
+                                    )
+                                );
+                                return Err(err);
+                            }
+                        }
+                        Err(err) => {
+                            debugger::error(
+                                &format!(
+                                    "can't get function '{}' in lua system {}\nerror: {}",
+                                    function_name, system_id, err
+                                )
+                            );
+                        }
+                    }
+                },
+                Err(err) => 
+                    debugger::error(
+                        &format!(
+                            "Failed to call server_start!\nFailed to convert Framework to userdata\nErr: {}",
+                            err
+                        )
+                    ),
+            };
+        } else {
+            let function_result: Result<Function, mlua::Error> = lua.globals().get(function_name);
+
+            match function_result {
+                Ok(func) => {
+                    let call_result: Result<(), Error> = Function::call(&func, ());
+
+                    if let Err(err) = call_result {
+                        debugger::error(&format!(
+                            "lua error when calling '{}' in system {}\nerror: {}",
+                            function_name, system_id, err
+                        ));
+                        return Err(err);
+                    }
+                }
+                Err(err) => {
+                    debugger::error(&format!(
+                        "can't get function '{}' in lua system {}\nerror: {}",
+                        function_name, system_id, err
+                    ));
+                }
             }
+        }
 
-            Ok(())
-        }
-        Err(err) => {
-            debugger::error(&format!(
-                "can't get function '{}' in lua system {}\nerror: {}",
-                function_name, system_id, err
-            ));
-            Err(err)
-        }
-    }
+        Ok(())
+    });
 }
 
 #[derive(Debug)]
@@ -283,7 +325,7 @@ pub struct ObjectHandle {
 }
 
 impl UserData for ObjectHandle {
-    fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {}
+    fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(_: &mut F) {}
 
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         /*
@@ -1358,11 +1400,13 @@ impl<'lua> IntoLua<'lua> for DebugMode {
 }
 
 impl UserData for ModelAsset {}
-
 impl UserData for Framework {
     fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(_: &mut F) {}
 
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("get_ptr", |_, _, () : _| {
+            Ok(unsafe { crate::framework::FRAMEWORK_POINTER.to_string() })
+        });
         methods.add_method("debug_mode", |lua, framework, (): _| framework.debug_mode().into_lua(lua));
         methods.add_method_mut("set_debug_mode", 
             |_, framework, debug_mode: String| {
@@ -1520,6 +1564,19 @@ impl UserData for Framework {
             }
         );
     }
+}
+        /*
+       let collider = match collider_type.as_str() {
+           "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
+           "Capsule" => BodyColliderType::Capsule(size_x, size_y),
+           "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
+           "Ball" => BodyColliderType::Ball(size_x),
+           _ => {
+        // error here
+        BodyColliderType::Capsule(size_x, size_y)
+        }
+        }*/
+
     /*
     pub fn new_character_controller_object(
         &mut self,
@@ -1606,4 +1663,89 @@ impl UserData for Framework {
         Trigger::new(&mut self.physics, name, membership_group, mask, collider)
     }
     */
+
+impl UserData for Box<dyn Object> { }
+
+impl<'lua> FromLuaMulti<'lua> for Framework {
+    fn from_lua_multi(values: mlua::prelude::LuaMultiValue<'lua>, _: &'lua Lua) -> mlua::prelude::LuaResult<Self> {
+        let value = values.get(0);
+        match value {
+            Some(value) => {
+                let userdata = value.as_userdata();
+                match userdata {
+                    Some(userdata) => {
+                        let framework: Result<Framework, Error> = userdata.take();
+                        match framework {
+                            Ok(framework) => Ok(framework),
+                            Err(err) => {
+                                debugger::error(
+                                    &format!("Lua error! Failed to get Framework from lua. Can't convert userdata to Framework.\nErr: {}", err));
+                                mlua::prelude::LuaResult::Err(Error::FromLuaConversionError { 
+                                    from: "-",
+                                    to: "Framework",
+                                    message: Some("Lua error! Failed to get Framework from lua. Can't convert userdata to Framework.".into())
+                                })
+                            },
+                        }
+                    },
+                    None => {
+                        debugger::error("Lua error! Failed to get Framework from lua. Can't convert value to userdata.");
+                        mlua::prelude::LuaResult::Err(Error::FromLuaConversionError { 
+                            from: "-",
+                            to: "Framework",
+                            message: Some("Lua error! Failed to get Framework from lua. Can't convert value to userdata.".into())
+                        })
+                    },
+                }
+            },
+            None => {
+                debugger::error("Lua error! Failed to get Framework from lua. values[0] = None");
+                mlua::prelude::LuaResult::Err(Error::FromLuaConversionError { 
+                    from: "-",
+                    to: "Framework",
+                    message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
+                })
+            },
+        }
+    }
 }
+
+/*
+impl<'lua> IntoLua<'lua> for Framework {
+    fn into_lua(self, lua: &'lua Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
+        match lua.create_userdata(self) {
+            Ok(userdata) => {
+                let lua_value = userdata.into_lua_multi(lua);
+                match lua_value {
+                    Ok(lua_value) => Ok(lua_value),
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error! Failed to convert Framework into a Lua value. Can't convert userdata to a LuaMultiValue\nErr: {}",
+                                err
+                            )
+                        );
+                        mlua::prelude::LuaResult::Err(Error::ToLuaConversionError {
+                            from: "-",
+                            to: "Framework",
+                            message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
+                        })
+                    },
+                }
+            },
+            Err(err) => {
+                debugger::error(
+                    &format!(
+                        "Lua error! Failed to convert Framework into a Lua value. Can't create userdata from Framework.\nErr: {}",
+                        err
+                    )
+                );
+                mlua::prelude::LuaResult::Err(Error::ToLuaConversionError { 
+                    from: "-",
+                    to: "Framework",
+                    message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
+                })
+            },
+        }
+    }
+}*/
