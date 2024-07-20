@@ -4,20 +4,33 @@ use super::{ObjectHandle, SYSTEMS_LUA_VMS};
 use crate::{
     assets::{
         self,
-        model_asset::ModelAsset,
         shader_asset::{ShaderAsset, ShaderAssetPath},
-        sound_asset::SoundAsset,
-        texture_asset::TextureAsset,
     }, framework::Framework, managers::{
-        self, debugger, input::{self, InputEventType}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, saves, systems::{self, SystemValue}
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, systems
     }, objects::{
-        character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Object, Transform
+        Object, Transform
     }, systems::System
 };
-use ez_al::SoundSourceType;
-use glam::{Vec2, Vec3};
-use mlua::{AnyUserData, AnyUserDataExt, Error, Lua, UserData};
-use winit::{event::MouseButton, keyboard::KeyCode};
+use glam::Vec3;
+use mlua::{AnyUserData, AnyUserDataExt, Error, Lua};
+
+macro_rules! add_function {
+    ($name:literal, $function:expr, $lua:expr, $system_id:expr) => {
+        match $function {
+            Ok(function) => {
+                if let Err(err) = $lua.globals().set($name, function) {
+                    debugger::error(&format!("failed to add a function {} as a lua global in system {}\nerror: {}", $name, $system_id, err));
+                }
+            }
+            Err(err) => debugger::error(
+                &format!(
+                    "failed to create a function {} in system {}\nerror: {}",
+                    $name, $system_id, err
+                )
+            ),
+        }
+    };
+}
 
 pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
     unsafe {
@@ -25,96 +38,88 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         let lua = SYSTEMS_LUA_VMS.get_mut(&system_id).unwrap();
         let _ = lua.globals().set("current_parent", None::<String>);
 
+        // creating some functions
+        // setting/crearing current parent
         let system_id_for_functions = system_id.clone();
         let set_current_parent = lua.create_function(move |lua, name: String| {
             if let Err(err) = lua.globals().set("current_parent", Some(name)) {
                 debugger::error(&format!(
-                    "lua error: failed to set current_parent! system: {}\nerr: {:?}",
-                    system_id_for_functions, err
+                        "lua error: failed to set current_parent! system: {}\nerr: {:?}",
+                        system_id_for_functions, err
                 ));
             }
             Ok(())
         });
+        add_function!("set_current_parent", set_current_parent, lua, system_id);
 
-        match set_current_parent {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_current_parent", func) {
-                    debugger::error(&format!("failed to add a function set_current_parent as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function set_current_parent in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        /*
         let system_id_for_functions = system_id.clone();
-        let new_character_controller = lua.create_function_mut(move |lua, (name, shape, membership_groups, mask, size_x, size_y, size_z, framework):
-            (String, String, Option<u32>, Option<u32>, f32, f32, f32, AnyUserData)| {
-                let collider = match shape.as_str() {
-                    "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
-                    "Capsule" => BodyColliderType::Capsule(size_x, size_y),
-                    "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
-                    "Ball" => BodyColliderType::Ball(size_x),
-                    _ => {
-                        // error here
-                        BodyColliderType::Capsule(size_x, size_y)
-                    }
-                };
+        let clear_current_parent = lua.create_function(move |lua, _: ()| {
+            if let Err(err) = lua.globals().set("current_parent", None::<String>) {
+                debugger::error(&format!(
+                        "lua error: failed to set current_parent! system: {}\nerr: {:?}",
+                        system_id_for_functions, err
+                ));
+            }
+            Ok(())
+        });
+        add_function!("clear_current_parent", clear_current_parent, lua, &system_id);
 
-                let membership_groups = match membership_groups {
-                    Some(groups) => Some(CollisionGroups::from(groups)),
-                    None => None,
-                };
-
-                let mask = match mask {
-                    Some(groups) => Some(CollisionGroups::from(groups)),
-                    None => None,
-                };
-                //dbg!(&framework);
-                let framework_ptr: Result<usize, Error> = framework.call_method("get_ptr", ());
-
-                match framework_ptr {
-                    Ok(framework_ptr) => {
-                        let framework_ptr = framework_ptr as *mut Framework;
-                        let mut framework = framework_ptr.read();
-                        dbg!(framework_ptr);
-                        dbg!(framework_ptr.is_null());
-                        dbg!(framework.input.is_bind_pressed("just write false pls"));
-                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-                        match system_option {
-                            Some(system) => {
-                                let object = CharacterController::new(&mut framework.physics, &name, collider, membership_groups, mask);
-                                add_to_system_or_parent(lua, system, Box::new(object));
-                            },
-                            None => debugger::error("Lua error!\nFailed to call new_character_controller: system not found"),
+        // delete and find objects
+        let system_id_for_functions = system_id.clone();
+        let delete_object = lua.create_function(move |_, (name, framework): (String, AnyUserData)| {
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+            match framework_ptr {
+                Ok(framework_ptr) => {
+                    let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                    let framework_ptr = framework_ptr as *mut Framework;
+                    let framework = &mut *framework_ptr;
+                    match system_option {
+                        Some(system) =>
+                            return Ok(system.delete_object(framework, &name)),
+                        None => {
+                            debugger::error("failed to call delete_object: system not found");
                         }
-                    },
-                    Err(err) => {
-                        debugger::error(
-                            &format!(
-                                "Lua error!\nFailed to call new_character_controller: failed to convert Userdata to Framework\nErr: {}",
-                                err
-                            )
-                        );
-                    },
-                }
-                Ok(())
+                    }
+                },
+                Err(err) => {
+                    debugger::error(
+                        &format!(
+                            "Lua error!\nFailed to call new_model_object: failed to convert Userdata to Framework\nErr: {}",
+                            err
+                        )
+                    );
+                },
             }
-        );
+            Ok(())
+        });
+        add_function!("delete_object", delete_object, lua, system_id);
 
-        match new_character_controller {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_character_controller", func) {
-                    debugger::error(&format!("failed to add a function new_character_controller as a lua global in system {}\nerror: {}", system_id, err));
+        let system_id_for_functions = system_id.clone();
+        let find_object = lua.create_function(move |_, name: String| {
+            let system_option = systems::get_system_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => match system.find_object(&name) {
+                    Some(object) => Ok(Some(ObjectHandle {
+                        system_id: system.system_id().into(),
+                        name: object.name().into(),
+                    })),
+                    None => {
+                        debugger::error("failed to call find_object: object not found");
+                        Ok(None)
+                    }
+                },
+                None => {
+                    debugger::error("failed to call find_object: system not found");
+                    Ok(None)
                 }
             }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_character_controller in system {}\nerror: {}",
-                system_id, err
-            )),
-        }*/
+        });
+        add_function!("find_object", find_object, lua, system_id);
+
+
+
+        // creating new objects
         let system_id_for_functions = system_id.clone();
         let new_character_controller = lua.create_function_mut(move |lua, (name, shape, membership_groups, mask, size_x, size_y, size_z, framework):
             (String, String, Option<u32>, Option<u32>, f32, f32, f32, AnyUserData)| {
@@ -163,22 +168,11 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             )
                         );
                     },
-                }
+            }
                 Ok(())
             }
         );
-
-        match new_character_controller {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_character_controller", func) {
-                    debugger::error(&format!("failed to add a function new_character_controller as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                    "failed to create a function new_character_controller in system {}\nerror: {}",
-                    system_id, err
-            )),
-        }
+        add_function!("new_character_controller", new_character_controller, lua, &system_id);
 
         let system_id_for_functions = system_id.clone();
         let new_empty_object = 
@@ -207,623 +201,452 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             )
                         );
                     },
-                }
+            }
                 Ok(())
             }
         );
-
-        match new_empty_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_empty_object", func) {
-                    debugger::error(&format!("failed to add a function new_empty_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                    "failed to create a function new_empty_object in system {}\nerror: {}",
-                    system_id, err
-            )),
-        }
-
-        /*
-        // creating some functions
-        let system_id_for_functions = system_id.clone();
-        let set_current_parent = lua.create_function(move |lua, name: String| {
-        if let Err(err) = lua.globals().set("current_parent", Some(name)) {
-        debugger::error(&format!(
-        "lua error: failed to set current_parent! system: {}\nerr: {:?}",
-        system_id_for_functions, err
-        ));
-        }
-            Ok(())
-        });
-
-        match set_current_parent {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_current_parent", func) {
-                    debugger::error(&format!("failed to add a function set_current_parent as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function set_current_parent in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        add_function!("new_empty_object", new_empty_object, lua, &system_id);
 
         let system_id_for_functions = system_id.clone();
-        let clear_current_parent = lua.create_function(move |lua, _: ()| {
-            if let Err(err) = lua.globals().set("current_parent", None::<String>) {
-                debugger::error(&format!(
-                    "lua error: failed to set current_parent! system: {}\nerr: {:?}",
-                    system_id_for_functions, err
-                ));
-            }
-            Ok(())
-        });
+        let new_sound_emitter_object = lua.create_function_mut(move |lua, (name, asset_id, should_loop, is_positional, max_distance, framework):
+            (String, String, bool, bool, f32, AnyUserData)| {
+                let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
 
-        match clear_current_parent {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("clear_current_parent", func) {
-                    debugger::error(&format!("failed to add a function clear_current_parent as a lua global in system {}\nerror: {}", system_id, err));
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        match system_option {
+                            Some(system) => {
+                                let id = framework.get_sound_asset(&asset_id);
+                                match id {
+                                    Some(id) => {
+                                        let mut object = framework.new_sound_emitter(&name, id, is_positional);
+                                        if is_positional {
+                                            let _ = object.set_max_distance(max_distance);
+                                        }
+                                        object.set_looping(should_loop);
+                                        add_to_system_or_parent(lua, system, Box::new(object));
+                                    },
+                                    None => todo!(),
+                                }
+                            },
+                            None => debugger::error("failed to call new_sound_emitter_object, system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_sound_emitter_object: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
                 }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function clear_current_parent in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
-
-        let system_id_for_functions = system_id.clone();
-        let delete_object = lua.create_function(move |_, name: String| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) =>
-                    Ok(system.delete_object(&name)),
-                None => {
-                    debugger::error("failed to call delete_object: system not found");
-                    Ok(())
-                }
-            }
-        });
-
-        match delete_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("delete_object", func) {
-                    debugger::error(&format!("failed to add a function delete_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function delete_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
-
-        let system_id_for_functions = system_id.clone();
-        let find_object = lua.create_function(move |_, name: String| {
-            let system_option = systems::get_system_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => match system.find_object(&name) {
-                    Some(object) => Ok(Some(ObjectHandle {
-                        system_id: system.system_id().into(),
-                        name: object.name().into(),
-                    })),
-                    None => {
-                        debugger::error("failed to call find_object: object not found");
-                        Ok(None)
-                    }
-                },
-                None => {
-                    debugger::error("failed to call find_object: system not found");
-                    Ok(None)
-                }
-            }
-        });
-
-        match find_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("find_object", func) {
-                    debugger::error(&format!("failed to add a function find_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function find_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let new_empty_object = lua.create_function_mut(move |lua, name: String| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let object = EmptyObject::new(&name);
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                },
-                None => debugger::error("failed to call new_empty_object, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_empty_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_empty_object", func) {
-                    debugger::error(&format!("failed to add a function new_empty_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_empty_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let new_sound_emitter_object = lua.create_function_mut(move |lua, (name, wav_sound_path, should_loop, is_positional, max_distance): (String, String, bool, bool, f32)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let emitter_type = match is_positional {
-                        true => SoundSourceType::Positional,
-                        false => SoundSourceType::Simple,
-                    };
-
-                    let mut object = SoundEmitter::new_from_path(&name, wav_sound_path, emitter_type);
-                    if is_positional {
-                        let _ = object.set_max_distance(max_distance);
-                    }
-                    object.set_looping(should_loop);
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                },
-                None => debugger::error("failed to call new_sound_emitter_object, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_sound_emitter_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_sound_emitter_object", func) {
-                    debugger::error(&format!("failed to add a function new_sound_emitter_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_sound_emitter_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let new_camera_position_object = lua.create_function_mut(move |lua, name: String| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let object = CameraPosition::new(&name);
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                }
-                None => {
-                    debugger::error("failed to call new_camera_position_object, system not found")
-                }
-            }
-
-            Ok(())
-        });
-
-        match new_camera_position_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_camera_position_object", func) {
-                    debugger::error(&format!("failed to add a function new_camera_position_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_camera_position_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+                Ok(())
+            });
+        add_function!("new_sound_emitter_object", new_sound_emitter_object, lua, &system_id);
 
         let system_id_for_functions = system_id.clone();
         let new_model_object = lua.create_function_mut(
-            move |lua, (name, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
-            (String, String, Option<String>, Option<String>, Option<String>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let texture_asset;
-                    match texture_asset_path {
-                        Some(path) => {
-                            let asset = TextureAsset::from_file(&path);
-                            match asset {
-                                Ok(asset) => texture_asset = Some(asset),
-                                Err(err) => {
-                                    debugger::warn(&format!("lua warning: error when calling new_model_object, failed to load texture asset!\nerr: {:?}", err));
-                                    texture_asset = None;
-                                },
-                            }
-                        },
-                        None => texture_asset = None,
-                    }
-                    let mut shader_asset_path = ShaderAssetPath {
-                        vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
-                        fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
-                    };
-                    if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
-                        shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
-                    }
-                    if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
-                        shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
-                    }
-                    let shader_asset = ShaderAsset::load_from_file(shader_asset_path);
-                    match shader_asset {
-                        Ok(shader_asset) => {
-                            let model_asset = ModelAsset::from_gltf(&model_asset_path);
-                            match model_asset {
-                                Ok(model_asset) => {
-                                    let object = ModelObject::new(&name, model_asset, texture_asset, shader_asset);
-                                    add_to_system_or_parent(lua, system, Box::new(object));
-                                },
-                                Err(err) => 
-                                    debugger::error(&format!("lua error: error when calling new_model_object, failed to load a model asset!\nerr: {:?}", err)),
-                            }
-                        },
-                        Err(err) => 
-                            debugger::error(&format!("lua error: error when calling new_model_object, failed to load a shader asset!\nerr: {:?}", err)),
-                    }
-                },
-                None => debugger::error("failed to call new_model_object, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_model_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_model_object", func) {
-                    debugger::error(&format!("failed to add a function new_model_object as a lua global in system {}\nerror: {}", system_id, err));
+            move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, framework):
+            (String, String, Option<String>, Option<String>, Option<String>, AnyUserData)| {
+                let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        match system_option {
+                            Some(system) => {
+                                let texture_asset;
+                                match texture_asset_id {
+                                    Some(id) => {
+                                        let asset = framework.get_texture_asset(&id);
+                                        match asset {
+                                            Some(asset) => texture_asset = Some(asset),
+                                            None => {
+                                                debugger::warn("lua warning: error when calling new_model_object, failed to get preloaded texture asset!");
+                                                texture_asset = None;
+                                            },
+                                        }
+                                    },
+                                    None => texture_asset = None,
+                                }
+                                let mut shader_asset_path = ShaderAssetPath {
+                                    vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
+                                    fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
+                                };
+                                if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
+                                    shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
+                                }
+                                if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
+                                    shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
+                                }
+                                let shader_asset = ShaderAsset::load_from_file(&shader_asset_path);
+                                match shader_asset {
+                                    Ok(shader_asset) => {
+                                        let model_asset = framework.get_model_asset(&model_asset_id);
+                                        match model_asset {
+                                            Some(model_asset) => {
+                                                let object = framework.new_model_object(&name, model_asset, texture_asset, shader_asset);
+                                                add_to_system_or_parent(lua, system, Box::new(object));
+                                            },
+                                            None => 
+                                                debugger::error("lua error: error when calling new_model_object, failed to get the model asset!"),
+                                        }
+                                    },
+                                    Err(err) => 
+                                        debugger::error(&format!("lua error: error when calling new_model_object, failed to load the shader asset!\nerr: {:?}", err)),
+                                }
+                            },
+                            None => debugger::error("failed to call new_model_object, system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_model_object: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
                 }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_model_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+                Ok(())
+            });
+        add_function!("new_model_object", new_model_object, lua, &system_id);
 
         let system_id_for_functions = system_id.clone();
         let new_master_instanced_model_object = lua.create_function_mut(
-            move |lua, (name, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
-            (String, String, Option<String>, Option<String>, Option<String>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let texture_asset;
-                    match texture_asset_path {
-                        Some(path) => {
-                            let asset = TextureAsset::from_file(&path);
-                            match asset {
-                                Ok(asset) => texture_asset = Some(asset),
-                                Err(err) => {
-                                    debugger::warn(&format!("lua warning: error when calling new_master_instanced_model_object, failed to load texture asset!\nerr: {:?}", err));
-                                    texture_asset = None;
-                                },
-                            }
-                        },
-                        None => texture_asset = None,
-                    }
-                    let mut shader_asset_path = ShaderAssetPath {
-                        vertex_shader_path: assets::shader_asset::get_default_instanced_vertex_shader_path(),
-                        fragment_shader_path: assets::shader_asset::get_default_instanced_fragment_shader_path(),
-                    };
-                    if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
-                        shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
-                    }
-                    if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
-                        shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
-                    }
-                    let shader_asset = ShaderAsset::load_from_file(shader_asset_path);
-                    match shader_asset {
-                        Ok(shader_asset) => {
-                            let model_asset = ModelAsset::from_gltf(&model_asset_path);
-                            match model_asset {
-                                Ok(model_asset) => {
-                                    let object = MasterInstancedModelObject::new(&name, model_asset, texture_asset, shader_asset);
-                                    add_to_system_or_parent(lua, system, Box::new(object));
-                                },
-                                Err(err) => 
-                                    debugger::error(&format!("lua error: error when calling new_master_instanced_model_object, failed to load a model asset!\nerr: {:?}", err)),
-                            }
-                        },
-                        Err(err) => 
-                            debugger::error(&format!("lua error: error when calling new_master_instanced_model_object, failed to load a shader asset!\nerr: {:?}", err)),
-                    }
-                },
-                None => debugger::error("failed to call new_master_instanced_model_object, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_master_instanced_model_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_master_instanced_model_object", func) {
-                    debugger::error(&format!("failed to add a function new_master_instanced_model_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_master_instanced_model_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let new_instanced_model_object = lua.create_function_mut(move |lua, (name, instance): (String, String)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let object = InstancedModelObject::new(&name, &instance);
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                },
-                None => debugger::error("failed to call new_instanced_model_object, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_instanced_model_object {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_instanced_model_object", func) {
-                    debugger::error(&format!("failed to add a function new_instanced_model_object as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_instanced_model_object in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        // transform = {{pos_x, pos_y, pos_z, rot_x, rot_y, rot_z, sc_x, sc_y, sc_z}, ...}
-        let new_instanced_model_transform_holder = lua.create_function_mut(move |lua, (name, instance, transforms): (String, String, Vec<[f32; 9]>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let transforms = transforms.iter().map(|transform| {
-                        Transform {
-                            position: Vec3::new(transform[0], transform[1], transform[2]),
-                            rotation: Vec3::new(transform[3], transform[4], transform[5]),
-                            scale: Vec3::new(transform[6], transform[7], transform[8]),
-                        }
-                    }).collect();
-                    let object = InstancedModelTransformHolder::new(&name, &instance, transforms);
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                },
-                None => debugger::error("failed to call new_instanced_model_transform_holder, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_instanced_model_transform_holder {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_instanced_model_transform_holder", func) {
-                    debugger::error(&format!("failed to add a function new_instanced_model_transform_holder as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_instanced_model_transform_holder in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let new_character_controller = lua.create_function_mut(
-            move |lua,
-                  (name, collider_type, size_x, size_y, size_z, membership_bits, mask_bits): (
-                String,
-                String,
-                f32,
-                f32,
-                f32,
-                Option<u32>,
-                Option<u32>,
-            )| {
+            move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, framework):
+            (String, String, Option<String>, Option<String>, Option<String>, AnyUserData)| {
                 let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-                match system_option {
-                    Some(system) => {
-                        let collider = match collider_type.as_str() {
-                            "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
-                            "Capsule" => BodyColliderType::Capsule(size_x, size_y),
-                            "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
-                            "Ball" => BodyColliderType::Ball(size_x),
-                            _ => {
-                                // error here
-                                BodyColliderType::Capsule(size_x, size_y)
-                            }
-                        };
-                        let membership = match membership_bits {
-                            Some(bits) => Some(CollisionGroups::from(bits)),
-                            None => None,
-                        };
-                        let mask = match mask_bits {
-                            Some(bits) => Some(CollisionGroups::from(bits)),
-                            None => None,
-                        };
-                        let object = CharacterController::new(&name, collider, membership, mask);
-                        add_to_system_or_parent(lua, system, Box::new(object));
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        match system_option {
+                            Some(system) => {
+                                let texture_asset;
+                                match texture_asset_id {
+                                    Some(id) => {
+                                        let asset = framework.get_texture_asset(&id);
+                                        match asset {
+                                            Some(asset) => texture_asset = Some(asset),
+                                            None => {
+                                                debugger::warn("lua warning: error when calling new_master_instanced_model_object, failed to get preloaded texture asset!");
+                                                texture_asset = None;
+                                            },
+                                        }
+                                    },
+                                    None => texture_asset = None,
+                                }
+                                let mut shader_asset_path = ShaderAssetPath {
+                                    vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
+                                    fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
+                                };
+                                if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
+                                    shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
+                                }
+                                if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
+                                    shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
+                                }
+                                let shader_asset = ShaderAsset::load_from_file(&shader_asset_path);
+                                match shader_asset {
+                                    Ok(shader_asset) => {
+                                        let model_asset = framework.get_model_asset(&model_asset_id);
+                                        match model_asset {
+                                            Some(model_asset) => {
+                                                let object = 
+                                                    framework.new_master_instanced_model_object(&name, model_asset, texture_asset, shader_asset);
+                                                add_to_system_or_parent(lua, system, Box::new(object));
+                                            },
+                                            None => 
+                                                debugger::error("lua error: error when calling new_master_instanced_model_object, failed to get the model asset!"),
+                                        }
+                                    },
+                                    Err(err) => {
+                                        debugger::error(
+                                            &format!("lua error: error when calling new_master_instanced_model_object, failed to load the shader asset!\nerr: {:?}", err)
+                                        )
+                                    },
+                                }
+                            },
+                            None => debugger::error("failed to call new_master_instanced_model_object, system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_master_instanced_model_object: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
+                }
+                Ok(())
+            });
+        add_function!("new_master_instanced_model_object", new_master_instanced_model_object, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
+        let new_instanced_model_object = lua.create_function_mut(move |lua, (name, instance, framework): (String, String, AnyUserData)| {
+            let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+            match framework_ptr {
+                Ok(framework_ptr) => {
+                    let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                    let framework_ptr = framework_ptr as *mut Framework;
+                    let framework = &mut *framework_ptr;
+                    let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                    match system_option {
+                        Some(system) => {
+                            let object = framework.new_instanced_model_object(&name, &instance);
+                            add_to_system_or_parent(lua, system, Box::new(object));
+                        },
+                        None => debugger::error("failed to call new_instanced_model_object, system not found"),
                     }
-                    None => debugger::error("failed to call new_character_controller, system not found"),
+                },
+                Err(err) => {
+                    debugger::error(
+                        &format!(
+                            "Lua error!\nFailed to call new_instanced_model_object: failed to convert Userdata to Framework\nErr: {}",
+                            err
+                        )
+                    );
+                },
+            }
+
+            Ok(())
+        });
+        add_function!("new_instanced_model_object", new_instanced_model_object, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
+        let new_instanced_model_transform_holder = lua.create_function_mut(move 
+            |lua, (name, instance, transforms, framework): (String, String, Vec<[f32; 9]>, AnyUserData)| {
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                        match system_option {
+                            Some(system) => {
+                                let transforms = transforms.iter().map(|transform| {
+                                    Transform {
+                                        position: Vec3::new(transform[0], transform[1], transform[2]),
+                                        rotation: Vec3::new(transform[3], transform[4], transform[5]),
+                                        scale: Vec3::new(transform[6], transform[7], transform[8]),
+                                    }
+                                }).collect();
+                                let object = framework.new_instanced_model_transform_holder(&name, &instance, transforms);
+                                add_to_system_or_parent(lua, system, Box::new(object));
+                            },
+                            None => debugger::error("failed to call new_instanced_model_transform_holder, system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_instanced_model_transform_holder: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
                 }
 
                 Ok(())
-            },
-        );
-
-        match new_character_controller {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_character_controller_object", func) {
-                    debugger::error(&format!("failed to add a function new_character_controller as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_character_controller in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
+            });
+        add_function!("new_instanced_model_transform_holder", new_instanced_model_transform_holder, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
-        let new_navigation_ground = lua.create_function_mut(move |lua, (name, size_x, size_z): (String, f32, f32)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let object = NavigationGround::new(&name, Vec2::new(size_x, size_z));
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                },
-                None => debugger::error("failed to call new_navigation_ground, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_navigation_ground {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_navigation_ground", func) {
-                    debugger::error(&format!("failed to add a function new_navigation_ground as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_navigation_ground in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
-
-        let system_id_for_functions = system_id.clone();
-        let new_ray = lua.create_function_mut(move |lua, (name, direction_x, direction_y, direction_z, mask_bits): (String, f32, f32, f32, Option<u32>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let mask = match mask_bits {
-                        Some(mask_bits) => Some(CollisionGroups::from(mask_bits)),
-                        None => None,
-                    };
-
-                    let object = Ray::new(&name, Vec3::new(direction_x, direction_y, direction_z), mask);
-                    add_to_system_or_parent(lua, system, Box::new(object));
-                },
-                None => debugger::error("failed to call new_ray, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match new_ray {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_ray", func) {
-                    debugger::error(&format!("failed to add a function new_ray as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_ray in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
-
-        let system_id_for_functions = system_id.clone();
-        let new_trigger = lua.create_function_mut(move |lua, (name, collider_type, size_x, size_y, size_z, membership_bits, mask_bits): (String, String, f32, f32, f32, Option<u32>, Option<u32>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let membership = match membership_bits {
-                        Some(membership_bits) => Some(CollisionGroups::from(membership_bits)),
-                        None => None,
-                    };
-                    let mask = match mask_bits {
-                        Some(mask_bits) => Some(CollisionGroups::from(mask_bits)),
-                        None => None,
-                    };
-
-                    let collider = match collider_type.as_str() {
-                        "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
-                        "Capsule" => BodyColliderType::Capsule(size_x, size_y),
-                        "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
-                        "Ball" => BodyColliderType::Ball(size_x),
-                        _ => {
-                            debugger::error(
-                                "lua error: new_trigger failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'"
-                            );
-                            BodyColliderType::Cuboid(size_x, size_y, size_z)
+        let new_navigation_ground = lua.create_function_mut(move |lua, (name, size_x, size_z, framework): (String, f32, f32, AnyUserData)| {
+            let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+            match framework_ptr {
+                Ok(framework_ptr) => {
+                    let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                    let framework_ptr = framework_ptr as *mut Framework;
+                    let framework = &mut *framework_ptr;
+                    let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                    match system_option {
+                        Some(system) => {
+                            let object = framework.new_navigation_ground(&name, Vec3::new(size_x, 1.0, size_z));
+                            add_to_system_or_parent(lua, system, Box::new(object));
                         },
-                    };
-
-                    let object = Trigger::new(&name, membership, mask, collider);
-                    add_to_system_or_parent(lua, system, Box::new(object));
+                        None => debugger::error("failed to call new_navigation_ground, system not found"),
+                    }
                 },
-                None => debugger::error("failed to call new_trigger, system not found"),
+                Err(err) => {
+                    debugger::error(
+                        &format!(
+                            "Lua error!\nFailed to call new_navigation_ground: failed to convert Userdata to Framework\nErr: {}",
+                            err
+                        )
+                    );
+                },
             }
-            
+
             Ok(())
         });
-
-        match new_trigger {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_trigger", func) {
-                    debugger::error(&format!("failed to add a function new_trigger as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_trigger in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
+        add_function!("new_navigation_ground", new_navigation_ground, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
-        let new_nav_obstacle = lua.create_function_mut(move |lua, (name, size_x, size_z): (String, f32, f32)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let object = NavObstacle::new(&name, Vec3::new(size_x, 1.0, size_z));
-                    add_to_system_or_parent(lua, system, Box::new(object));
+        let new_ray = lua.create_function_mut(
+            move |lua, (name, direction_x, direction_y, direction_z, mask_bits, framework): (String, f32, f32, f32, Option<u32>, AnyUserData)| {
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                        match system_option {
+                            Some(system) => {
+                                let mask = match mask_bits {
+                                    Some(mask_bits) => Some(CollisionGroups::from(mask_bits)),
+                                    None => None,
+                                };
+
+                                let object = framework.new_ray(&name, Vec3::new(direction_x, direction_y, direction_z), mask);
+                                add_to_system_or_parent(lua, system, Box::new(object));
+                            },
+                            None => debugger::error("failed to call new_ray, system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_ray: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
+                }
+
+                Ok(())
+            });
+        add_function!("new_ray", new_ray, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
+        let new_trigger = lua.create_function_mut(move |lua, (name, collider_type, size_x, size_y, size_z, membership_bits, mask_bits, framework): 
+            (String, String, f32, f32, f32, Option<u32>, Option<u32>, AnyUserData)| {
+                let possible_collider_val_err =
+                    "lua error: new_trigger failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'";
+                let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                match framework_ptr {
+                    Ok(framework_ptr) => {
+                        let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                        let framework_ptr = framework_ptr as *mut Framework;
+                        let framework = &mut *framework_ptr;
+                        let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                        match system_option {
+                            Some(system) => {
+                                let membership = match membership_bits {
+                                    Some(membership_bits) => Some(CollisionGroups::from(membership_bits)),
+                                    None => None,
+                                };
+                                let mask = match mask_bits {
+                                    Some(mask_bits) => Some(CollisionGroups::from(mask_bits)),
+                                    None => None,
+                                };
+
+                                let collider = match collider_type.as_str() {
+                                    "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
+                                    "Capsule" => BodyColliderType::Capsule(size_x, size_y),
+                                    "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
+                                    "Ball" => BodyColliderType::Ball(size_x),
+                                    _ => {
+                                        debugger::error(possible_collider_val_err);
+                                        BodyColliderType::Cuboid(size_x, size_y, size_z)
+                                    },
+                                };
+
+                                let object = framework.new_trigger(&name, membership, mask, collider);
+                                add_to_system_or_parent(lua, system, Box::new(object));
+                            },
+                            None => debugger::error("failed to call new_trigger, system not found"),
+                        }
+                    },
+                    Err(err) => {
+                        debugger::error(
+                            &format!(
+                                "Lua error!\nFailed to call new_trigger: failed to convert Userdata to Framework\nErr: {}",
+                                err
+                            )
+                        );
+                    },
+                }
+
+                Ok(())
+            });
+
+        add_function!("new_trigger", new_trigger, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
+        let new_nav_obstacle = lua.create_function_mut(move |lua, (name, size_x, size_z, framework): (String, f32, f32, AnyUserData)| {
+            let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+            match framework_ptr {
+                Ok(framework_ptr) => {
+                    let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                    let framework_ptr = framework_ptr as *mut Framework;
+                    let framework = &mut *framework_ptr;
+                    let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+                    match system_option {
+                        Some(system) => {
+                            let object = framework.new_nav_obstacle(&name, Vec3::new(size_x, 1.0, size_z));
+                            add_to_system_or_parent(lua, system, Box::new(object));
+                        },
+                        None => debugger::error("failed to call new_nav_obstacle, system not found"),
+                    }
                 },
-                None => debugger::error("failed to call new_nav_obstacle, system not found"),
+                Err(err) => {
+                    debugger::error(
+                        &format!(
+                            "Lua error!\nFailed to call new_nav_obstacle: failed to convert Userdata to Framework\nErr: {}",
+                            err
+                        )
+                    );
+                },
             }
-            
+
             Ok(())
         });
 
-        match new_nav_obstacle {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_nav_obstacle", func) {
-                    debugger::error(&format!("failed to add a function new_nav_obstacle as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_nav_obstacle in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-
+        add_function!("new_nav_obstacle", new_nav_obstacle, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let set_object_position = lua.create_function_mut(
-            move |_, (name, pos_x, pos_y, pos_z): (String, f32, f32, f32)| {
+            move |_, (name, pos_x, pos_y, pos_z, framework): (String, f32, f32, f32, AnyUserData)| {
                 match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                     Some(system) => {
-                        let object_option = system.find_object_mut(&name);
-                        match object_option {
-                            Some(object) => {
-                                object.set_position(Vec3::new(pos_x, pos_y, pos_z), true)
-                            }
-                            None => debugger::error(
-                                "failed to call set_object_position, object not found",
-                            ),
+                        let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                        match framework_ptr {
+                            Ok(framework_ptr) => {
+                                let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                                let framework_ptr = framework_ptr as *mut Framework;
+                                let framework = &mut *framework_ptr;
+                                let object_option = system.find_object_mut(&name);
+                                match object_option {
+                                    Some(object) => {
+                                        object.set_position(framework, Vec3::new(pos_x, pos_y, pos_z), true)
+                                    }
+                                    None => debugger::error(
+                                        "failed to call set_object_position, object not found",
+                                    ),
+                                }
+                            },
+                            Err(err) => {
+                                debugger::error(
+                                    &format!(
+                                        "Lua error!\nFailed to call set_object_position: failed to convert Userdata to Framework\nErr: {}",
+                                        err
+                                    )
+                                );
+                            },
                         }
                     }
                     None => debugger::error("failed to call set_object_position, system not found"),
@@ -832,32 +655,37 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Ok(())
             },
         );
-
-        match set_object_position {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_object_position", func) {
-                    debugger::error(&format!("failed to add a function set_object_position as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function set_object_position in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        add_function!("set_object_position", set_object_position, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let set_object_rotation = lua.create_function_mut(
-            move |_, (name, rot_x, rot_y, rot_z): (String, f32, f32, f32)| {
+            move |_, (name, rot_x, rot_y, rot_z, framework): (String, f32, f32, f32, AnyUserData)| {
                 match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                     Some(system) => {
-                        let object_option = system.find_object_mut(&name);
-                        match object_option {
-                            Some(object) => {
-                                object.set_rotation(Vec3::new(rot_x, rot_y, rot_z), true)
-                            }
-                            None => debugger::error(
-                                "failed to call set_object_rotation, object not found",
-                            ),
+                        let framework_ptr: Result<String, Error> = framework.call_method("get_ptr", ());
+                        match framework_ptr {
+                            Ok(framework_ptr) => {
+                                let framework_ptr = framework_ptr.parse::<usize>().unwrap();
+                                let framework_ptr = framework_ptr as *mut Framework;
+                                let framework = &mut *framework_ptr;
+                                let object_option = system.find_object_mut(&name);
+                                match object_option {
+                                    Some(object) => {
+                                        object.set_rotation(framework, Vec3::new(rot_x, rot_y, rot_z), true)
+                                    }
+                                    None => debugger::error(
+                                        "failed to call set_object_rotation, object not found",
+                                    ),
+                                }
+                            },
+                            Err(err) => {
+                                debugger::error(
+                                    &format!(
+                                        "Lua error!\nFailed to call set_object_rotation: failed to convert Userdata to Framework\nErr: {}",
+                                        err
+                                    )
+                                );
+                            },
                         }
                     }
                     None => debugger::error("failed to call set_object_rotation, system not found"),
@@ -866,18 +694,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Ok(())
             },
         );
-
-        match set_object_rotation {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_object_rotation", func) {
-                    debugger::error(&format!("failed to add a function set_object_rotation as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function set_object_rotation in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        add_function!("set_object_rotation", set_object_rotation, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let set_object_scale = lua.create_function_mut(
@@ -886,30 +703,20 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                     Some(system) => {
                         let object_option = system.find_object_mut(&name);
                         match object_option {
-                            Some(object) => object.set_scale(Vec3::new(sc_x, sc_y, sc_z)),
-                            None => {
-                                debugger::error("failed to call set_object_scale, object not found")
+                            Some(object) => {
+                                object.set_scale(Vec3::new(sc_x, sc_y, sc_z))
                             }
+                            None => debugger::error(
+                                "failed to call set_object_rotation, object not found",
+                            ),
                         }
-                    }
-                    None => debugger::error("failed to call set_object_scale, system not found"),
+                    },
+                    None => debugger::error("failed to call set_object_rotation, system not found"),
                 }
-
                 Ok(())
-            },
-        );
-
-        match set_object_scale {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_object_scale", func) {
-                    debugger::error(&format!("failed to add a function set_object_scale as a lua global in system {}\nerror: {}", system_id, err));
-                }
             }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function set_object_scale in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        );
+        add_function!("set_object_scale", set_object_scale, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let get_object_position = lua.create_function_mut(move |_, name: String| {
@@ -934,18 +741,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
             Ok(vec![])
         });
+        add_function!("get_object_position", get_object_position, lua, system_id);
 
-        match get_object_position {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("get_object_position", func) {
-                    debugger::error(&format!("failed to add a function get_object_position as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function get_object_position in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
 
         let system_id_for_functions = system_id.clone();
         let get_object_rotation = lua.create_function_mut(move |_, name: String| {
@@ -970,18 +767,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
             Ok(vec![])
         });
-
-        match get_object_rotation {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("get_object_rotation", func) {
-                    debugger::error(&format!("failed to add a function get_object_rotation as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function get_object_rotation in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        add_function!("get_object_rotation", get_object_rotation, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let get_object_scale = lua.create_function_mut(move |_, name: String| {
@@ -1006,21 +792,9 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
             Ok(vec![])
         });
-
-        match get_object_scale {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("get_object_scale", func) {
-                    debugger::error(&format!("failed to add a function get_object_scale as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function get_object_scale in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        add_function!("get_object_scale", get_object_scale, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
-
         let send_custom_message = lua.create_function_mut(move |_, (is_reliable, message_id, contents, receiver, client_id): (bool, String, String, Option<String>, Option<u64>)| {
             match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                 Some(system) => {
@@ -1075,200 +849,75 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
             Ok(())
         });
-
-        match send_custom_message {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("send_custom_message", func) {
-                    debugger::error(&format!("failed to add a function send_custom_message as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function send_custom_message in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+        add_function!("send_custom_message", send_custom_message, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let send_sync_object_message = lua.create_function_mut(move 
             |_, (is_reliable, message_id, object_name, pos, rot, scale, receiver, client_id): 
             (bool, String, String, [f32; 3], [f32; 3], [f32; 3], Option<String>, Option<u64>)| {
-            let contents = MessageContents::SyncObject(SyncObjectMessage {
-                object_name,
-                transform: Transform {
-                    position: pos.into(),
-                    rotation: rot.into(),
-                    scale: scale.into()
-                },
-            });
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let reliability = match is_reliable {
-                        true => MessageReliability::Reliable,
-                        false => MessageReliability::Unreliable,
-                    };
-                    if let networking::NetworkingMode::Server(_) = networking::get_current_networking_mode() {
-                        match receiver {
-                            Some(receiver) => {
-                                let receiver = match receiver.as_str() {
-                                    "Everybody" => MessageReceiver::Everybody,
-                                    "OneClient" => {
-                                        match client_id {
-                                            Some(id) => MessageReceiver::OneClient(id),
-                                            None => {
-                                                debugger::error("lua send_sync_object_message error: message receiver set to 'Client', but client id is 0");
-                                                MessageReceiver::OneClient(0)
-                                            },
-                                        }
-                                    }, 
-                                    "EverybodyExcept" => {
-                                        match client_id {
-                                            Some(id) => MessageReceiver::EverybodyExcept(id),
-                                            None => {
-                                                debugger::error("lua send_sync_object_message error: message receiver set to 'EverybodyExcept', but client id is 0");
-                                                MessageReceiver::OneClient(0)
-                                            },
-                                        }
-                                    },
-                                    _ => {
-                                        debugger::error("lua send_sync_object_message error: receiver arg is wrong! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
-                                        MessageReceiver::OneClient(0)
-                                    },
-                                };
-                                let message = Message::new_from_server(receiver, contents, system_id_for_functions.clone(), message_id);
-                                let _ = system.send_message(reliability, message);
-                            },
-                            None => {
-                                debugger::error("lua send_sync_object_message error: receiver arg is nil! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
-                            },
+                let contents = MessageContents::SyncObject(SyncObjectMessage {
+                    object_name,
+                    transform: Transform {
+                        position: pos.into(),
+                        rotation: rot.into(),
+                        scale: scale.into()
+                    },
+                });
+                match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
+                    Some(system) => {
+                        let reliability = match is_reliable {
+                            true => MessageReliability::Reliable,
+                            false => MessageReliability::Unreliable,
                         };
+                        if let networking::NetworkingMode::Server(_) = networking::get_current_networking_mode() {
+                            match receiver {
+                                Some(receiver) => {
+                                    let receiver = match receiver.as_str() {
+                                        "Everybody" => MessageReceiver::Everybody,
+                                        "OneClient" => {
+                                            match client_id {
+                                                Some(id) => MessageReceiver::OneClient(id),
+                                                None => {
+                                                    debugger::error("lua send_sync_object_message error: message receiver set to 'Client', but client id is 0");
+                                                    MessageReceiver::OneClient(0)
+                                                },
+                                            }
+                                        }, 
+                                        "EverybodyExcept" => {
+                                            match client_id {
+                                                Some(id) => MessageReceiver::EverybodyExcept(id),
+                                                None => {
+                                                    debugger::error("lua send_sync_object_message error: message receiver set to 'EverybodyExcept', but client id is 0");
+                                                    MessageReceiver::OneClient(0)
+                                                },
+                                            }
+                                        },
+                                        _ => {
+                                            debugger::error("lua send_sync_object_message error: receiver arg is wrong! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
+                                            MessageReceiver::OneClient(0)
+                                        },
+                                    };
+                                    let message = Message::new_from_server(receiver, contents, system_id_for_functions.clone(), message_id);
+                                    let _ = system.send_message(reliability, message);
+                                },
+                                None => {
+                                    debugger::error("lua send_sync_object_message error: receiver arg is nil! Possible values: 'Everybody', 'OneClient', 'EverybodyExcept'");
+                                },
+                            };
 
-                    } else if let networking::NetworkingMode::Client(_) = networking::get_current_networking_mode() {
-                        let message = Message::new_from_client(contents, system_id_for_functions.clone(), message_id);
-                        let _ = system.send_message(reliability, message);
+                        } else if let networking::NetworkingMode::Client(_) = networking::get_current_networking_mode() {
+                            let message = Message::new_from_client(contents, system_id_for_functions.clone(), message_id);
+                            let _ = system.send_message(reliability, message);
+                        }
                     }
+                    None => debugger::error("failed to call send_sync_object_message, system not found"),
                 }
-                None => debugger::error("failed to call send_sync_object_message, system not found"),
-            }
 
-            Ok(())
-        });
-
-        match send_sync_object_message {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("send_sync_object_message", func) {
-                    debugger::error(&format!("failed to add a function send_sync_object_message as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function send_sync_object_message in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
+                Ok(())
+            });
+        add_function!("send_sync_object_message", send_sync_object_message, lua, system_id);
 
 
-        
-
-/*
-
-        match send_sync_object_message_to_everybody {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("send_sync_object_message_to_everybody", func) {
-                    debugger::error(&format!("failed to add a function send_sync_object_message_to_everybody as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function send_sync_object_message_to_everybody in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let send_sync_object_message_to_one_client = lua.create_function_mut(
-            move |_, (client_id, is_reliable, message_id, object_name, pos, rot, scale): (u64, bool, String, String, [f32; 3], [f32; 3], [f32; 3])| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let reliability = match is_reliable {
-                        true => MessageReliability::Reliable,
-                        false => MessageReliability::Unreliable,
-                    };
-                    let message = Message {
-                        receiver: MessageReceiver::OneClient(client_id),
-                        system_id: system.system_id().into(),
-                        message_id,
-                        contents: MessageContents::SyncObject(SyncObjectMessage {
-                            object_name,
-                            transform: Transform {
-                                position: pos.into(),
-                                rotation: rot.into(),
-                                scale: scale.into()
-                            },
-                        }),
-                    };
-
-                    let _ = system.send_message(reliability, message);
-                },
-                None => debugger::error("failed to call send_sync_object_message_to_one_client, system not found"),
-            }
-
-            Ok(())
-        });
-
-        match send_sync_object_message_to_one_client {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("send_sync_object_message_to_one_client", func) {
-                    debugger::error(&format!("failed to add a function send_sync_object_message_to_one_client as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function send_sync_object_message_to_one_client in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let send_sync_object_message_to_everybody_except = lua.create_function_mut(
-            move |_, (client_id, is_reliable, message_id, object_name, pos, rot, scale): (u64, bool, String, String, [f32; 3], [f32; 3], [f32; 3])| {
-            match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
-                Some(system) => {
-                    let reliability = match is_reliable {
-                        true => MessageReliability::Reliable,
-                        false => MessageReliability::Unreliable,
-                    };
-                    let message = Message {
-                        receiver: MessageReceiver::EverybodyExcept(client_id),
-                        system_id: system.system_id().into(),
-                        message_id,
-                        contents: MessageContents::SyncObject(SyncObjectMessage {
-                            object_name,
-                            transform: Transform {
-                                position: pos.into(),
-                                rotation: rot.into(),
-                                scale: scale.into()
-                            },
-                        }),
-                    };
-
-                    let _ = system.send_message(reliability, message);
-                }
-                None => debugger::error("failed to call send_sync_object_message_to_everybody_except, system not found"),
-            }
-
-            Ok(())
-        });
-
-        match send_sync_object_message_to_everybody_except {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("send_sync_object_message_to_everybody_except", func) {
-                    debugger::error(&format!("failed to add a function send_sync_object_message_to_everybody_except as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function send_sync_object_message_to_everybody_except in system {}\nerror: {}",
-                system_id, err
-            )),
-        }*/
-
-        //let system_id_for_functions = system_id.clone();
         let get_network_events = lua.create_function_mut(
             move |_, _: ()| {
                 let mut events: Vec<HashMap<&str, String>> = Vec::new();
@@ -1302,445 +951,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 Ok(events)
             }
         );
-
-        match get_network_events {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("get_network_events", func) {
-                    debugger::error(&format!("failed to add a function get_network_events as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function get_network_events in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let get_value_in_system = lua.create_function_mut(
-            move |_, (system_id, value_name): (String, String)| {
-                Ok(managers::systems::get_value_in_system(&system_id, value_name))
-            }
-        );
-
-        match get_value_in_system {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("get_value_in_system", func) {
-                    debugger::error(&format!("failed to add a function get_value_in_system as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function get_value_in_system in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let get_global_system_value = lua.create_function_mut(
-            move |_, name: String| {
-                Ok(framework::get_global_system_value(&name))
-            }
-        );
-
-        match get_global_system_value {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("get_global_system_value", func) {
-                    debugger::error(&format!("failed to add a function get_global_system_value as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function get_global_system_value in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let set_global_system_value = lua.create_function_mut(
-            move |_, (name, value): (String, Vec<SystemValue>)| {
-                Ok(framework::set_global_system_value(&name, value))
-            }
-        );
-
-        match set_global_system_value {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_global_system_value", func) {
-                    debugger::error(&format!("failed to add a function set_global_system_value as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function set_global_system_value in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let register_save_value = lua.create_function_mut(
-            move |_, value_name: String| {
-                Ok(saves::register_save_value(&value_name))
-            }
-        );
-
-        match register_save_value {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("register_save_value", func) {
-                    debugger::error(&format!("failed to add a function register_save_value as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function register_save_value in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let unregister_save_value = lua.create_function_mut(
-            move |_, value_name: String| {
-                Ok(saves::unregister_save_value(&value_name))
-            }
-        );
-
-        match unregister_save_value {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("unregister_save_value", func) {
-                    debugger::error(&format!("failed to add a function unregister_save_value as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function unregister_save_value in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let save_game = lua.create_function_mut(
-            move |_, (): ()| {
-                Ok(saves::save_game())
-            }
-        );
-
-        match save_game {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("save_game", func) {
-                    debugger::error(&format!("failed to add a function save_game as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function save_game in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let new_save = lua.create_function_mut(
-            move |_, save_name: String| {
-                Ok(saves::new_save(&save_name).unwrap())
-            }
-        );
-
-        match new_save {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_save", func) {
-                    debugger::error(&format!("failed to add a function new_save as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function new_save in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let load_save = lua.create_function_mut(
-            move |_, save_name: String| {
-                Ok(saves::load_save(&save_name).unwrap())
-            }
-        );
-
-        match load_save {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("load_save", func) {
-                    debugger::error(&format!("failed to add a function load_save as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function load_save in system {}\nerror: {}",
-                system_id, err
-            )),
-        }
-
-        let new_bind_keyboard = lua.create_function_mut(
-            move |_, (bind_name, keycode): (String, String)| {
-                match serde_json::from_str::<KeyCode>(&keycode.replace("\"", "")) {
-                    Ok(keycode) => input::new_bind(&bind_name, vec![InputEventType::Key(keycode)]),
-                    Err(err) => 
-                        debugger::error(&format!("new_bind_keyboard error!\nUnable to create bind '{}': failed to parse keycode {}\nerr: {}", bind_name, keycode, err)),
-                }
-
-                Ok(())
-            }
-        );
-
-        match new_bind_keyboard {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_bind_keyboard", func) {
-                    debugger::error(&format!("failed to add a function new_bind_keyboard as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function new_bind_keyboard in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let new_bind_mouse = lua.create_function_mut(
-            move |_, (bind_name, mouse_button): (String, String)| { // mouse_button = Left/Right/Middle
-                match serde_json::from_str::<MouseButton>(&mouse_button.replace("\"", "")) {
-                    Ok(mouse_button) => input::new_bind(&bind_name, vec![InputEventType::Mouse(mouse_button)]),
-                    Err(err) => 
-                        debugger::error(&format!("new_bind_mouse error!\nUnable to create bind '{}': failed to parse mouse button {}\nerr: {}", bind_name, mouse_button, err)),
-                }
-
-                Ok(())
-            }
-        );
-
-        match new_bind_mouse {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("new_bind_mouse", func) {
-                    debugger::error(&format!("failed to add a function new_bind_mouse as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function new_bind_mouse in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let is_bind_pressed = lua.create_function_mut(
-            move |_, bind_name: String| {
-                Ok(input::is_bind_pressed(&bind_name))
-            }
-        );
-
-        match is_bind_pressed {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("is_bind_pressed", func) {
-                    debugger::error(&format!("failed to add a function is_bind_pressed as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function is_bind_pressed in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let is_bind_down = lua.create_function_mut(
-            move |_, bind_name: String| {
-                Ok(input::is_bind_down(&bind_name))
-            }
-        );
-
-        match is_bind_down {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("is_bind_down", func) {
-                    debugger::error(&format!("failed to add a function is_bind_down as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function is_bind_down in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let is_bind_released = lua.create_function_mut(
-            move |_, bind_name: String| {
-                Ok(input::is_bind_released(&bind_name))
-            }
-        );
-
-        match is_bind_released {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("is_bind_released", func) {
-                    debugger::error(&format!("failed to add a function is_bind_released as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function is_bind_released in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let mouse_position = lua.create_function_mut(
-            move |_, (): ()| {
-                let position = input::mouse_position();
-                Ok(vec![position.x, position.y])
-            }
-        );
-
-        match mouse_position {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("mouse_position", func) {
-                    debugger::error(&format!("failed to add a function mouse_position as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function mouse_position in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let mouse_position = lua.create_function_mut(
-            move |_, (): ()| {
-                let position = input::mouse_position();
-                Ok(vec![position.x, position.y])
-            }
-        );
-
-        match mouse_position {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("mouse_position", func) {
-                    debugger::error(&format!("failed to add a function mouse_position as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function mouse_position in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let mouse_delta = lua.create_function_mut(
-            move |_, (): ()| {
-                let delta = input::mouse_delta();
-                Ok(vec![delta.x, delta.y])
-            }
-        );
-
-        match mouse_delta {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("mouse_delta", func) {
-                    debugger::error(&format!("failed to add a function mouse_delta as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function mouse_delta in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let is_mouse_locked = lua.create_function_mut(
-            move |_, (): ()| {
-                Ok(input::is_mouse_locked())
-            }
-        );
-
-        match is_mouse_locked {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("is_mouse_locked", func) {
-                    debugger::error(&format!("failed to add a function is_mouse_locked as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function is_mouse_locked in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let set_mouse_locked = lua.create_function_mut(
-            move |_, lock: bool| {
-                Ok(input::set_mouse_locked(lock))
-            }
-        );
-
-        match set_mouse_locked {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("set_mouse_locked", func) {
-                    debugger::error(&format!("failed to add a function set_mouse_locked as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(
-                &format!(
-                    "failed to create a function set_mouse_locked in system {}\nerror: {}",
-                    system_id, err
-                )
-            ),
-        }
-
-        let system_id_for_functions = system_id.clone();
-        let multiple_new_model_objects = lua.create_function_mut(
-            move |lua, (names, model_asset_path, texture_asset_path, vertex_shader_asset_path, fragment_shader_asset_path):
-            (Vec<String>, String, Option<String>, Option<String>, Option<String>)| {
-            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
-            match system_option {
-                Some(system) => {
-                    let texture_asset;
-                    match texture_asset_path {
-                        Some(path) => {
-                            let asset = TextureAsset::from_file(&path);
-                            match asset {
-                                Ok(asset) => texture_asset = Some(asset),
-                                Err(err) => {
-                                    debugger::warn(&format!("lua warning: error when calling new_model_object, failed to load texture asset!\nerr: {:?}", err));
-                                    texture_asset = None;
-                                },
-                            }
-                        },
-                        None => texture_asset = None,
-                    }
-                    let mut shader_asset_path = ShaderAssetPath {
-                        vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
-                        fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
-                    };
-                    if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
-                        shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
-                    }
-                    if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
-                        shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
-                    }
-                    let shader_asset = ShaderAsset::load_from_file(shader_asset_path);
-                    match shader_asset {
-                        Ok(shader_asset) => {
-                            let model_asset = ModelAsset::from_gltf(&model_asset_path);
-                            match model_asset {
-                                Ok(model_asset) => {
-                                    for name in names {
-                                        let object = ModelObject::new(&name, model_asset.clone(), texture_asset.clone(), shader_asset.clone());
-                                        add_to_system_or_parent(lua, system, Box::new(object));
-                                    }
-                                },
-                                Err(err) => 
-                                    debugger::error(&format!("lua error: error when calling new_model_object, failed to load a model asset!\nerr: {:?}", err)),
-                            }
-                        },
-                        Err(err) => 
-                            debugger::error(&format!("lua error: error when calling new_model_object, failed to load a shader asset!\nerr: {:?}", err)),
-                    }
-                },
-                None => debugger::error("failed to call new_model_object, system not found"),
-            }
-            
-            Ok(())
-        });
-
-        match multiple_new_model_objects {
-            Ok(func) => {
-                if let Err(err) = lua.globals().set("multiple_new_model_objects", func) {
-                    debugger::error(&format!("failed to add a function multiple_new_model_objects as a lua global in system {}\nerror: {}", system_id, err));
-                }
-            }
-            Err(err) => debugger::error(&format!(
-                "failed to create a function multiple_new_model_objects in system {}\nerror: {}",
-                system_id, err
-            )),
-        }*/
+        add_function!("get_network_events", get_network_events, lua, system_id);
     }
 }
 
@@ -1760,4 +971,3 @@ fn add_to_system_or_parent(lua: &Lua, system: &mut Box<dyn System>, object: Box<
     }
     system.add_object(object);
 }
-

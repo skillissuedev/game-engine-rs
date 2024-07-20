@@ -3,7 +3,7 @@ use winit::keyboard::KeyCode;
 use crate::{
     framework::{DebugMode, Framework},
     managers::{input::InputEventType, scripting::lua::LuaSystem, systems::add_system},
-    systems::player_manager::PlayerManager,
+    //systems::player_manager::PlayerManager,
 };
 
 pub fn start(framework: &mut Framework) {

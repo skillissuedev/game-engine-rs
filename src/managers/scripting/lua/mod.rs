@@ -1565,18 +1565,6 @@ impl UserData for Framework {
         );
     }
 }
-        /*
-       let collider = match collider_type.as_str() {
-           "Cuboid" => BodyColliderType::Cuboid(size_x, size_y, size_z),
-           "Capsule" => BodyColliderType::Capsule(size_x, size_y),
-           "Cylinder" => BodyColliderType::Cylinder(size_x, size_y),
-           "Ball" => BodyColliderType::Ball(size_x),
-           _ => {
-        // error here
-        BodyColliderType::Capsule(size_x, size_y)
-        }
-        }*/
-
     /*
     pub fn new_character_controller_object(
         &mut self,
