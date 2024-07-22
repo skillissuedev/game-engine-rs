@@ -246,7 +246,7 @@ impl Object for MasterInstancedModelObject {
 
     fn render(&mut self, framework: &mut Framework) {
         let render = framework.render.as_mut().expect(
-            "wtf there are no display in a framework and it's still calling render() in a system?",
+            "wtf there is no display in a framework and it's still calling render() in a system?",
         );
 
         if self.error {
@@ -273,7 +273,6 @@ impl Object for MasterInstancedModelObject {
         let per_instance_buffer =
             glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
 
-        //dbg!(&self.model_asset.objects);
         if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
             let vertex_buffers = &asset.vertex_buffers.as_ref().unwrap();
             for i in 0..asset.objects.len() {

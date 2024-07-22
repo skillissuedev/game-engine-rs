@@ -72,6 +72,25 @@ pub enum AnimationChannelType {
 }
 
 impl ModelAsset {
+    pub fn clone_for_collider(asset: &ModelAsset) -> ModelAsset {
+        let mut objects = Vec::new();
+        if let Some(object) = asset.objects.get(0) {
+            objects.push(object.clone());
+        }
+        let joint_arr = [[[0.0; 4]; 4]; 128];
+
+        ModelAsset {
+            path: asset.path.clone(),
+            objects,
+            joints: Vec::new(),
+            nodes: Vec::new(),
+            root_nodes: Vec::new(),
+            animations: Vec::new(),
+            joints_mats: joint_arr,
+            joints_inverse_bind_mats: joint_arr,
+            vertex_buffers: None
+        }
+    }
     pub fn from_gltf(
         path: &str,
         render: Option<&RenderManager>,

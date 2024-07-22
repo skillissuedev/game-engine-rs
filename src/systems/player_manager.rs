@@ -9,6 +9,7 @@ use crate::{
     },
     objects::Object,
 };
+use glam::Vec3;
 use winit::keyboard::KeyCode;
 
 pub struct PlayerManager {
@@ -53,7 +54,7 @@ impl System for PlayerManager {
     fn server_start(&mut self, _: &mut Framework) {}
 
     fn client_update(&mut self, framework: &mut Framework) {
-        /*//dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
+        //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         let camera_position;
         let delta_time = framework.delta_time();
         {
@@ -130,8 +131,6 @@ impl System for PlayerManager {
             let rot = render.get_camera_rotation();
             render.set_camera_rotation(Vec3::new(-89.0, rot.y, rot.z));
         }
-        //println!("{}", get_camera_position());
-        */
     }
 
     fn server_update(&mut self, _: &mut Framework) {}

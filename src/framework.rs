@@ -170,7 +170,6 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                     render.draw();
                                 }
 
-                                //println!("render!");
                                 systems::shadow_render(
                                     framework.render.as_mut().unwrap(),
                                     &framework.assets,
@@ -181,7 +180,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                     &framework.assets,
                                     &CurrentCascade::Furthest,
                                 );
-                                systems::render(&mut framework); // Don't mind me, beautiful Rust code going on here
+                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
 
                                 {
                                     let render = framework.render.as_mut().unwrap();
@@ -277,12 +276,13 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
+    /*
     // Render to the closest cascade
     systems::render(framework);
     // Render to the furthest cascade
     systems::render(framework);
     // Render normally
-    systems::render(framework);
+    systems::render(framework);*/
     framework.navigation.create_grids();
     if let Some(render) = &mut framework.render {
         render.finish_render();

@@ -2,7 +2,7 @@ use winit::keyboard::KeyCode;
 
 use crate::{
     framework::{DebugMode, Framework},
-    managers::{input::InputEventType, scripting::lua::LuaSystem, systems::add_system},
+    managers::{input::InputEventType, networking, scripting::lua::LuaSystem, systems::add_system}, systems::player_manager::PlayerManager,
     //systems::player_manager::PlayerManager,
 };
 
@@ -11,18 +11,21 @@ pub fn start(framework: &mut Framework) {
         "debug_toggle",
         vec![InputEventType::Key(KeyCode::Backquote)],
     );
-    framework
-        .preload_texture_asset("default".into(), "textures/default_texture.png")
-        .expect("Failed to load the default texture!");
+    if networking::is_server() == false {
+        framework
+            .preload_texture_asset("default".into(), "textures/default_texture.png")
+            .expect("Failed to load the default texture!");
+    }
 
     //add_system(Box::new(TestSystem::new()));
-    //add_system(Box::new(PlayerManager::new()), framework);
+    add_system(Box::new(PlayerManager::new()), framework);
     //add_system(Box::new(WorldGenerator::new()));
+    //add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("vanila_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);
+
     add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()), framework);
-    /*add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("world_generator", "scripts/lua/world_generation.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("tile1", "scripts/lua/tile1.lua").unwrap()), framework);
-    add_system(Box::new(LuaSystem::new("vanila_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);*/
 }
 
 pub fn update(framework: &mut Framework) {

@@ -1,13 +1,14 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::ModelAsset, framework::{DebugMode, Framework}, managers::{
-        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{CallList, SystemValue}
-    }, systems::System
+    assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
+        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
+    }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
+use glam::Vec3;
 use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, fs, ptr::addr_of_mut};
+use std::{collections::HashMap, fs};
 
 static mut SYSTEMS_LUA_VMS: Lazy<HashMap<String, Lua>> = Lazy::new(|| HashMap::new()); // String is system's id and Lua is it's vm
 
@@ -26,8 +27,8 @@ impl LuaSystem {
                     Ok(lua) => lua,
                     Err(err) => {
                         debugger::error(&format!(
-                            "lua system creation error!\nlua creation error\nerror: {}",
-                            err
+                                "lua system creation error!\nlua creation error\nerror: {}",
+                                err
                         ));
                         return Err(LuaSystemError::ScriptLoadingError);
                     }
@@ -49,8 +50,8 @@ impl LuaSystem {
                     }
                     Err(err) => {
                         debugger::error(&format!(
-                            "lua system creation error!\nlua execution error\nerror: {}",
-                            err
+                                "lua system creation error!\nlua execution error\nerror: {}",
+                                err
                         ));
                         Err(LuaSystemError::ScriptLoadingError)
                     }
@@ -106,6 +107,7 @@ impl System for LuaSystem {
     }
 
     fn server_render(&mut self) {
+        /*
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
@@ -113,6 +115,8 @@ impl System for LuaSystem {
             }
             None => debugger::error("lua system server_render function error\ncan't get lua vm reference"),
         }
+        do nothing lol
+        */
     }
 
     fn client_render(&mut self) {
@@ -132,16 +136,16 @@ impl System for LuaSystem {
                 let _ = call_lua_function(self.system_id(), &lua, "call", None);
             }
             None => debugger::error(&format!(
-                "lua system call function error(call_id: {})\ncan't get lua vm reference",
-                call_id
+                    "lua system call function error(call_id: {})\ncan't get lua vm reference",
+                    call_id
             )),
         }
     }
 
     fn call_mut(&mut self, call_id: &str) {
         debugger::warn(&format!(
-            "lua system {} warning when calling {}\nyou can just use call, instead of call_mut",
-            self.id, call_id
+                "lua system {} warning when calling {}\nyou can just use call, instead of call_mut",
+                self.id, call_id
         ));
 
         self.call(call_id);
@@ -179,18 +183,31 @@ impl System for LuaSystem {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let function_result: Result<Function, mlua::Error> = lua.globals().get("reg_message");
+                let scope = lua.scope(|scope| {
+                    let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
+                    let framework = unsafe { &mut *framework_ptr };
+                    let framework_userdata = scope.create_userdata_ref_mut(framework);
 
-                match function_result {
-                    Ok(func) => {
-                        let call_result: Result<(), mlua::Error> = Function::call(&func, message);
-                        if let Err(err) = call_result {
-                            debugger::error(&format!(
-                                "lua error when calling reg_message in system {}\nerror: {}", self.system_id(), err
-                            ));
+                    let function_result: Result<Function, mlua::Error> = lua.globals().get("reg_message");
+
+                    match function_result {
+                        Ok(func) => {
+                            let call_result: Result<(), mlua::Error> = Function::call(&func, (message, framework_userdata));
+                            if let Err(err) = call_result {
+                                debugger::error(
+                                    &format!(
+                                        "lua error when calling reg_message in system {}\nerror: {}", self.system_id(), err
+                                    )
+                                );
+                            }
                         }
+                        Err(err) => debugger::error(&format!("can't get function reg_message in lua system {}\nerror: {}", self.system_id(), err)),
                     }
-                    Err(err) => debugger::error(&format!("can't get function reg_message in lua system {}\nerror: {}", self.system_id(), err)),
+
+                    Ok(())
+                });
+                if let Err(err) = scope {
+                    debugger::error(&format!("reg_message function error!\nFailed to create Lua scope! Err: {}", err));
                 }
             }
             None => debugger::error("lua system reg_message function error\ncan't get lua vm reference"),
@@ -287,16 +304,16 @@ fn call_lua_function(system_id: &str, lua: &Lua, function_name: &str, framework:
 
                     if let Err(err) = call_result {
                         debugger::error(&format!(
-                            "lua error when calling '{}' in system {}\nerror: {}",
-                            function_name, system_id, err
+                                "lua error when calling '{}' in system {}\nerror: {}",
+                                function_name, system_id, err
                         ));
                         return Err(err);
                     }
                 }
                 Err(err) => {
                     debugger::error(&format!(
-                        "can't get function '{}' in lua system {}\nerror: {}",
-                        function_name, system_id, err
+                            "can't get function '{}' in lua system {}\nerror: {}",
+                            function_name, system_id, err
                     ));
                 }
             }
@@ -314,10 +331,10 @@ pub enum LuaSystemError {
 }
 
 /*#[derive(Debug, Clone)]
-pub struct LuaObjectHandle {
-    pub object_name: String,
-    pub owner_system_name: String
-}*/
+  pub struct LuaObjectHandle {
+  pub object_name: String,
+  pub owner_system_name: String
+  }*/
 
 pub struct ObjectHandle {
     pub system_id: String,
@@ -328,7 +345,6 @@ impl UserData for ObjectHandle {
     fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(_: &mut F) {}
 
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        /*
         // methods that work for all objects:
         methods.add_method("children_list", |_, this, (): ()| {
             match systems::get_system_mut_with_id(&this.system_id) {
@@ -378,8 +394,8 @@ impl UserData for ObjectHandle {
                         },
                     },
                     None => debugger::error(&format!(
-                        "lua error: object_type failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: object_type failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
@@ -395,13 +411,13 @@ impl UserData for ObjectHandle {
                         this.name = name;
                     }
                     None => debugger::error(&format!(
-                        "lua error: set_name failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: set_name failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: set_name failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: set_name failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -416,13 +432,13 @@ impl UserData for ObjectHandle {
                         return Ok(transform.position.to_array());
                     }
                     None => debugger::error(&format!(
-                        "lua error: get_position failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: get_position failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: get_position failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: get_position failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -437,13 +453,13 @@ impl UserData for ObjectHandle {
                         return Ok(transform.rotation.to_array());
                     }
                     None => debugger::error(&format!(
-                        "lua error: get_rotation failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: get_rotation failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: get_rotation failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: get_rotation failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -458,13 +474,13 @@ impl UserData for ObjectHandle {
                         return Ok(transform.scale.to_array());
                     }
                     None => debugger::error(&format!(
-                        "lua error: get_scale failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: get_scale failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: get_scale failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: get_scale failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -479,13 +495,13 @@ impl UserData for ObjectHandle {
                         return Ok(transform.position.to_array());
                     }
                     None => debugger::error(&format!(
-                        "lua error: get_global_position failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: get_global_position failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: get_global_position failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: get_global_position failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -500,13 +516,13 @@ impl UserData for ObjectHandle {
                         return Ok(transform.rotation.to_array());
                     }
                     None => debugger::error(&format!(
-                        "lua error: get_global_rotation failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: get_global_rotation failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: get_global_rotation failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: get_global_rotation failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -521,13 +537,13 @@ impl UserData for ObjectHandle {
                         return Ok(transform.scale.to_array());
                     }
                     None => debugger::error(&format!(
-                        "lua error: get_global_scale failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: get_global_scale failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: get_global_scale failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: get_global_scale failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -537,17 +553,20 @@ impl UserData for ObjectHandle {
         methods.add_method(
             "set_position",
             |_, this, (x, y, z, set_body_position): (f32, f32, f32, bool)| {
+                let framework = &mut *get_framework_pointer();
                 match systems::get_system_mut_with_id(&this.system_id) {
                     Some(system) => match system.find_object_mut(&this.name) {
-                        Some(object) => object.set_position(Vec3::new(x, y, z), set_body_position),
-                        None => debugger::error(&format!(
-                            "lua error: set_position failed! failed to get object {} in system {}",
-                            this.name, this.system_id
-                        )),
+                        Some(object) => object.set_position(framework, Vec3::new(x, y, z), set_body_position),
+                        None => debugger::error(
+                            &format!(
+                                "lua error: set_position failed! failed to get object {} in system {}",
+                                this.name, this.system_id
+                            )
+                        ),
                     },
                     None => debugger::error(&format!(
-                        "lua error: set_position failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: set_position failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
@@ -558,17 +577,18 @@ impl UserData for ObjectHandle {
         methods.add_method(
             "set_rotation",
             |_, this, (x, y, z, set_body_rotation): (f32, f32, f32, bool)| {
+                let framework = &mut *get_framework_pointer();
                 match systems::get_system_mut_with_id(&this.system_id) {
                     Some(system) => match system.find_object_mut(&this.name) {
-                        Some(object) => object.set_rotation(Vec3::new(x, y, z), set_body_rotation),
+                        Some(object) => object.set_rotation(framework, Vec3::new(x, y, z), set_body_rotation),
                         None => debugger::error(&format!(
-                            "lua error: set_rotation failed! failed to get object {} in system {}",
-                            this.name, this.system_id
+                                "lua error: set_rotation failed! failed to get object {} in system {}",
+                                this.name, this.system_id
                         )),
                     },
                     None => debugger::error(&format!(
-                        "lua error: set_rotation failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: set_rotation failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
@@ -581,13 +601,13 @@ impl UserData for ObjectHandle {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => object.set_scale(Vec3::new(x, y, z)),
                     None => debugger::error(&format!(
-                        "lua error: set_scale failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: set_scale failed! failed to get object {} in system {}",
+                            this.name, this.system_id
                     )),
                 },
                 None => debugger::error(&format!(
-                    "lua error: set_scale failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
+                        "lua error: set_scale failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
                 )),
             }
 
@@ -603,51 +623,52 @@ impl UserData for ObjectHandle {
         // * = optional
         methods.add_method("build_object_rigid_body", |_, this, 
             (body_type, body_collider_type, render_collider_type, collider_size_x, collider_size_y, collider_size_z, 
-            mass, membership_bits, filter_bits): (String, String, String, f32, f32, f32, f32, Option<u32>, Option<u32>)| {
-            //body_type: Option<BodyType>,
-            //custom_render_collider: Option<RenderColliderType>,
-            //mass: f32,
-            //membership_groups: Option<CollisionGroups>,
-            //filter_groups: Option<CollisionGroups>,
+             mass, membership_bits, filter_bits): (String, String, String, f32, f32, f32, f32, Option<u32>, Option<u32>)| {
+                //body_type: Option<BodyType>,
+                //custom_render_collider: Option<RenderColliderType>,
+                //mass: f32,
+                //membership_groups: Option<CollisionGroups>,
+                //filter_groups: Option<CollisionGroups>,
 
-            match systems::get_system_mut_with_id(&this.system_id) {
-                Some(system) => match system.find_object_mut(&this.name) {
-                    Some(object) => {
-                        let body_collider_type = match body_collider_type.as_str() {
-                            "None" => None,
-                            "Cuboid" => Some(BodyColliderType::Cuboid(collider_size_x, collider_size_y, collider_size_z)),
-                            "Capsule" => Some(BodyColliderType::Capsule(collider_size_x, collider_size_y)),
-                            "Cylinder" => Some(BodyColliderType::Cylinder(collider_size_x, collider_size_y)),
-                            "Ball" => Some(BodyColliderType::Ball(collider_size_x)),
-                            _ => {
-                                debugger::error(&format!(
-                                    "lua error: build_object_rigid_body failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
-                                    this.name, this.system_id
-                                ));
-                                None
-                            },
-                        };
+                let framework = &mut *get_framework_pointer();
+                match systems::get_system_mut_with_id(&this.system_id) {
+                    Some(system) => match system.find_object_mut(&this.name) {
+                        Some(object) => {
+                            let body_collider_type = match body_collider_type.as_str() {
+                                "None" => None,
+                                "Cuboid" => Some(BodyColliderType::Cuboid(collider_size_x, collider_size_y, collider_size_z)),
+                                "Capsule" => Some(BodyColliderType::Capsule(collider_size_x, collider_size_y)),
+                                "Cylinder" => Some(BodyColliderType::Cylinder(collider_size_x, collider_size_y)),
+                                "Ball" => Some(BodyColliderType::Ball(collider_size_x)),
+                                _ => {
+                                    debugger::error(&format!(
+                                            "lua error: build_object_rigid_body failed! the body_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
+                                            this.name, this.system_id
+                                    ));
+                                    None
+                                },
+                            };
 
-                        let (render_collider_type, body_type, membership, filter) =
-                            lua_body_render_colliders_and_groups_to_rust(this.name.clone(), this.system_id.clone(), 
-                                body_collider_type, body_type, render_collider_type, collider_size_x, collider_size_y, 
-                                collider_size_z, membership_bits, filter_bits);
+                            let (render_collider_type, body_type, membership, filter) =
+                                lua_body_render_colliders_and_groups_to_rust(this.name.clone(), this.system_id.clone(), 
+                                    body_collider_type, body_type, render_collider_type, collider_size_x, collider_size_y, 
+                                    collider_size_z, membership_bits, filter_bits);
 
-                        object.build_object_rigid_body(body_type, render_collider_type, mass, membership, filter);
+                            object.build_object_rigid_body(framework, body_type, render_collider_type, mass, membership, filter);
+                        },
+                        None => debugger::error(&format!(
+                                "lua error: build_object_rigid_body failed! failed to get object {} in system {}",
+                                this.name, this.system_id
+                        )),
                     },
                     None => debugger::error(&format!(
-                        "lua error: build_object_rigid_body failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: build_object_rigid_body failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
-                },
-                None => debugger::error(&format!(
-                    "lua error: build_object_rigid_body failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
-                )),
-            }
+                }
 
-            Ok(())
-        });
+                Ok(())
+            });
 
         // body_type = "None"/"Fixed"/""/"Ball"/"Cylinder"
         // model_path - path to the GLTF model
@@ -657,51 +678,57 @@ impl UserData for ObjectHandle {
         // membership_bits* - bitmask of object collider membership, filter_bits* - bitmask of stuff collider can interact with
         // * = optional
         methods.add_method("build_object_triangle_mesh_rigid_body", |_, this, 
-            (body_type, model_path, render_collider_type, collider_size_x, collider_size_y, collider_size_z, 
-            mass, membership_bits, filter_bits): (String, String, String, f32, f32, f32, f32, Option<u32>, Option<u32>)| {
-            //body_type: Option<BodyType>,
-            //custom_render_collider: Option<RenderColliderType>,
-            //mass: f32,
-            //membership_groups: Option<CollisionGroups>,
-            //filter_groups: Option<CollisionGroups>,
+            (body_type, model_id, render_collider_type, collider_size_x, collider_size_y, collider_size_z, 
+             mass, membership_bits, filter_bits): (String, String, String, f32, f32, f32, f32, Option<u32>, Option<u32>)| {
+                //body_type: Option<BodyType>,
+                //custom_render_collider: Option<RenderColliderType>,
+                //mass: f32,
+                //membership_groups: Option<CollisionGroups>,
+                //filter_groups: Option<CollisionGroups>,
 
-            match systems::get_system_mut_with_id(&this.system_id) {
-                Some(system) => match system.find_object_mut(&this.name) {
-                    Some(object) => {
-                        let model_asset = ModelAsset::from_gltf(&model_path);
-                        match model_asset {
-                            Ok(model_asset) => {
-                                let body_collider = Some(BodyColliderType::TriangleMesh(model_asset));
-
-                                let (render_collider_type, body_type, membership, filter) =
-                                    lua_body_render_colliders_and_groups_to_rust(this.name.clone(), this.system_id.clone(), 
-                                        body_collider, body_type, render_collider_type, collider_size_x, collider_size_y, 
-                                        collider_size_z, membership_bits, filter_bits);
-
-                                object.build_object_rigid_body(body_type, render_collider_type, mass, membership, filter);
-                            },
-                            Err(err) => {
-                                debugger::error(&format!(
-                                    "lua error: build_object_trimesh_rigid_body failed! failed to load a ModelAsset\nerr: {:?}\nobject: {}; system: {}",
-                                    err, this.name, this.system_id
-                                ));
-                                return Ok(());
+                let framework = &mut *get_framework_pointer();
+                match systems::get_system_mut_with_id(&this.system_id) {
+                    Some(system) => match system.find_object_mut(&this.name) {
+                        Some(object) => {
+                            let model_asset_id = framework.get_model_asset(&model_id);
+                            let model_asset;// 
+                            match model_asset_id {
+                                Some(model_asset_id) => model_asset = framework.assets.get_model_asset(&model_asset_id),
+                                None => {
+                                    debugger::error(&format!("Lua error: build_object_triangle_mesh_rigid_body failed!\nFailed to get preloaded model asset with id {}", model_id));
+                                    return Ok(())
+                                },
                             }
-                        }
+
+                            match model_asset {
+                                Some(model_asset) => {
+                                    let body_collider = Some(BodyColliderType::TriangleMesh(ModelAsset::clone_for_collider(model_asset)));
+
+                                    let (render_collider_type, body_type, membership, filter) =
+                                        lua_body_render_colliders_and_groups_to_rust(this.name.clone(), this.system_id.clone(), 
+                                            body_collider, body_type, render_collider_type, collider_size_x, collider_size_y, 
+                                            collider_size_z, membership_bits, filter_bits);
+
+                                    object.build_object_rigid_body(framework, body_type, render_collider_type, mass, membership, filter);
+                                },
+                                None => {
+                                    return Ok(());
+                                }
+                            }
+                        },
+                        None => debugger::error(&format!(
+                                "lua error: build_object_rigid_body failed! failed to get object {} in system {}",
+                                this.name, this.system_id
+                        )),
                     },
                     None => debugger::error(&format!(
-                            "lua error: build_object_rigid_body failed! failed to get object {} in system {}",
-                        this.name, this.system_id
+                            "lua error: build_object_rigid_body failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
-                },
-                None => debugger::error(&format!(
-                    "lua error: build_object_rigid_body failed! failed to get system {} to find object {}",
-                    this.system_id, this.name
-                )),
-            }
+                }
 
-            Ok(())
-        });
+                Ok(())
+            });
 
         methods.add_method(
             "object_id",
@@ -716,8 +743,8 @@ impl UserData for ObjectHandle {
                         },
                     },
                     None => debugger::error(&format!(
-                        "lua error: object_id failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: object_id failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
@@ -744,14 +771,14 @@ impl UserData for ObjectHandle {
                         },
                     },
                     None => debugger::error(&format!(
-                        "lua error: groups_list failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: groups_list failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
                 Ok(None)
             },
-        );
+            );
 
         methods.add_method(
             "find_object",
@@ -776,14 +803,14 @@ impl UserData for ObjectHandle {
                         },
                     },
                     None => debugger::error(&format!(
-                        "lua error: find_object failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: find_object failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
                 Ok(None)
             },
-        );
+            );
 
         methods.add_method(
             "add_to_group",
@@ -799,14 +826,14 @@ impl UserData for ObjectHandle {
                         },
                     },
                     None => debugger::error(&format!(
-                        "lua error: add_to_group failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: add_to_group failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
                 Ok(())
             },
-        );
+            );
 
         methods.add_method(
             "remove_from_group",
@@ -822,27 +849,28 @@ impl UserData for ObjectHandle {
                         },
                     },
                     None => debugger::error(&format!(
-                        "lua error: remove_from_group failed! failed to get system {} to find object {}",
-                        this.system_id, this.name
+                            "lua error: remove_from_group failed! failed to get system {} to find object {}",
+                            this.system_id, this.name
                     )),
                 }
 
                 Ok(())
             },
-        );
+            );
 
 
         // object-specific methods:
         methods.add_method("play_animation", |_, this, anim_name: String| {
+            let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
                         match object.downcast_mut::<ModelObject>() {
                             Some(object) => {
-                                if let Err(err) = object.play_animation(&anim_name) {
+                                if let Err(err) = object.play_animation(&anim_name, framework) {
                                     debugger::error(
                                         &format!("lua error(system {}): play_animation failed! error in ModelObject '{}': {:?}", 
-                                           this.system_id, this.name, err));
+                                            this.system_id, this.name, err));
                                 }
                             },
                             None => {
@@ -867,12 +895,13 @@ impl UserData for ObjectHandle {
         });
 
         methods.add_method("intersection_position", |_, this, _: ()| {
+            let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
                         return match object.downcast_mut::<Ray>() {
                             Some(object) => {
-                                return match object.intersection_position() {
+                                return match object.intersection_position(&framework.physics) {
                                     Some(pos) => Ok(Some([pos.x, pos.y, pos.z])),
                                     None => Ok(None),
                                 }
@@ -900,20 +929,21 @@ impl UserData for ObjectHandle {
         });
 
         methods.add_method("is_intersecting", |_, this, _: ()| {
+            let framework = unsafe { &mut *get_framework_pointer() };
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
                         return match object.downcast_mut::<Ray>() {
                             Some(object) => {
-                                Ok(object.is_intersecting())
+                                Ok(object.is_intersecting(&framework.physics))
                             },
                             None => {
                                 match object.downcast_mut::<Trigger>() {
-                                    Some(object) => Ok(object.is_intersecting()),
+                                    Some(object) => Ok(object.is_intersecting(&framework.physics)),
                                     None => {
                                         debugger::error(
                                             &format!("lua error(system {}): is_intersecting failed in object: {}. this object is neither Ray nor Trigger!",
-                                                this.system_id, this.name));
+                                            this.system_id, this.name));
                                         Ok(false)
                                     },
                                 }
@@ -935,12 +965,13 @@ impl UserData for ObjectHandle {
         });
 
         methods.add_method("is_intersecting_with_group", |_, this, group: String| {
+            let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
                         return match object.downcast_mut::<Trigger>() {
                             Some(object) => {
-                                Ok(object.is_intersecting_with_group(group.into()))
+                                Ok(object.is_intersecting_with_group(&framework.physics, group.into()))
                             },
                             None => {
                                 debugger::error(
@@ -1102,7 +1133,7 @@ impl UserData for ObjectHandle {
                             None => {
                                 debugger::error(
                                     &format!("lua error(system {}): set_max_distance failed in object: {}. this object is not SoundEmitter!",
-                                        this.system_id, this.name));
+                                    this.system_id, this.name));
                             },
                         }
                     }
@@ -1134,7 +1165,7 @@ impl UserData for ObjectHandle {
                             None => {
                                 debugger::error(
                                     &format!("lua error(system {}): get_max_distance failed in object: {}. this object is not SoundEmitter!",
-                                        this.system_id, this.name));
+                                    this.system_id, this.name));
                             },
                         }
                     }
@@ -1153,15 +1184,16 @@ impl UserData for ObjectHandle {
         });
 
         methods.add_method("move_controller", |_, this, (x, y, z): (f32, f32, f32)| {
+            let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
                         match object.downcast_mut::<CharacterController>() {
-                            Some(object) => object.move_controller(Vec3::new(x, y, z)),
+                            Some(object) => object.move_controller(framework, Vec3::new(x, y, z)),
                             None => {
                                 debugger::error(
                                     &format!("lua error(system {}): move_controller failed in object: {}. this object is not CharacterController!",
-                                        this.system_id, this.name));
+                                    this.system_id, this.name));
                             },
                         }
                     }
@@ -1188,7 +1220,7 @@ impl UserData for ObjectHandle {
                             None => {
                                 debugger::error(
                                     &format!("lua error(system {}): walk_to failed in object: {}. this object is not CharacterController!",
-                                        this.system_id, this.name));
+                                    this.system_id, this.name));
                             },
                         }
                     }
@@ -1206,7 +1238,6 @@ impl UserData for ObjectHandle {
             Ok(())
         });
         // i could've used a macro
-        */
     }
 }
 
@@ -1219,46 +1250,46 @@ impl UserData for ObjectHandle {
 // * = optional
 fn lua_body_render_colliders_and_groups_to_rust(object_name: String, object_system_id: String, body_collider: Option<BodyColliderType>, body_type: String, render_collider_type: String, collider_size_x: f32, collider_size_y: f32, collider_size_z: f32, membership_bits: Option<u32>, filter_bits: Option<u32>) 
     -> (Option<RenderColliderType>, Option<BodyType>, Option<CollisionGroups>, Option<CollisionGroups>) {
-    let render_collider_type = match render_collider_type.as_str() {
-        "None" => None,
-        "Cuboid" => Some(RenderColliderType::Cuboid(None, None, collider_size_x, collider_size_y, collider_size_z, false)),
-        "Capsule" => Some(RenderColliderType::Capsule(None, None, collider_size_x, collider_size_y, false)),
-        "Cylinder" => Some(RenderColliderType::Cylinder(None, None, collider_size_x, collider_size_y, false)),
-        "Ball" => Some(RenderColliderType::Ball(None, None, collider_size_x, false)),
-        _ => {
-            debugger::error(&format!(
-                "lua error: build_object_rigid_body failed! the render_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
-                object_name, object_system_id
-            ));
-            None
-        },
-    };
-    let body_type = match body_type.as_str() {
-        "None" => None,
-        "Fixed" => Some(BodyType::Fixed(body_collider)),
-        "Dynamic" => Some(BodyType::Dynamic(body_collider)),
-        "VelocityKinematic" => Some(BodyType::VelocityKinematic(body_collider)),
-        "PositionKinematic" => Some(BodyType::PositionKinematic(body_collider)),
-        _ => {
-            debugger::error(&format!(
-                "lua error: build_object_rigid_body failed! the body_type argument is wrong, possible values are 'None', 'Fixed', 'Dynamic', 'VelocityKinematic', 'PositionKinematic'; object: {}; system: {}",
-                object_name, object_system_id
-            ));
-            None
-        },
-    };
+        let render_collider_type = match render_collider_type.as_str() {
+            "None" => None,
+            "Cuboid" => Some(RenderColliderType::Cuboid(None, None, collider_size_x, collider_size_y, collider_size_z, false)),
+            "Capsule" => Some(RenderColliderType::Capsule(None, None, collider_size_x, collider_size_y, false)),
+            "Cylinder" => Some(RenderColliderType::Cylinder(None, None, collider_size_x, collider_size_y, false)),
+            "Ball" => Some(RenderColliderType::Ball(None, None, collider_size_x, false)),
+            _ => {
+                debugger::error(&format!(
+                        "lua error: build_object_rigid_body failed! the render_collider_type argument is wrong, possible values are 'None', 'Cuboid', 'Capsule', 'Cylinder', 'Ball'; object: {}; system: {}",
+                        object_name, object_system_id
+                ));
+                None
+            },
+        };
+        let body_type = match body_type.as_str() {
+            "None" => None,
+            "Fixed" => Some(BodyType::Fixed(body_collider)),
+            "Dynamic" => Some(BodyType::Dynamic(body_collider)),
+            "VelocityKinematic" => Some(BodyType::VelocityKinematic(body_collider)),
+            "PositionKinematic" => Some(BodyType::PositionKinematic(body_collider)),
+            _ => {
+                debugger::error(&format!(
+                        "lua error: build_object_rigid_body failed! the body_type argument is wrong, possible values are 'None', 'Fixed', 'Dynamic', 'VelocityKinematic', 'PositionKinematic'; object: {}; system: {}",
+                        object_name, object_system_id
+                ));
+                None
+            },
+        };
 
-    let membership = match membership_bits {
-        Some(bits) => Some(CollisionGroups::from(bits)),
-        None => None,
-    };
+        let membership = match membership_bits {
+            Some(bits) => Some(CollisionGroups::from(bits)),
+            None => None,
+        };
 
-    let filter = match filter_bits {
-        Some(bits) => Some(CollisionGroups::from(bits)),
-        None => None,
-    };
+        let filter = match filter_bits {
+            Some(bits) => Some(CollisionGroups::from(bits)),
+            None => None,
+        };
 
-    (render_collider_type, body_type, membership, filter)
+        (render_collider_type, body_type, membership, filter)
 }
 
 impl UserData for Message {
@@ -1435,7 +1466,7 @@ impl UserData for Framework {
 
         methods.add_method_mut("load_save",
             |_, framework, save_name: String| {
-                framework.load_save(&save_name);
+                let _ = framework.load_save(&save_name);
                 Ok(())
             }
         );
@@ -1456,7 +1487,7 @@ impl UserData for Framework {
 
         methods.add_method_mut("new_save",
             |_, framework, save_name: String| {
-                framework.new_save(&save_name);
+                let _ = framework.new_save(&save_name);
                 Ok(())
             }
         );
@@ -1565,92 +1596,92 @@ impl UserData for Framework {
         );
     }
 }
-    /*
-    pub fn new_character_controller_object(
-        &mut self,
-        name: &str,
-        shape: physics::BodyColliderType,
-        membership_groups: Option<CollisionGroups>,
-        mask: Option<CollisionGroups>,
-    ) -> CharacterController {
-        CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
-    }
+/*
+   pub fn new_character_controller_object(
+   &mut self,
+   name: &str,
+   shape: physics::BodyColliderType,
+   membership_groups: Option<CollisionGroups>,
+   mask: Option<CollisionGroups>,
+   ) -> CharacterController {
+   CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
+   }
 
-    pub fn new_empty_object(
-        &mut self,
-        name: &str,
-    ) -> EmptyObject {
-        EmptyObject::new(name)
-    }
+   pub fn new_empty_object(
+   &mut self,
+   name: &str,
+   ) -> EmptyObject {
+   EmptyObject::new(name)
+   }
 
-    pub fn new_instanced_model_object(
-        &mut self,
-        name: &str,
-        instance: &str,
-    ) -> InstancedModelObject {
-        InstancedModelObject::new(name, instance)
-    }
+   pub fn new_instanced_model_object(
+   &mut self,
+   name: &str,
+   instance: &str,
+   ) -> InstancedModelObject {
+   InstancedModelObject::new(name, instance)
+   }
 
-    pub fn new_instanced_model_transform_holder(
-        &mut self,
-        name: &str,
-        instance: &str,
-        transforms: Vec<Transform>
-    ) -> InstancedModelTransformHolder {
-        InstancedModelTransformHolder::new(name, instance, transforms)
-    }
+   pub fn new_instanced_model_transform_holder(
+   &mut self,
+   name: &str,
+   instance: &str,
+   transforms: Vec<Transform>
+   ) -> InstancedModelTransformHolder {
+   InstancedModelTransformHolder::new(name, instance, transforms)
+   }
 
-    pub fn new_master_instanced_model_object(
-        &mut self,
-        name: &str,
-        model_asset_id: ModelAssetId,
-        texture_asset_id: Option<TextureAssetId>,
-        shader_asset: ShaderAsset,
-    ) -> MasterInstancedModelObject {
-        MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
-    }
+   pub fn new_master_instanced_model_object(
+   &mut self,
+   name: &str,
+   model_asset_id: ModelAssetId,
+   texture_asset_id: Option<TextureAssetId>,
+   shader_asset: ShaderAsset,
+   ) -> MasterInstancedModelObject {
+   MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+   }
 
-    pub fn new_model_object(
-        &mut self,
-        name: &str,
-        model_asset_id: ModelAssetId,
-        texture_asset_id: Option<TextureAssetId>,
-        shader_asset: ShaderAsset,
-    ) -> ModelObject {
-        ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
-    }
+   pub fn new_model_object(
+   &mut self,
+   name: &str,
+   model_asset_id: ModelAssetId,
+   texture_asset_id: Option<TextureAssetId>,
+   shader_asset: ShaderAsset,
+   ) -> ModelObject {
+   ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+   }
 
-    pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {
-        NavObstacle::new(name, size)
-    }
+   pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {
+   NavObstacle::new(name, size)
+   }
 
-    pub fn new_navigation_ground(&mut self, name: &str, size: Vec3) -> NavigationGround {
-        NavigationGround::new(name, Vec2::new(size.x, size.z))
-    }
+   pub fn new_navigation_ground(&mut self, name: &str, size: Vec3) -> NavigationGround {
+   NavigationGround::new(name, Vec2::new(size.x, size.z))
+   }
 
-    pub fn new_ray(&mut self, name: &str, direction: Vec3, mask: Option<CollisionGroups>) -> Ray {
-        Ray::new(name, direction, mask)
-    }
+   pub fn new_ray(&mut self, name: &str, direction: Vec3, mask: Option<CollisionGroups>) -> Ray {
+   Ray::new(name, direction, mask)
+   }
 
-    pub fn new_sound_emitter(&mut self, name: &str, asset_id: SoundAssetId, is_positional: bool) -> SoundEmitter {
-        let emitter_type = match is_positional {
-            true => SoundSourceType::Positional,
-            false => SoundSourceType::Simple,
-        };
+   pub fn new_sound_emitter(&mut self, name: &str, asset_id: SoundAssetId, is_positional: bool) -> SoundEmitter {
+   let emitter_type = match is_positional {
+   true => SoundSourceType::Positional,
+   false => SoundSourceType::Simple,
+};
 
-        SoundEmitter::new(name, self, asset_id, emitter_type)
-    }
+SoundEmitter::new(name, self, asset_id, emitter_type)
+   }
 
-    pub fn new_trigger(
-        &mut self, 
-        name: &str,
-        membership_group: Option<CollisionGroups>,
-        mask: Option<CollisionGroups>,
-        collider: BodyColliderType,
-    ) -> Trigger {
-        Trigger::new(&mut self.physics, name, membership_group, mask, collider)
-    }
-    */
+pub fn new_trigger(
+    &mut self, 
+    name: &str,
+    membership_group: Option<CollisionGroups>,
+    mask: Option<CollisionGroups>,
+    collider: BodyColliderType,
+) -> Trigger {
+    Trigger::new(&mut self.physics, name, membership_group, mask, collider)
+}
+*/
 
 impl UserData for Box<dyn Object> { }
 
@@ -1699,41 +1730,46 @@ impl<'lua> FromLuaMulti<'lua> for Framework {
 }
 
 /*
-impl<'lua> IntoLua<'lua> for Framework {
-    fn into_lua(self, lua: &'lua Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
-        match lua.create_userdata(self) {
-            Ok(userdata) => {
-                let lua_value = userdata.into_lua_multi(lua);
-                match lua_value {
-                    Ok(lua_value) => Ok(lua_value),
-                    Err(err) => {
-                        debugger::error(
-                            &format!(
-                                "Lua error! Failed to convert Framework into a Lua value. Can't convert userdata to a LuaMultiValue\nErr: {}",
-                                err
-                            )
-                        );
-                        mlua::prelude::LuaResult::Err(Error::ToLuaConversionError {
-                            from: "-",
-                            to: "Framework",
-                            message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
-                        })
-                    },
-                }
-            },
-            Err(err) => {
-                debugger::error(
-                    &format!(
-                        "Lua error! Failed to convert Framework into a Lua value. Can't create userdata from Framework.\nErr: {}",
-                        err
-                    )
-                );
-                mlua::prelude::LuaResult::Err(Error::ToLuaConversionError { 
-                    from: "-",
-                    to: "Framework",
-                    message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
-                })
-            },
-        }
-    }
-}*/
+   impl<'lua> IntoLua<'lua> for Framework {
+   fn into_lua(self, lua: &'lua Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
+   match lua.create_userdata(self) {
+   Ok(userdata) => {
+   let lua_value = userdata.into_lua_multi(lua);
+   match lua_value {
+   Ok(lua_value) => Ok(lua_value),
+   Err(err) => {
+   debugger::error(
+   &format!(
+   "Lua error! Failed to convert Framework into a Lua value. Can't convert userdata to a LuaMultiValue\nErr: {}",
+   err
+   )
+   );
+   mlua::prelude::LuaResult::Err(Error::ToLuaConversionError {
+   from: "-",
+   to: "Framework",
+   message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
+   })
+   },
+   }
+   },
+   Err(err) => {
+   debugger::error(
+   &format!(
+   "Lua error! Failed to convert Framework into a Lua value. Can't create userdata from Framework.\nErr: {}",
+   err
+   )
+   );
+   mlua::prelude::LuaResult::Err(Error::ToLuaConversionError { 
+   from: "-",
+   to: "Framework",
+   message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
+   })
+   },
+   }
+   }
+   }*/
+fn get_framework_pointer() -> &'static mut Framework {
+    let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
+    let framework = unsafe { &mut *framework_ptr };
+    framework
+}

@@ -256,7 +256,7 @@ impl Object for ModelObject {
 
     fn render(&mut self, framework: &mut Framework) {
         let render = framework.render.as_mut().expect(
-            "wtf there are no display in a framework and it's still calling render() in a system?",
+            "wtf there is no display in a framework and it's still calling render() in a system?",
         );
 
         if self.error {
