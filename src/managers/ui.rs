@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, ComboBox, Context, Label, TextEdit, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ComboBox, Context, Label, ProgressBar, Slider, TextEdit, Ui, Window};
 use glam::{Vec2, Vec3};
 use crate::framework::{DebugMode, Framework};
 use super::{debugger, physics::RenderColliderType, systems};
@@ -9,12 +9,18 @@ pub struct UiManager {
     windows: HashMap<String, UiManagerWindow>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum WidgetData {
     Button(String),
     Label(String),
     Horizontal,
     Vertical,
+    SinglelineTextEdit(String),
+    MultilineTextEdit(String),
+    Checkbox(bool, String),
+    FloatSlider(f32, f32, f32),
+    IntSlider(i32, i32, i32),
+    ProgressBar(f32),
 }
 
 impl Default for WidgetData {
@@ -23,31 +29,37 @@ impl Default for WidgetData {
     }
 }
 
+#[derive(Clone, Default, Debug)]
+pub struct WidgetState {
+    pub left_clicked: bool,
+    pub right_clicked: bool,
+    pub double_clicked: bool,
+    pub hovered: bool,
+    pub dragged: bool,
+    pub changed: bool,
+}
+
+#[derive(Debug)]
 pub struct UiManagerWindow {
-    position: Vec2,
+    position: Option<Vec2>,
     size: Option<Vec2>,
     widgets: Vec<Widget>,
     transparent: bool
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Widget {
     id: String,
     size: Vec2,
     widget_data: WidgetData,
     children: Vec<Widget>,
-    left_clicked: bool,
-    right_clicked: bool,
-    double_clicked: bool,
-    hovered: bool,
-    dragged: bool,
-    changed: bool,
+    state: WidgetState,
 }
 
 impl UiManager {
     pub fn render(&mut self, ctx: &Context) {
         for (id, manager_window) in self.windows.iter_mut() {
-            let window = match manager_window.transparent {
+            let mut window = match manager_window.transparent {
                 true => {
                     Window::new(id)
                         .frame(egui::Frame::none())
@@ -57,6 +69,11 @@ impl UiManager {
                 },
                 false => Window::new(id),
             };
+
+            if let Some(position) = manager_window.position {
+                window = window.fixed_pos([position.x, position.y]);
+            }
+
             window.show(ctx, |ui| {
                 for widget in &mut manager_window.widgets {
                     Self::render_widget(ctx, ui, widget);
@@ -67,9 +84,9 @@ impl UiManager {
 
     fn render_widget(ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
-        let egui_widget = match &widget.widget_data {
-            WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents)),
-            WidgetData::Label(contents) => ui.add_sized(size, Label::new(contents)),
+        let egui_widget = match &mut widget.widget_data {
+            WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str())),
+            WidgetData::Label(contents) => ui.add_sized(size, Label::new(contents.as_str())),
             WidgetData::Horizontal => ui.horizontal(|ui| {
                 for widget in &mut widget.children {
                     Self::render_widget(ctx, ui, widget);
@@ -80,14 +97,52 @@ impl UiManager {
                     Self::render_widget(ctx, ui, widget);
                 }
             }).response,
+            WidgetData::SinglelineTextEdit(contents) => ui.add_sized(size, TextEdit::singleline(contents)),
+            WidgetData::MultilineTextEdit(contents) => ui.add_sized(size, TextEdit::multiline(contents)),
+            WidgetData::Checkbox(value, text) => ui.add_sized(size, Checkbox::new(value, text.as_str())),
+            WidgetData::FloatSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
+            WidgetData::IntSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
+            WidgetData::ProgressBar(value) => ui.add_sized(size, ProgressBar::new(*value)),
         };
 
-        widget.left_clicked = egui_widget.clicked();
-        widget.right_clicked = egui_widget.secondary_clicked();
-        widget.hovered = egui_widget.hovered();
-        widget.dragged = egui_widget.dragged();
-        widget.changed = egui_widget.changed();
-        widget.double_clicked = egui_widget.double_clicked();
+        let state = WidgetState {
+            left_clicked: egui_widget.clicked(),
+            right_clicked: egui_widget.secondary_clicked(),
+            hovered: egui_widget.hovered(),
+            dragged: egui_widget.dragged(),
+            changed: egui_widget.changed(),
+            double_clicked: egui_widget.double_clicked(),
+        };
+
+        widget.state = state;
+    }
+
+    fn remove_child(target_widget: &str, current_widget: &mut Widget) -> bool {
+        let mut widget_idx = None;
+
+        for (idx, widget) in current_widget.children.iter().enumerate() {
+            let id = &widget.id;
+            if id == target_widget {
+                widget_idx = Some(idx);
+                break
+            } 
+        }
+
+        match widget_idx {
+            Some(idx) => {
+                current_widget.children.remove(idx);
+                return true
+            },
+            None => (),
+        }
+
+        for widget in &mut current_widget.children {
+            if Self::remove_child(target_widget, widget) == true {
+                return true
+            }
+        }
+
+        false
     }
 
     fn add_child(function_name: &str, target_widget: &str, current_widget: &mut Widget, widget_to_add: Widget, widget_to_add_id: &str) -> bool {
@@ -125,7 +180,6 @@ impl UiManager {
                     Some(parent) => {
                         for child in &mut window.widgets {
                             let child_id = &child.id;
-                            println!("{}", child_id);
                             if child_id == parent {
                                 for i in &widget.children {
                                     if i.id == widget_id {
@@ -139,7 +193,6 @@ impl UiManager {
                                     }
                                 }
 
-                                println!("added!");
                                 child.children.push(widget.clone());
                                 return
                             }
@@ -173,13 +226,273 @@ impl UiManager {
         }
     }
 
+
+
+
+    // Public methods:
+    pub fn remove_widget(&mut self, window_id: &str, widget_id: &str) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                let mut widget_idx = None;
+                for (idx, widget) in window.widgets.iter().enumerate() {
+                    if widget.id == widget_id {
+                        widget_idx = Some(idx);
+                    }
+                }
+                match widget_idx {
+                    Some(idx) => {
+                        window.widgets.remove(idx);
+                        return
+                    },
+                    None => (),
+                }
+
+                // if true, something was removed
+                for widget in &mut window.widgets {
+                    if Self::remove_child(widget_id, widget) == true {
+                        return
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "remove_widget error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "remove_widget error!\nFailed to get the window with id '{}' to get widget with id '{}'", window_id, widget_id
+                    )
+                );
+            },
+        }
+    }
+
+
+    pub fn set_window_position(&mut self, window_id: &str, position: Option<Vec2>) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                window.position = position;
+            },
+            None => {
+                debugger::error(&format!("set_window_position error!\nFailed to get the window with id '{}'", window_id));
+            },
+        }
+
+    }
+
+    pub fn get_widget_state(&self, window_id: &str, widget_id: &str) -> Option<WidgetState> {
+        match self.windows.get(window_id) {
+            Some(window) => {
+                for widget in &window.widgets {
+                    if &widget.id == widget_id {
+                        return Some(widget.state.clone())
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "get_widget_state error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+                None
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "get_widget_state error!\nFailed to get the window with id '{}' to get state of the widget with id '{}'", window_id, widget_id
+                    )
+                );
+                None
+            },
+        }
+    }
+
+
+
+
+
+
+
+    pub fn get_widget_text(&self, window_id: &str, widget_id: &str) -> Option<String> {
+        match self.windows.get(window_id) {
+            Some(window) => {
+                for widget in &window.widgets {
+                    if &widget.id == widget_id {
+                        return match widget.widget_data.clone() {
+                            WidgetData::Button(contents) => Some(contents),
+                            WidgetData::Label(contents) => Some(contents),
+                            WidgetData::SinglelineTextEdit(contents) => Some(contents),
+                            WidgetData::MultilineTextEdit(contents) => Some(contents),
+                            WidgetData::Checkbox(_, label) => Some(label),
+                            _ => {
+                                debugger::error(
+                                    &format!(
+                                        "get_widget_text error!\nWidget with id '{}' doesn't contain any text.", widget_id
+                                    )
+                                );
+                                None
+                            }
+                        }
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "get_widget_text error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+                None
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "get_widget_text error!\nFailed to get the window with id '{}' to get widget with id '{}'", window_id, widget_id
+                    )
+                );
+                None
+            },
+        }
+    }
+
+    pub fn get_widget_numeric_value(&self, window_id: &str, widget_id: &str) -> Option<f32> {
+        match self.windows.get(window_id) {
+            Some(window) => {
+                for widget in &window.widgets {
+                    if &widget.id == widget_id {
+                        return match widget.widget_data.clone() {
+                            WidgetData::IntSlider(value, _, _) => Some(value as f32),
+                            WidgetData::FloatSlider(value, _, _) => Some(value),
+                            WidgetData::ProgressBar(value) => Some(value),
+                            _ => {
+                                debugger::error(
+                                    &format!(
+                                        "get_widget_numeric_value error!\nWidget with id '{}' doesn't contain any num values.", widget_id
+                                    )
+                                );
+                                None
+                            }
+                        }
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "get_widget_numeric_value error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+                None
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "get_widget_numeric_value error!\nFailed to get the window with id '{}' to get widget with id '{}'", window_id, widget_id
+                    )
+                );
+                None
+            },
+        }
+    }
+
+    pub fn get_widget_bool_value(&self, window_id: &str, widget_id: &str) -> Option<bool> {
+        match self.windows.get(window_id) {
+            Some(window) => {
+                for widget in &window.widgets {
+                    if &widget.id == widget_id {
+                        return match widget.widget_data.clone() {
+                            WidgetData::Checkbox(checked, _) => Some(checked),
+                            _ => {
+                                debugger::error(
+                                    &format!(
+                                        "get_widget_bool_value error!\nWidget with id '{}' doesn't contain any bool values.", widget_id
+                                    )
+                                );
+                                None
+                            }
+                        }
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "get_widget_bool_value error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+                None
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "get_widget_bool_value error!\nFailed to get the window with id '{}' to get widget with id '{}'", window_id, widget_id
+                    )
+                );
+                None
+            },
+        }
+    }
+
+
+
+
+
+
+    pub fn is_widget_left_clicked(&self, window_id: &str, widget_id: &str) -> bool {
+        match self.get_widget_state(window_id, widget_id) {
+            Some(value) => value.left_clicked,
+            None => false,
+        }
+    }
+
+    pub fn is_widget_right_clicked(&self, window_id: &str, widget_id: &str) -> bool {
+        match self.get_widget_state(window_id, widget_id) {
+            Some(value) => value.right_clicked,
+            None => false,
+        }
+    }
+
+    pub fn is_widget_double_clicked(&self, window_id: &str, widget_id: &str) -> bool {
+        match self.get_widget_state(window_id, widget_id) {
+            Some(value) => value.double_clicked,
+            None => false,
+        }
+    }
+
+    pub fn is_widget_hovered(&self, window_id: &str, widget_id: &str) -> bool {
+        match self.get_widget_state(window_id, widget_id) {
+            Some(value) => value.hovered,
+            None => false,
+        }
+    }
+
+    pub fn is_widget_dragged(&self, window_id: &str, widget_id: &str) -> bool {
+        match self.get_widget_state(window_id, widget_id) {
+            Some(value) => value.dragged,
+            None => false,
+        }
+    }
+
+    pub fn is_widget_changed(&self, window_id: &str, widget_id: &str) -> bool {
+        match self.get_widget_state(window_id, widget_id) {
+            Some(value) => value.changed,
+            None => false,
+        }
+    }
+
+
+
+
+
+
+
     pub fn new_window(&mut self, id: &str, transparent: bool) {
         if self.windows.contains_key(id) == true {
             debugger::error(&format!("new_window error!\nWindow with id '{}' already exists!", id));
             return;
         }
         self.windows.insert(id.into(), UiManagerWindow {
-            position: Vec2::ZERO,
+            position: None,
             size: None,
             widgets: Vec::new(),
             transparent,
@@ -198,9 +511,10 @@ impl UiManager {
         self.add_widget("add_button", window_id, widget_id, widget, parent)
     }
 
-    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, parent: Option<&str>) {
+    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
+            size,
             widget_data: WidgetData::Label(contents.into()),
             children: Vec::new(),
             ..Default::default()
@@ -209,7 +523,7 @@ impl UiManager {
         self.add_widget("add_label", window_id, widget_id, widget, parent)
     }
 
-    pub fn add_horizontal(&mut self, window_id: &str, widget_id: &str, parent: Option<&str>) {
+    pub fn add_horizontal(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
             widget_data: WidgetData::Horizontal,
@@ -230,6 +544,78 @@ impl UiManager {
         };
 
         self.add_widget("add_vertical", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_singleline_text_edit(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::SinglelineTextEdit(contents.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_singleline_text_edit", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_multiline_text_edit(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::MultilineTextEdit(contents.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_multiline_text_edit", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_checkbox(&mut self, window_id: &str, widget_id: &str, contents: bool, label: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Checkbox(contents, label.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_checkbox", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_float_slider(&mut self, window_id: &str, widget_id: &str, current_value: f32, min: f32, max: f32, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::FloatSlider(current_value, min, max),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_float_slider", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_int_slider(&mut self, window_id: &str, widget_id: &str, current_value: i32, min: i32, max: i32, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::IntSlider(current_value, min, max),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_int_slider", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_progress_bar(&mut self, window_id: &str, widget_id: &str, current_value: f32, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::ProgressBar(current_value),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_progress_bar", window_id, widget_id, widget, parent)
     }
 }
 
@@ -341,7 +727,6 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                             selected_object.cancel_collider = false;
                             return;
                         }
-                        //dbg!(&selected_object.render_collider, &selected_object.cancel_collider);
                         if let Some(collider) = &mut selected_object.render_collider {
                             ui.separator();
                             ui.label("render collider settings:");

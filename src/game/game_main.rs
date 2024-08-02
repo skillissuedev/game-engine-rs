@@ -19,10 +19,17 @@ pub fn start(framework: &mut Framework) {
         framework.ui.as_mut().unwrap().new_window("Test", false);
         framework.ui.as_mut().unwrap().new_window("Test2", true);
         framework.ui.as_mut().unwrap().add_button("Test2", "TestButton1", "123213123", Vec2::new(700.0, 10.0), None);
-        framework.ui.as_mut().unwrap().add_horizontal("Test", "TestHorizontal", None);
+        framework.ui.as_mut().unwrap().add_horizontal("Test", "TestHorizontal", Vec2::new(200.0, 200.0), None);
         framework.ui.as_mut().unwrap().add_button("Test", "TestButton2", "123213123", Vec2::new(69.0, 200.0), Some("TestHorizontal"));
         framework.ui.as_mut().unwrap().add_button("Test", "TestButton3", "456456456", Vec2::new(420.0, 200.0), Some("TestHorizontal"));
         framework.ui.as_mut().unwrap().add_button("Test", "TestButton1", "123213123", Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().add_checkbox("Test", "TestCheckbox", false, "test checkbox lol", Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().add_label("Test", "TestCheckbox", "test label", Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().add_float_slider("Test", "TestSlider", 5.0, 0.0, 21.0, Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().add_progress_bar("Test", "TestProgressBar", 0.25, Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().add_singleline_text_edit("Test", "TestSingleTextEdit", "abc hehe", Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().add_multiline_text_edit("Test", "TestMultiTextEdit", "abc hehe\nabc", Vec2::new(200.0, 200.0), None);
+        framework.ui.as_mut().unwrap().set_window_position("Test2", Some(Vec2::new(100.0, 100.0)));
     }
 
     //add_system(Box::new(TestSystem::new()));
@@ -44,6 +51,13 @@ pub fn update(framework: &mut Framework) {
                 framework.set_debug_mode(DebugMode::None);
             }
         }
+    }
+    if networking::is_server() == false {
+        if framework.ui.as_mut().unwrap().get_widget_state("Test2", "TestButton1").unwrap().left_clicked == true {
+            framework.ui.as_mut().unwrap().remove_widget("Test", "TestButton2");
+            framework.ui.as_mut().unwrap().remove_widget("Test", "TestButton1");
+        }
+        dbg!(framework.ui.as_mut().unwrap().get_widget_text("Test", "TestMultiTextEdit"));
     }
 }
 
