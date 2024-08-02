@@ -1,3 +1,4 @@
+use glam::Vec2;
 use winit::keyboard::KeyCode;
 
 use crate::{
@@ -15,6 +16,13 @@ pub fn start(framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
+        framework.ui.as_mut().unwrap().new_window("Test", false);
+        framework.ui.as_mut().unwrap().new_window("Test2", true);
+        framework.ui.as_mut().unwrap().add_button("Test2", "TestButton1", "123213123", Vec2::new(700.0, 10.0), None);
+        framework.ui.as_mut().unwrap().add_horizontal("Test", "TestHorizontal", None);
+        framework.ui.as_mut().unwrap().add_button("Test", "TestButton2", "123213123", Vec2::new(69.0, 200.0), Some("TestHorizontal"));
+        framework.ui.as_mut().unwrap().add_button("Test", "TestButton3", "456456456", Vec2::new(420.0, 200.0), Some("TestHorizontal"));
+        framework.ui.as_mut().unwrap().add_button("Test", "TestButton1", "123213123", Vec2::new(200.0, 200.0), None);
     }
 
     //add_system(Box::new(TestSystem::new()));

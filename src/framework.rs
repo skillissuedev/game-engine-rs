@@ -12,7 +12,7 @@ use crate::{
         render::{CurrentCascade, RenderManager},
         saves::SavesManager,
         sound::set_listener_transform,
-        systems::{self, SystemValue},
+        systems::{self, SystemValue}, ui::UiManager,
     },
     objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform},
 };
@@ -91,6 +91,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         saves: SavesManager::default(),
         assets: AssetManager::default(),
         render: Some(RenderManager::new(display)),
+        ui: Some(UiManager::default())
     };
 
     framework.set_debug_mode(debug_mode);
@@ -156,6 +157,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                     }
 
                                     systems::ui_render(ctx);
+                                    framework.ui.as_mut().unwrap().render(ctx);
                                 });
 
                                 {
@@ -244,6 +246,7 @@ pub fn start_game_without_render() {
         saves: SavesManager::default(),
         assets: AssetManager::default(),
         render: None,
+        ui: None
     };
 
     game_main::start(&mut framework);
@@ -381,6 +384,7 @@ pub struct Framework {
     pub saves: SavesManager, // done + api is ready
     pub assets: AssetManager, // done + api is ready
     pub render: Option<RenderManager>, // done + api is not required
+    pub ui: Option<UiManager>,
     // todo: networking??
 }
 

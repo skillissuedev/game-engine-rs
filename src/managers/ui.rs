@@ -1,9 +1,237 @@
-use egui_glium::egui_winit::egui::{self, ComboBox, TextEdit, Ui};
-use glam::Vec3;
-
+use std::collections::HashMap;
+use egui_glium::egui_winit::egui::{self, Button, ComboBox, Context, Label, TextEdit, Ui, Window};
+use glam::{Vec2, Vec3};
 use crate::framework::{DebugMode, Framework};
+use super::{debugger, physics::RenderColliderType, systems};
 
-use super::{physics::RenderColliderType, systems};
+#[derive(Default)]
+pub struct UiManager {
+    windows: HashMap<String, UiManagerWindow>,
+}
+
+#[derive(Clone)]
+pub enum WidgetData {
+    Button(String),
+    Label(String),
+    Horizontal,
+    Vertical,
+}
+
+impl Default for WidgetData {
+    fn default() -> Self {
+        Self::Label(String::new())
+    }
+}
+
+pub struct UiManagerWindow {
+    position: Vec2,
+    size: Option<Vec2>,
+    widgets: Vec<Widget>,
+    transparent: bool
+}
+
+#[derive(Default, Clone)]
+pub struct Widget {
+    id: String,
+    size: Vec2,
+    widget_data: WidgetData,
+    children: Vec<Widget>,
+    left_clicked: bool,
+    right_clicked: bool,
+    double_clicked: bool,
+    hovered: bool,
+    dragged: bool,
+    changed: bool,
+}
+
+impl UiManager {
+    pub fn render(&mut self, ctx: &Context) {
+        for (id, manager_window) in self.windows.iter_mut() {
+            let window = match manager_window.transparent {
+                true => {
+                    Window::new(id)
+                        .frame(egui::Frame::none())
+                        .title_bar(false)
+                        .resizable(false)
+                        .scroll(false)
+                },
+                false => Window::new(id),
+            };
+            window.show(ctx, |ui| {
+                for widget in &mut manager_window.widgets {
+                    Self::render_widget(ctx, ui, widget);
+                }
+            });
+        }
+    }
+
+    fn render_widget(ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
+        let size = egui::Vec2::new(widget.size.x, widget.size.y);
+        let egui_widget = match &widget.widget_data {
+            WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents)),
+            WidgetData::Label(contents) => ui.add_sized(size, Label::new(contents)),
+            WidgetData::Horizontal => ui.horizontal(|ui| {
+                for widget in &mut widget.children {
+                    Self::render_widget(ctx, ui, widget);
+                }
+            }).response,
+            WidgetData::Vertical => ui.vertical(|ui| {
+                for widget in &mut widget.children {
+                    Self::render_widget(ctx, ui, widget);
+                }
+            }).response,
+        };
+
+        widget.left_clicked = egui_widget.clicked();
+        widget.right_clicked = egui_widget.secondary_clicked();
+        widget.hovered = egui_widget.hovered();
+        widget.dragged = egui_widget.dragged();
+        widget.changed = egui_widget.changed();
+        widget.double_clicked = egui_widget.double_clicked();
+    }
+
+    fn add_child(function_name: &str, target_widget: &str, current_widget: &mut Widget, widget_to_add: Widget, widget_to_add_id: &str) -> bool {
+        for widget in &mut current_widget.children {
+            let id = &widget.id;
+            if id == target_widget {
+                for i in &widget.children {
+                    if i.id == widget_to_add_id {
+                        debugger::error(
+                            &format!(
+                                "{} error!\nChild with id '{}' already exists in the children list of the widget with id '{}'", function_name, widget_to_add_id, id
+                            )
+                        );
+
+                        return false
+                    }
+                }
+
+                widget.children.push(widget_to_add);
+                return true
+            } 
+
+            if Self::add_child(function_name, target_widget, widget, widget_to_add.clone(), widget_to_add_id) == true {
+                return true
+            }
+        }
+
+        false
+    }
+    // exists to write less in functions like add_button, add_label, ...
+    fn add_widget(&mut self, function_name: &str, window_id: &str, widget_id: &str, widget: Widget, parent: Option<&str>) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                match parent {
+                    Some(parent) => {
+                        for child in &mut window.widgets {
+                            let child_id = &child.id;
+                            println!("{}", child_id);
+                            if child_id == parent {
+                                for i in &widget.children {
+                                    if i.id == widget_id {
+                                        debugger::error(
+                                            &format!(
+                                                "{} error!\nChild with id '{}' already exists in the children list of the widget with id '{}'", 
+                                                function_name, widget_id, child_id
+                                            )
+                                        );
+                                        return
+                                    }
+                                }
+
+                                println!("added!");
+                                child.children.push(widget.clone());
+                                return
+                            }
+
+                            Self::add_child(function_name, parent, child, widget.clone(), widget_id);
+                        }
+                    },
+                    None => {
+                        for i in &window.widgets {
+                            if i.id == widget_id {
+                                debugger::error(
+                                    &format!(
+                                        "{} error!\nWidget with id '{}' already exists in the window with id '{}'", function_name, widget_id, window_id
+                                    )
+                                );
+                                return
+                            }
+                        }
+
+                        window.widgets.push(widget);
+                    },
+                }
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "{} error!\nFailed to get the window with id '{}' to add a widget with id '{}'", function_name, window_id, widget_id
+                    )
+                )
+            },
+        }
+    }
+
+    pub fn new_window(&mut self, id: &str, transparent: bool) {
+        if self.windows.contains_key(id) == true {
+            debugger::error(&format!("new_window error!\nWindow with id '{}' already exists!", id));
+            return;
+        }
+        self.windows.insert(id.into(), UiManagerWindow {
+            position: Vec2::ZERO,
+            size: None,
+            widgets: Vec::new(),
+            transparent,
+        });
+    }
+
+    pub fn add_button(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Button(contents.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_button", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            widget_data: WidgetData::Label(contents.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_label", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_horizontal(&mut self, window_id: &str, widget_id: &str, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            widget_data: WidgetData::Horizontal,
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_horizontal", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_vertical(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Vertical,
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_vertical", window_id, widget_id, widget, parent)
+    }
+}
 
 // inspector
 pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
@@ -419,3 +647,4 @@ pub fn draw_vec3_editor_inspector(
 
     return_val
 }
+
