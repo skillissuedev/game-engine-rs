@@ -37,6 +37,7 @@ pub fn start(framework: &mut Framework) {
     //add_system(Box::new(WorldGenerator::new()));
     //add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanila_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("ui_test", "scripts/lua/ui_test.lua").unwrap()), framework);
 
     add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("world_generator", "scripts/lua/world_generation.lua").unwrap()), framework);
@@ -57,7 +58,6 @@ pub fn update(framework: &mut Framework) {
             framework.ui.as_mut().unwrap().remove_widget("Test", "TestButton2");
             framework.ui.as_mut().unwrap().remove_widget("Test", "TestButton1");
         }
-        dbg!(framework.ui.as_mut().unwrap().get_widget_text("Test", "TestMultiTextEdit"));
     }
 }
 

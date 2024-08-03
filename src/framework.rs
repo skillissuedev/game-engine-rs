@@ -537,6 +537,195 @@ impl Framework {
         self.assets.get_sound_asset_id(asset_id)
     }
 
+    // UI
+    pub fn is_widget_double_clicked(&mut self, window_id: &str, widget_id: &str) -> bool {
+        match &mut self.ui {
+            Some(ui) => ui.is_widget_double_clicked(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (is_widget_double_clicked) while running server");
+                false
+            },
+        }
+    }
+
+    pub fn get_widget_numeric_value(&mut self, window_id: &str, widget_id: &str) -> Option<f32> {
+        match &mut self.ui {
+            Some(ui) => ui.get_widget_numeric_value(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (get_widget_numeric_value) while running server");
+                None
+            },
+        }
+    }
+
+    pub fn add_singleline_text_edit(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_singleline_text_edit(window_id, widget_id, contents, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_singleline_text_edit) while running server");
+            },
+        }
+    }
+
+    pub fn is_widget_right_clicked(&mut self, window_id: &str, widget_id: &str) -> bool {
+        match &mut self.ui {
+            Some(ui) => ui.is_widget_right_clicked(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (is_widget_right_clicked) while running server");
+                false
+            },
+        }
+    }
+
+    pub fn add_multiline_text_edit(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_multiline_text_edit(window_id, widget_id, contents, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_singleline_text_edit) while running server");
+            },
+        }
+    }
+
+    pub fn add_progress_bar(&mut self, window_id: &str, widget_id: &str, contents: f32, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_progress_bar(window_id, widget_id, contents, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_progress_bar) while running server");
+            },
+        }
+    }
+
+    pub fn add_float_slider(&mut self, window_id: &str, widget_id: &str, value: f32, min: f32, max: f32, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_float_slider(window_id, widget_id, value, min, max, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_float_slider) while running server");
+            },
+        }
+    }
+
+    pub fn add_int_slider(&mut self, window_id: &str, widget_id: &str, value: i32, min: i32, max: i32, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_int_slider(window_id, widget_id, value, min, max, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_int_slider) while running server");
+            },
+        }
+    }
+
+    pub fn add_checkbox(&mut self, window_id: &str, widget_id: &str, value: bool, title: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_checkbox(window_id, widget_id, value, title, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_checkbox) while running server");
+            },
+        }
+    }
+
+    pub fn add_horizontal(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_horizontal(window_id, widget_id, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_horizontal) while running server");
+            },
+        }
+    }
+
+    pub fn add_vertical(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_vertical(window_id, widget_id, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_vertical) while running server");
+            },
+        }
+    }
+
+    pub fn add_button(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_button(window_id, widget_id, contents, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_button) while running server");
+            },
+        }
+    }
+
+    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_label(window_id, widget_id, contents, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_label) while running server");
+            },
+        }
+    }
+
+    pub fn set_window_position(&mut self, window_id: &str, position: Option<Vec2>) {
+        match &mut self.ui {
+            Some(ui) => ui.set_window_position(window_id, position),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (set_window_position) while running server");
+            },
+        }
+    }
+
+    pub fn new_window(&mut self, window_id: &str, transparency: bool) {
+        match &mut self.ui {
+            Some(ui) => ui.new_window(window_id, transparency),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (new_window) while running server");
+            },
+        }
+    }
+
+    pub fn remove_widget(&mut self, window_id: &str, widget_id: &str) {
+        match &mut self.ui {
+            Some(ui) => ui.remove_widget(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (remove_widget) while running server");
+            },
+        }
+    }
+
+    pub fn is_widget_hovered(&mut self, window_id: &str, widget_id: &str) -> bool {
+        match &mut self.ui {
+            Some(ui) => ui.is_widget_hovered(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (is_widget_hovered) while running server");
+                false
+            },
+        }
+    }
+
+    pub fn is_widget_left_clicked(&mut self, window_id: &str, widget_id: &str) -> bool {
+        match &mut self.ui {
+            Some(ui) => ui.is_widget_left_clicked(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (is_widget_left_clicked) while running server");
+                false
+            },
+        }
+    }
+
+    pub fn is_widget_dragged(&mut self, window_id: &str, widget_id: &str) -> bool {
+        match &mut self.ui {
+            Some(ui) => ui.is_widget_dragged(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (is_widget_dragged) while running server");
+                false
+            },
+        }
+    }
+
+    pub fn is_widget_changed(&mut self, window_id: &str, widget_id: &str) -> bool {
+        match &mut self.ui {
+            Some(ui) => ui.is_widget_changed(window_id, widget_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (is_widget_changed) while running server");
+                false
+            },
+        }
+    }
+
+
     // new objects
     pub fn new_character_controller_object(
         &mut self,
@@ -621,5 +810,9 @@ impl Framework {
         collider: BodyColliderType,
     ) -> Trigger {
         Trigger::new(&mut self.physics, name, membership_group, mask, collider)
+    }
+
+    pub fn get_resolution(&self) -> Vec2 {
+        self.resolution
     }
 }

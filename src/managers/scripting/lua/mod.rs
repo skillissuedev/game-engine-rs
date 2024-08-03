@@ -5,7 +5,7 @@ use crate::{
     }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, fs};
@@ -1594,94 +1594,135 @@ impl UserData for Framework {
                 Ok(())
             }
         );
+
+        // ui
+        methods.add_method_mut("is_widget_double_clicked",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.is_widget_double_clicked(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("get_widget_numeric_value",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.get_widget_numeric_value(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("is_widget_right_clicked",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.is_widget_right_clicked(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("add_multiline_text_edit",
+            |_, framework, (window_id, widget_id, contents, size, parent): (String, String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_multiline_text_edit(&window_id, &widget_id, &contents, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_progress_bar",
+            |_, framework, (window_id, widget_id, contents, size, parent): (String, String, f32, [f32; 2], Option<String>)| {
+                Ok(framework.add_progress_bar(&window_id, &widget_id, contents, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_float_slider",
+            |_, framework, (window_id, widget_id, value, min, max, size, parent): (String, String, f32, f32, f32, [f32; 2], Option<String>)| {
+                Ok(framework.add_float_slider(&window_id, &widget_id, value, min, max, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_int_slider",
+            |_, framework, (window_id, widget_id, value, min, max, size, parent): (String, String, i32, i32, i32, [f32; 2], Option<String>)| {
+                Ok(framework.add_int_slider(&window_id, &widget_id, value, min, max, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_checkbox",
+            |_, framework, (window_id, widget_id, value, title, size, parent): (String, String, bool, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_checkbox(&window_id, &widget_id, value, &title, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_horizontal",
+            |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_horizontal(&window_id, &widget_id, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_vertical",
+            |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_vertical(&window_id, &widget_id, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_button",
+            |_, framework, (window_id, widget_id, contents, size, parent): (String, String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_button(&window_id, &widget_id, &contents, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_label",
+            |_, framework, (window_id, widget_id, contents, size, parent): (String, String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_label(&window_id, &widget_id, &contents, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("new_window",
+            |_, framework, (window_id, transparent): (String, bool)| {
+                Ok(framework.new_window(&window_id, transparent))
+            }
+        );
+
+        methods.add_method_mut("remove_widget",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.remove_widget(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("is_widget_hovered",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.is_widget_hovered(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("is_widget_left_clicked",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.is_widget_left_clicked(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("is_widget_dragged",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.is_widget_dragged(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("is_widget_changed",
+            |_, framework, (window_id, widget_id): (String, String)| {
+                Ok(framework.is_widget_changed(&window_id, &widget_id))
+            }
+        );
+
+        methods.add_method_mut("get_resolution",
+            |_, framework, _: ()| {
+                let resolution = framework.get_resolution();
+                Ok([resolution.x, resolution.y])
+            }
+        );
+
+        methods.add_method_mut("set_window_position",
+            |_, framework, (window_id, position): (String, Option<[f32; 2]>)| {
+                let position = match position {
+                    Some(position) => Some(Vec2::new(position[0], position[1])),
+                    None => None,
+                };
+
+                Ok(framework.set_window_position(&window_id, position))
+            }
+        );
     }
 }
-/*
-   pub fn new_character_controller_object(
-   &mut self,
-   name: &str,
-   shape: physics::BodyColliderType,
-   membership_groups: Option<CollisionGroups>,
-   mask: Option<CollisionGroups>,
-   ) -> CharacterController {
-   CharacterController::new(&mut self.physics, name, shape, membership_groups, mask)
-   }
-
-   pub fn new_empty_object(
-   &mut self,
-   name: &str,
-   ) -> EmptyObject {
-   EmptyObject::new(name)
-   }
-
-   pub fn new_instanced_model_object(
-   &mut self,
-   name: &str,
-   instance: &str,
-   ) -> InstancedModelObject {
-   InstancedModelObject::new(name, instance)
-   }
-
-   pub fn new_instanced_model_transform_holder(
-   &mut self,
-   name: &str,
-   instance: &str,
-   transforms: Vec<Transform>
-   ) -> InstancedModelTransformHolder {
-   InstancedModelTransformHolder::new(name, instance, transforms)
-   }
-
-   pub fn new_master_instanced_model_object(
-   &mut self,
-   name: &str,
-   model_asset_id: ModelAssetId,
-   texture_asset_id: Option<TextureAssetId>,
-   shader_asset: ShaderAsset,
-   ) -> MasterInstancedModelObject {
-   MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
-   }
-
-   pub fn new_model_object(
-   &mut self,
-   name: &str,
-   model_asset_id: ModelAssetId,
-   texture_asset_id: Option<TextureAssetId>,
-   shader_asset: ShaderAsset,
-   ) -> ModelObject {
-   ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
-   }
-
-   pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {
-   NavObstacle::new(name, size)
-   }
-
-   pub fn new_navigation_ground(&mut self, name: &str, size: Vec3) -> NavigationGround {
-   NavigationGround::new(name, Vec2::new(size.x, size.z))
-   }
-
-   pub fn new_ray(&mut self, name: &str, direction: Vec3, mask: Option<CollisionGroups>) -> Ray {
-   Ray::new(name, direction, mask)
-   }
-
-   pub fn new_sound_emitter(&mut self, name: &str, asset_id: SoundAssetId, is_positional: bool) -> SoundEmitter {
-   let emitter_type = match is_positional {
-   true => SoundSourceType::Positional,
-   false => SoundSourceType::Simple,
-};
-
-SoundEmitter::new(name, self, asset_id, emitter_type)
-   }
-
-pub fn new_trigger(
-    &mut self, 
-    name: &str,
-    membership_group: Option<CollisionGroups>,
-    mask: Option<CollisionGroups>,
-    collider: BodyColliderType,
-) -> Trigger {
-    Trigger::new(&mut self.physics, name, membership_group, mask, collider)
-}
-*/
 
 impl UserData for Box<dyn Object> { }
 
@@ -1729,45 +1770,6 @@ impl<'lua> FromLuaMulti<'lua> for Framework {
     }
 }
 
-/*
-   impl<'lua> IntoLua<'lua> for Framework {
-   fn into_lua(self, lua: &'lua Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
-   match lua.create_userdata(self) {
-   Ok(userdata) => {
-   let lua_value = userdata.into_lua_multi(lua);
-   match lua_value {
-   Ok(lua_value) => Ok(lua_value),
-   Err(err) => {
-   debugger::error(
-   &format!(
-   "Lua error! Failed to convert Framework into a Lua value. Can't convert userdata to a LuaMultiValue\nErr: {}",
-   err
-   )
-   );
-   mlua::prelude::LuaResult::Err(Error::ToLuaConversionError {
-   from: "-",
-   to: "Framework",
-   message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
-   })
-   },
-   }
-   },
-   Err(err) => {
-   debugger::error(
-   &format!(
-   "Lua error! Failed to convert Framework into a Lua value. Can't create userdata from Framework.\nErr: {}",
-   err
-   )
-   );
-   mlua::prelude::LuaResult::Err(Error::ToLuaConversionError { 
-   from: "-",
-   to: "Framework",
-   message: Some("Lua error! Failed to get Framework from lua. values[0] = None".into())
-   })
-   },
-   }
-   }
-   }*/
 fn get_framework_pointer() -> &'static mut Framework {
     let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
     let framework = unsafe { &mut *framework_ptr };
