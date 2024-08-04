@@ -44,7 +44,9 @@ pub struct UiManagerWindow {
     position: Option<Vec2>,
     size: Option<Vec2>,
     widgets: Vec<Widget>,
-    transparent: bool
+    transparent: bool,
+    show_title_bar: bool,
+    show_close_button: bool,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -67,7 +69,12 @@ impl UiManager {
                         .resizable(false)
                         .scroll(false)
                 },
-                false => Window::new(id),
+                false => {
+                    Window::new(id)
+                        .resizable(false)
+                        .title_bar(manager_window.show_title_bar)
+                        .collapsible(manager_window.show_close_button)
+                },
             };
 
             if let Some(position) = manager_window.position {
@@ -230,6 +237,36 @@ impl UiManager {
 
 
     // Public methods:
+    pub fn show_title_bar(&mut self, window_id: &str, show: bool) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                window.show_title_bar = show;
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "show_title_button error!\nFailed to get the window with id '{}'", window_id
+                    )
+                );
+            },
+        }
+    }
+
+    pub fn show_close_button(&mut self, window_id: &str, show: bool) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                window.show_close_button = show;
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "show_close_button error!\nFailed to get the window with id '{}'", window_id
+                    )
+                );
+            },
+        }
+    }
+
     pub fn remove_widget(&mut self, window_id: &str, widget_id: &str) {
         match self.windows.get_mut(window_id) {
             Some(window) => {
@@ -496,6 +533,8 @@ impl UiManager {
             size: None,
             widgets: Vec::new(),
             transparent,
+            show_title_bar: true,
+            show_close_button: true,
         });
     }
 

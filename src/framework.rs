@@ -538,6 +538,24 @@ impl Framework {
     }
 
     // UI
+    pub fn show_title_bar(&mut self, window_id: &str, show: bool) {
+        match &mut self.ui {
+            Some(ui) => ui.show_title_bar(window_id, show),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (show_title_bar) while running server");
+            },
+        }
+    }
+
+    pub fn show_close_button(&mut self, window_id: &str, show: bool) {
+        match &mut self.ui {
+            Some(ui) => ui.show_close_button(window_id, show),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (show_close_button) while running server");
+            },
+        }
+    }
+
     pub fn is_widget_double_clicked(&mut self, window_id: &str, widget_id: &str) -> bool {
         match &mut self.ui {
             Some(ui) => ui.is_widget_double_clicked(window_id, widget_id),

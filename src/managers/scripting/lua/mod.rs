@@ -1721,6 +1721,18 @@ impl UserData for Framework {
                 Ok(framework.set_window_position(&window_id, position))
             }
         );
+
+        methods.add_method_mut("show_title_bar",
+            |_, framework, (window_id, show): (String, bool)| {
+                Ok(framework.show_title_bar(&window_id, show))
+            }
+        );
+
+        methods.add_method_mut("show_close_button",
+            |_, framework, (window_id, show): (String, bool)| {
+                Ok(framework.show_close_button(&window_id, show))
+            }
+        );
     }
 }
 
