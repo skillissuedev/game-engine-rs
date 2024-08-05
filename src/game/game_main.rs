@@ -2,11 +2,29 @@ use winit::keyboard::KeyCode;
 
 use crate::{
     framework::{DebugMode, Framework},
-    managers::{input::InputEventType, networking, scripting::lua::LuaSystem, systems::add_system}, systems::player_manager::PlayerManager,
+    managers::{input::InputEventType, networking, scripting::lua::LuaSystem, systems::{add_system, SystemValue}}, systems::player_manager::PlayerManager, Args,
     //systems::player_manager::PlayerManager,
 };
 
-pub fn start(framework: &mut Framework) {
+pub fn start(args: Args, framework: &mut Framework) {
+    if let Some(save_name) = &args.new_save_name {
+        framework.set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(args.new_save_seed.unwrap())]);
+        framework.register_save_value("WorldGeneratorSeed");
+
+        match framework.new_save(&save_name) {
+            Ok(_) => println!("Successfully created a new save file!"),
+            Err(err) => println!("Failed to create a new save file!\nErr: {}", err),
+        }
+        std::process::exit(0);
+    }
+
+    if let Some(save_name) = &args.load_save {
+        if let Err(_) = framework.load_save(&save_name) {
+            println!("Failed to load the save file and start the server!");
+        }
+    }
+
+
     framework.input.new_bind(
         "debug_toggle",
         vec![InputEventType::Key(KeyCode::Backquote)],

@@ -1499,6 +1499,18 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("load_lazy_value",
+            |_, framework, value_name: String| {
+                Ok(framework.load_lazy_value(&value_name))
+            }
+        );
+
+        methods.add_method_mut("save_lazy_value",
+            |_, framework, (value_name, value): (String, Vec<SystemValue>)| {
+                Ok(framework.save_lazy_value(&value_name, value))
+            }
+        );
+
         methods.add_method_mut("new_bind_keyboard",
             |_, framework, (name, keys): (String, Vec<String>)| {
                 let keys: Vec<&str> = keys.iter().map(|key| key.as_str()).collect();

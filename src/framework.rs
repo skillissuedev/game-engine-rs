@@ -14,7 +14,7 @@ use crate::{
         sound::set_listener_transform,
         systems::{self, SystemValue}, ui::UiManager,
     },
-    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform},
+    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use ez_al::{EzAl, SoundSourceType};
@@ -44,7 +44,7 @@ pub static mut FRAMEWORK_POINTER: usize = 0;
 static FONT: Lazy<Vec<u8>> =
     Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
 
-pub fn start_game_with_render(debug_mode: DebugMode) {
+pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     dbg!(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf"));
     let event_loop: EventLoop<_> = EventLoopBuilder::new()
         .build()
@@ -96,15 +96,13 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
 
     framework.set_debug_mode(debug_mode);
 
-    //render::init(&display);
-
     framework.navigation.update();
     unsafe {
         let ptr = &mut framework as *mut Framework;
         FRAMEWORK_POINTER = ptr as usize;
     };
 
-    game_main::start(&mut framework);
+    game_main::start(args, &mut framework);
 
     event_loop
         .run(move |ev, window_target| {
@@ -134,6 +132,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
                                 let time_since_last_frame = last_frame.elapsed();
                                 last_frame = Instant::now();
                                 update_game(&mut framework, time_since_last_frame);
+                                dbg!(&framework.system_globals);
 
                                 if framework.input.is_mouse_locked() {
                                     let _ = window.set_cursor_grab(CursorGrabMode::Locked);
@@ -230,7 +229,7 @@ pub fn start_game_with_render(debug_mode: DebugMode) {
         .unwrap();
 }
 
-pub fn start_game_without_render() {
+pub fn start_game_without_render(args: Args) {
     println!("starting game without render");
 
     let mut framework = Framework {
@@ -249,7 +248,7 @@ pub fn start_game_without_render() {
         ui: None
     };
 
-    game_main::start(&mut framework);
+    game_main::start(args, &mut framework);
 
     let tickrate_tick = Duration::from_millis(16);
     let clock = chron::Clock::new(NonZeroU32::new(60).unwrap());
@@ -447,6 +446,14 @@ impl Framework {
 
     pub fn save_game(&mut self) {
         self.saves.save_game(&self.system_globals)
+    }
+
+    pub fn save_lazy_value(&mut self, value_name: &str, value: Vec<SystemValue>) {
+        self.saves.save_lazy_value(value_name, value)
+    }
+
+    pub fn load_lazy_value(&mut self, value_name: &str) -> Option<Vec<SystemValue>> {
+        self.saves.load_lazy_value(value_name)
     }
 
     // InputManager
