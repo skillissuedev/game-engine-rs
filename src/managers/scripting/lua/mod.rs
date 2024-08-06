@@ -2,7 +2,7 @@ pub mod lua_functions;
 use crate::{
     assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
-    }, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
+    }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use glam::{Vec2, Vec3};
@@ -1451,6 +1451,12 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("delta_time",
+            |_, framework, _: ()| {
+                Ok(framework.delta_time().as_secs_f32())
+            }
+        );
+
         methods.add_method_mut("set_global_system_value", 
             |_, framework, (key, value): (String, Vec<SystemValue>)| {
                 framework.set_global_system_value(&key, value);
@@ -1743,6 +1749,87 @@ impl UserData for Framework {
         methods.add_method_mut("show_close_button",
             |_, framework, (window_id, show): (String, bool)| {
                 Ok(framework.show_close_button(&window_id, show))
+            }
+        );
+        // render
+        methods.add_method_mut("set_camera_position",
+            |_, framework, (x, y, z): (f32, f32, f32)| {
+                Ok(framework.set_camera_position(Vec3::new(x, y, z)))
+            }
+        );
+
+        methods.add_method_mut("set_camera_rotation",
+            |_, framework, (x, y, z): (f32, f32, f32)| {
+                Ok(framework.set_camera_rotation(Vec3::new(x, y, z)))
+            }
+        );
+
+        methods.add_method_mut("set_camera_fov",
+            |_, framework, fov: f32| {
+                Ok(framework.set_camera_fov(fov))
+            }
+        );
+
+        methods.add_method_mut("set_light_direction",
+            |_, framework, (x, y, z): (f32, f32, f32)| {
+                Ok(framework.set_light_direction(Vec3::new(x, y, z)))
+            }
+        );
+
+        methods.add_method_mut("get_light_direction",
+            |_, framework, (): ()| {
+                let direction = framework.get_light_direction();
+                match direction {
+                    Some(direction) => Ok(Some([direction.x, direction.y, direction.z])),
+                    None => Ok(None),
+                }
+            }
+        );
+
+        methods.add_method_mut("get_camera_position",
+            |_, framework, (): ()| {
+                let result = framework.get_camera_position();
+                match result {
+                    Some(vector) => Ok(Some([vector.x, vector.y, vector.z])),
+                    None => Ok(None),
+                }
+            }
+        );
+
+        methods.add_method_mut("get_camera_rotation",
+            |_, framework, (): ()| {
+                let result = framework.get_camera_rotation();
+                match result {
+                    Some(vector) => Ok(Some([vector.x, vector.y, vector.z])),
+                    None => Ok(None),
+                }
+            }
+        );
+
+        methods.add_method_mut("get_camera_front",
+            |_, framework, (): ()| {
+                let result = framework.get_camera_front();
+                match result {
+                    Some(vector) => Ok(Some([vector.x, vector.y, vector.z])),
+                    None => Ok(None),
+                }
+            }
+        );
+
+        methods.add_method_mut("get_camera_right",
+            |_, framework, (): ()| {
+                let result = framework.get_camera_right();
+                match result {
+                    Some(vector) => Ok(Some([vector.x, vector.y, vector.z])),
+                    None => Ok(None),
+                }
+            }
+        );
+
+        methods.add_method_mut("rotate_vector",
+            |_, _, (dir_x, dir_y, dir_z, rot_x, rot_y, rot_z): (f32, f32, f32, f32, f32, f32)| {
+                let vec = math_utils::rotate_vector(Vec3::new(dir_x, dir_y, dir_z), Vec3::new(rot_x, rot_y, rot_z));
+                Ok([vec.x, vec.y, vec.z])
             }
         );
     }

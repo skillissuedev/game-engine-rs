@@ -5,9 +5,9 @@ use crate::{
         debugger,
         physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager},
     },
-    math_utils::deg_to_rad,
+    math_utils::{self, deg_to_rad},
 };
-use glam::{Vec2, Vec3};
+use glam::{Mat4, Quat, Vec2, Vec3};
 use rapier3d::{
     control::{CharacterLength, KinematicCharacterController},
     geometry::{ActiveCollisionTypes, ColliderHandle},
@@ -204,13 +204,11 @@ impl CharacterController {
             let collider = framework.physics.collider_set.get(self.collider);
             if let Some(collider) = collider {
                 let shape = collider.shape();
-                let global_position = self.global_transform().position;
+                let global_transform = self.global_transform();
+                let global_position = global_transform.position;
+                let global_rotation = math_utils::deg_vec_to_rad(global_transform.rotation);
 
-                let direction = Vec3 {
-                    x: -direction.x,
-                    y: direction.y,
-                    z: -direction.z,
-                };
+                let direction = math_utils::rotate_vector(direction, global_rotation);
 
                 let movement = self.controller.move_shape(
                     framework.delta_time().as_secs_f32(),

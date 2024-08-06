@@ -7,7 +7,7 @@ use crate::{
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
         self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, scripting::lua::get_framework_pointer, systems
-    }, objects::{
+    }, math_utils, objects::{
         Object, Transform
     }, systems::System
 };
@@ -105,6 +105,11 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         });
         add_function!("find_object", find_object, lua, system_id);
 
+        let rotate_vector = lua.create_function(move |_, (dir_x, dir_y, dir_z, rot_x, rot_y, rot_z): (f32, f32, f32, f32, f32, f32)| {
+            let vec = math_utils::rotate_vector(Vec3::new(dir_x, dir_y, dir_z), Vec3::new(rot_x, rot_y, rot_z));
+            Ok([vec.x, vec.y, vec.z])
+        });
+        add_function!("rotate_vector", rotate_vector, lua, system_id);
 
 
         // creating new objects

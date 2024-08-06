@@ -132,7 +132,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 let time_since_last_frame = last_frame.elapsed();
                                 last_frame = Instant::now();
                                 update_game(&mut framework, time_since_last_frame);
-                                dbg!(&framework.system_globals);
 
                                 if framework.input.is_mouse_locked() {
                                     let _ = window.set_cursor_grab(CursorGrabMode::Locked);
@@ -246,6 +245,11 @@ pub fn start_game_without_render(args: Args) {
         assets: AssetManager::default(),
         render: None,
         ui: None
+    };
+
+    unsafe {
+        let ptr = &mut framework as *mut Framework;
+        FRAMEWORK_POINTER = ptr as usize;
     };
 
     game_main::start(args, &mut framework);
@@ -415,6 +419,85 @@ impl Framework {
         }
     }
 
+    // render
+    pub fn set_camera_position(&mut self, pos: Vec3) {
+        match self.render.as_mut() {
+            Some(render) => render.set_camera_position(pos),
+            None => debugger::error("Failed to call set_camera_position, render is None (probably running a server!)"),
+        }
+    }
+
+    pub fn set_camera_rotation(&mut self, rot: Vec3) {
+        match self.render.as_mut() {
+            Some(render) => render.set_camera_rotation(rot),
+            None => debugger::error("Failed to call set_camera_rotation, render is None (probably running a server!)"),
+        }
+    }
+
+    pub fn set_camera_fov(&mut self, fov: f32) {
+        match self.render.as_mut() {
+            Some(render) => render.set_camera_fov(fov),
+            None => debugger::error("Failed to call set_camera_fov, render is None (probably running a server!)"),
+        }
+    }
+
+    pub fn set_light_direction(&mut self, dir: Vec3) {
+        match self.render.as_mut() {
+            Some(render) => render.set_light_direction(dir),
+            None => debugger::error("Failed to call set_light_direction, render is None (probably running a server!)"),
+        }
+    }
+
+    pub fn get_light_direction(&self) -> Option<Vec3> {
+        match self.render.as_ref() {
+            Some(render) => Some(render.get_light_direction()),
+            None => {
+                debugger::error("Failed to call get_light_direction, render is None (probably running a server!)");
+                None
+            },
+        }
+    }
+
+    pub fn get_camera_position(&self) -> Option<Vec3> {
+        match self.render.as_ref() {
+            Some(render) => Some(render.get_camera_position()),
+            None => {
+                debugger::error("Failed to call get_camera_position, render is None (probably running a server!)");
+                None
+            },
+        }
+    }
+
+    pub fn get_camera_front(&mut self) -> Option<Vec3> {
+        match self.render.as_mut() {
+            Some(render) => Some(render.get_camera_front()),
+            None => {
+                debugger::error("Failed to call get_camera_front, render is None (probably running a server!)");
+                None
+            },
+        }
+    }
+
+    pub fn get_camera_right(&self) -> Option<Vec3> {
+        match self.render.as_ref() {
+            Some(render) => Some(render.get_camera_right()),
+            None => {
+                debugger::error("Failed to call get_camera_right, render is None (probably running a server!)");
+                None
+            },
+        }
+    }
+
+    pub fn get_camera_rotation(&self) -> Option<Vec3> {
+        match self.render.as_ref() {
+            Some(render) => Some(render.get_camera_rotation()),
+            None => {
+                debugger::error("Failed to call get_camera_rotation, render is None (probably running a server!)");
+                None
+            },
+        }
+    }
+
     // SavesManager
     pub fn load_save(&mut self, save_name: &str) -> Result<(), ()> {
         match self.saves.load_save(save_name) {
@@ -460,7 +543,7 @@ impl Framework {
     pub fn new_bind_keyboard(&mut self, bind_name: &str, keys: Vec<&str>) {
         let mut input_event_types = Vec::new();
         for key in keys {
-            match serde_json::from_str::<KeyCode>(&key.replace("\"", "")) {
+            match serde_json::from_str::<KeyCode>(&format!("\"{}\"", key)) {
                 Ok(key) => input_event_types.push(input::InputEventType::Key(key)),
                 Err(error) => debugger::error(
                     &format!(
@@ -477,7 +560,7 @@ impl Framework {
     pub fn new_bind_mouse(&mut self, bind_name: &str, buttons: Vec<&str>) {
         let mut input_event_types = Vec::new();
         for button in buttons {
-            match serde_json::from_str::<MouseButton>(&button.replace("\"", "")) {
+            match serde_json::from_str::<MouseButton>(&format!("\"{}\"", button)) {
                 Ok(key) => input_event_types.push(input::InputEventType::Mouse(key)),
                 Err(error) => debugger::error(
                     &format!(

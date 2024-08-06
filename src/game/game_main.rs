@@ -36,7 +36,7 @@ pub fn start(args: Args, framework: &mut Framework) {
     }
 
     //add_system(Box::new(TestSystem::new()));
-    add_system(Box::new(PlayerManager::new()), framework);
+    //add_system(Box::new(PlayerManager::new()), framework);
     //add_system(Box::new(WorldGenerator::new()));
     //add_system(Box::new(LuaSystem::new("player_manager", "scripts/lua/player_manager.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanila_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);
