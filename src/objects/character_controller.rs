@@ -42,7 +42,7 @@ impl CharacterController {
         mask: Option<CollisionGroups>,
     ) -> Self {
         let mut controller = KinematicCharacterController::default();
-        controller.max_slope_climb_angle = deg_to_rad(45.0);
+        controller.max_slope_climb_angle = deg_to_rad(65.0);
         controller.up = nalgebra::Vector::y_axis();
         controller.offset = CharacterLength::Absolute(0.2);
 
@@ -206,7 +206,7 @@ impl CharacterController {
                 let shape = collider.shape();
                 let global_transform = self.global_transform();
                 let global_position = global_transform.position;
-                let global_rotation = math_utils::deg_vec_to_rad(global_transform.rotation);
+                let global_rotation = global_transform.rotation;
 
                 let direction = math_utils::rotate_vector(direction, global_rotation);
 

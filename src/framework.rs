@@ -315,6 +315,7 @@ pub enum DebugMode {
 
 // Glium's SimpleWindowBuilder's build function with a few changes
 // https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
+// TODO: fix for Windows
 fn new_window<T>(
     event_loop: &winit::event_loop::EventLoop<T>,
 ) -> (
@@ -325,12 +326,14 @@ fn new_window<T>(
     let window_builder = WindowBuilder::new()
         .with_title("projectbaldej")
         .with_inner_size(PhysicalSize::new(1280, 720));
+
     let display_builder =
         glutin_winit::DisplayBuilder::new().with_window_builder(Some(window_builder));
+
     let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
         .with_multisampling(4)
-        //.with_swap_interval(Some(0), Some(0))
         .with_single_buffering(true);
+
     let (window, gl_config) = display_builder
         .build(&event_loop, config_template_builder, |mut configs| {
             // Just use the first configuration since we don't have any special preferences here
