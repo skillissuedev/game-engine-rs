@@ -20,7 +20,7 @@ use super::{debugger, systems::get_system_mut_with_id};
 static mut MAX_BYTES_PER_TICK: u64 = 100 * 1024 * 1024;
 static mut CURRENT_NETWORKING_MODE: NetworkingMode = NetworkingMode::Disconnected(None);
 static mut CURRENT_NETWORK_EVENTS: Vec<NetworkEvent> = vec![];
-static mut CLIENT_ID: Lazy<u64> = Lazy::new(generate_client_id);
+static mut CLIENT_ID: u64 = 0;
 
 #[derive(Debug)]
 pub struct ServerHandle {
@@ -177,7 +177,8 @@ pub fn new_server(port: u16, max_players: usize) -> Result<(), NetworkError> {
     Ok(())
 }
 
-pub fn new_client(ip_address: IpAddr, port: u16) -> Result<(), NetworkError> {
+pub fn new_client(ip_address: IpAddr, port: u16, client_id: u64) -> Result<(), NetworkError> {
+    unsafe { CLIENT_ID = client_id }
     match get_current_networking_mode() {
         NetworkingMode::Disconnected(_) => (),
         _ => {
@@ -199,7 +200,7 @@ pub fn new_client(ip_address: IpAddr, port: u16) -> Result<(), NetworkError> {
         .unwrap();
     let auth = ClientAuthentication::Unsecure {
         protocol_id: 0,
-        client_id: unsafe { *CLIENT_ID },
+        client_id: unsafe { CLIENT_ID },
         server_addr,
         user_data: None,
     };

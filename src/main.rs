@@ -3,9 +3,6 @@ use std::net::Ipv4Addr;
 use clap::Parser;
 use framework::DebugMode;
 use rand::Rng;
-
-use crate::managers::networking::get_current_networking_mode;
-
 mod assets;
 mod framework;
 mod game;
@@ -58,16 +55,13 @@ fn main() {
     } else {
         ip = Ipv4Addr::new(127, 0, 0, 1);
     }
-    println!("Connecting to {}:7777", ip);
-    managers::networking::new_client(std::net::IpAddr::V4(ip), 7777).unwrap();
 
-    match get_current_networking_mode() {
-        managers::networking::NetworkingMode::Server(_) => (),
-        managers::networking::NetworkingMode::Client(_) => (),
-        managers::networking::NetworkingMode::Disconnected(_) => {}
-    }
+    let client_id = args.client_id;
+    println!("Connecting to {}:7777, client ID is {}", ip, client_id);
+    managers::networking::new_client(std::net::IpAddr::V4(ip), 7777, client_id).unwrap();
 
     let debug = args.debug.clone();
+
     if debug {
         println!("debug");
         framework::start_game_with_render(args, DebugMode::Full);
@@ -88,4 +82,7 @@ struct Args {
     pub new_save_name: Option<String>,
     #[arg(long = "connect")]
     pub ip: Option<Ipv4Addr>,
+    #[arg(long = "clientid")]
+    #[clap(default_value_t)]
+    pub client_id: u64,
 }
