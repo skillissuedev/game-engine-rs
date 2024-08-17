@@ -760,6 +760,15 @@ impl Framework {
         }
     }
 
+    pub fn add_image(&mut self, window_id: &str, widget_id: &str, image_path: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_image(window_id, widget_id, image_path, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_image) while running server");
+            },
+        }
+    }
+
     pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
         match &mut self.ui {
             Some(ui) => ui.add_label(window_id, widget_id, contents, size, parent),

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ComboBox, Context, Label, ProgressBar, Slider, TextEdit, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ComboBox, Context, Image, Label, ProgressBar, Slider, TextEdit, Ui, Window};
 use glam::{Vec2, Vec3};
 use crate::framework::{DebugMode, Framework};
-use super::{debugger, physics::RenderColliderType, systems};
+use super::{assets::get_full_asset_path, debugger, physics::RenderColliderType, systems};
 
 #[derive(Default)]
 pub struct UiManager {
@@ -21,6 +21,7 @@ pub enum WidgetData {
     FloatSlider(f32, f32, f32),
     IntSlider(i32, i32, i32),
     ProgressBar(f32),
+    Image(String),
 }
 
 impl Default for WidgetData {
@@ -110,6 +111,11 @@ impl UiManager {
             WidgetData::FloatSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
             WidgetData::IntSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
             WidgetData::ProgressBar(value) => ui.add_sized(size, ProgressBar::new(*value)),
+            WidgetData::Image(image_path) => {
+                let uri = format!("file://{}", get_full_asset_path(image_path));
+                dbg!(&uri);
+                ui.add_sized(size, Image::new(uri))
+            },
         };
 
         let state = WidgetState {
@@ -565,6 +571,7 @@ impl UiManager {
     pub fn add_horizontal(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
+            size,
             widget_data: WidgetData::Horizontal,
             children: Vec::new(),
             ..Default::default()
@@ -655,6 +662,18 @@ impl UiManager {
         };
 
         self.add_widget("add_progress_bar", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_image(&mut self, window_id: &str, widget_id: &str, image_path: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Image(image_path.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_image", window_id, widget_id, widget, parent)
     }
 }
 

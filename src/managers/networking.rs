@@ -1,6 +1,5 @@
 use crate::objects::Transform;
 use machineid_rs::{HWIDComponent, IdBuilder};
-use once_cell::sync::Lazy;
 use renet::{
     transport::{
         ClientAuthentication, NetcodeClientTransport, NetcodeServerTransport, ServerAuthentication,
@@ -15,7 +14,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use super::{debugger, systems::get_system_mut_with_id};
+use super::{debugger, systems::{get_system_mut_with_id, SystemValue}};
 
 static mut MAX_BYTES_PER_TICK: u64 = 100 * 1024 * 1024;
 static mut CURRENT_NETWORKING_MODE: NetworkingMode = NetworkingMode::Disconnected(None);
@@ -102,7 +101,7 @@ impl Message {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageContents {
     SyncObject(SyncObjectMessage),
-    Custom(String),
+    Custom(Vec<SystemValue>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

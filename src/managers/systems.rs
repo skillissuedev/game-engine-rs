@@ -181,6 +181,6 @@ pub enum SystemValue {
     Int(i32),
     UInt(u32),
     Float(f32),
-    Vec3(f32, f32, f32),
     Bool(bool),
+    Vec(Vec<SystemValue>)
 }

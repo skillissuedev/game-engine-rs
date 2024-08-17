@@ -6,7 +6,7 @@ use crate::{
         self,
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, scripting::lua::get_framework_pointer, systems
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, scripting::lua::get_framework_pointer, systems::{self, SystemValue}
     }, math_utils, objects::{
         Object, Transform
     }, systems::System
@@ -604,7 +604,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         add_function!("get_object_scale", get_object_scale, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
-        let send_custom_message = lua.create_function_mut(move |_, (is_reliable, message_id, contents, receiver, client_id): (bool, String, String, Option<String>, Option<u64>)| {
+        let send_custom_message = lua.create_function_mut(move |_, (is_reliable, message_id, contents, receiver, client_id): (bool, String, Vec<SystemValue>, Option<String>, Option<u64>)| {
             match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                 Some(system) => {
                     let reliability = match is_reliable {

@@ -1,7 +1,7 @@
 pub mod lua_functions;
 use crate::{
     assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
-        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
+        assets, debugger::{self, error}, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
@@ -1390,15 +1390,15 @@ impl<'lua> FromLua<'lua> for SystemValue {
             return Ok(SystemValue::Bool(value));
         }
         if let Some(value) = value.as_table() {
-            let x: Result<f32, Error> = value.get(1);
-            let y: Result<f32, Error> = value.get(2);
-            let z: Result<f32, Error> = value.get(3);
-            if let (Ok(x), Ok(y), Ok(z)) = (x.clone(), y, z) {
-                return Ok(SystemValue::Vec3(x, y, z));
-            } 
-            if let Err(x) = x {
-                println!("{}", x);
-            }
+            let mut vec: Vec<SystemValue> = Vec::new();
+            if let Err(err) = value.for_each(|_: SystemValue, value: SystemValue| {
+                vec.push(value);
+                Ok(())
+            }) {
+                debugger::error(&format!("Failed to convert a Table to a Vec. Err: {}", err))
+            };
+
+            return Ok(SystemValue::Vec(vec))
         }
         Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
     }
@@ -1411,8 +1411,8 @@ impl<'lua> IntoLua<'lua> for SystemValue {
             SystemValue::Int(value) => Ok(value.into_lua(lua)?),
             SystemValue::UInt(value) => Ok(value.into_lua(lua)?),
             SystemValue::Float(value) => Ok(value.into_lua(lua)?),
-            SystemValue::Vec3(x, y, z) => Ok(vec![x, y, z].into_lua(lua)?),
             SystemValue::Bool(value) => Ok(value.into_lua(lua)?),
+            SystemValue::Vec(value) => Ok(value.into_lua(lua)?),
         }
     }
 }
@@ -1677,6 +1677,12 @@ impl UserData for Framework {
         methods.add_method_mut("add_button",
             |_, framework, (window_id, widget_id, contents, size, parent): (String, String, String, [f32; 2], Option<String>)| {
                 Ok(framework.add_button(&window_id, &widget_id, &contents, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_image",
+            |_, framework, (window_id, widget_id, image_path, size, parent): (String, String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_image(&window_id, &widget_id, &image_path, size.into(), parent.as_deref()))
             }
         );
 

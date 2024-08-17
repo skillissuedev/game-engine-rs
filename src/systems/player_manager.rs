@@ -62,8 +62,15 @@ impl System for PlayerManager {
             render.set_light_direction(Vec3::new(-0.2, 0.0, 0.0));
             camera_position = render.get_camera_position();
         }
+        
         {
-            framework.set_global_system_value("PlayerPosition", vec![SystemValue::Vec3(-camera_position.x, camera_position.y, camera_position.z)]);
+            framework.set_global_system_value("PlayerPosition", vec![SystemValue::Vec(
+                vec![
+                    SystemValue::Float(-camera_position.x),
+                    SystemValue::Float(camera_position.y), 
+                    SystemValue::Float(camera_position.z)
+                ])]
+            );
         }
 
         let render = framework.render.as_mut().unwrap();
