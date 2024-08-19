@@ -1687,14 +1687,20 @@ impl UserData for Framework {
         );
 
         methods.add_method_mut("add_label",
-            |_, framework, (window_id, widget_id, contents, size, parent): (String, String, String, [f32; 2], Option<String>)| {
-                Ok(framework.add_label(&window_id, &widget_id, &contents, size.into(), parent.as_deref()))
+            |_, framework, (window_id, widget_id, contents, text_size, size, parent): (String, String, String, Option<f32>, [f32; 2], Option<String>)| {
+                Ok(framework.add_label(&window_id, &widget_id, &contents, text_size, size.into(), parent.as_deref()))
             }
         );
 
         methods.add_method_mut("new_window",
             |_, framework, (window_id, transparent): (String, bool)| {
                 Ok(framework.new_window(&window_id, transparent))
+            }
+        );
+
+        methods.add_method_mut("remove_window",
+            |_, framework, window_id: String| {
+                Ok(framework.remove_window(&window_id))
             }
         );
 

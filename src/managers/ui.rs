@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ComboBox, Context, Image, Label, ProgressBar, Slider, TextEdit, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ComboBox, Context, Image, Label, ProgressBar, RichText, Slider, TextEdit, Ui, Window};
 use glam::{Vec2, Vec3};
 use crate::framework::{DebugMode, Framework};
 use super::{assets::get_full_asset_path, debugger, physics::RenderColliderType, systems};
@@ -12,7 +12,7 @@ pub struct UiManager {
 #[derive(Clone, Debug)]
 pub enum WidgetData {
     Button(String),
-    Label(String),
+    Label(String, f32),
     Horizontal,
     Vertical,
     SinglelineTextEdit(String),
@@ -26,7 +26,7 @@ pub enum WidgetData {
 
 impl Default for WidgetData {
     fn default() -> Self {
-        Self::Label(String::new())
+        Self::Label(String::new(), 14.0)
     }
 }
 
@@ -94,7 +94,7 @@ impl UiManager {
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
         let egui_widget = match &mut widget.widget_data {
             WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str())),
-            WidgetData::Label(contents) => ui.add_sized(size, Label::new(contents.as_str())),
+            WidgetData::Label(contents, text_size) => ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size))),
             WidgetData::Horizontal => ui.horizontal(|ui| {
                 for widget in &mut widget.children {
                     Self::render_widget(ctx, ui, widget);
@@ -333,6 +333,11 @@ impl UiManager {
                     if &widget.id == widget_id {
                         return Some(widget.state.clone())
                     }
+                    
+                    let children_state = self.get_children_widget_state(widget, widget_id);
+                    if children_state.is_some() {
+                        return children_state
+                    }
                 }
 
                 debugger::error(
@@ -353,6 +358,21 @@ impl UiManager {
         }
     }
 
+    pub fn get_children_widget_state(&self, widget: &Widget, widget_id: &str) -> Option<WidgetState> {
+        for widget in &widget.children {
+            if &widget.id == widget_id {
+                return Some(widget.state.clone())
+            }
+
+            let children_state = self.get_children_widget_state(widget, widget_id);
+            if children_state.is_some() {
+                return children_state
+            }
+        }
+
+        None
+    }
+
 
 
 
@@ -366,7 +386,7 @@ impl UiManager {
                     if &widget.id == widget_id {
                         return match widget.widget_data.clone() {
                             WidgetData::Button(contents) => Some(contents),
-                            WidgetData::Label(contents) => Some(contents),
+                            WidgetData::Label(contents, _) => Some(contents),
                             WidgetData::SinglelineTextEdit(contents) => Some(contents),
                             WidgetData::MultilineTextEdit(contents) => Some(contents),
                             WidgetData::Checkbox(_, label) => Some(label),
@@ -544,6 +564,16 @@ impl UiManager {
         });
     }
 
+    pub fn remove_window(&mut self, id: &str) {
+        self.windows.retain(|key, _| {
+            if key == id {
+                false
+            } else {
+                true
+            }
+        });
+    }
+
     pub fn add_button(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
@@ -556,11 +586,11 @@ impl UiManager {
         self.add_widget("add_button", window_id, widget_id, widget, parent)
     }
 
-    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
             size,
-            widget_data: WidgetData::Label(contents.into()),
+            widget_data: WidgetData::Label(contents.into(), text_size.unwrap_or(14.0)),
             children: Vec::new(),
             ..Default::default()
         };

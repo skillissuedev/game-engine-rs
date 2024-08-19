@@ -769,9 +769,9 @@ impl Framework {
         }
     }
 
-    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {
+    pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
         match &mut self.ui {
-            Some(ui) => ui.add_label(window_id, widget_id, contents, size, parent),
+            Some(ui) => ui.add_label(window_id, widget_id, contents, text_size, size, parent),
             None => {
                 debugger::error("Framework error!\nCan't use UI (add_label) while running server");
             },
@@ -792,6 +792,15 @@ impl Framework {
             Some(ui) => ui.new_window(window_id, transparency),
             None => {
                 debugger::error("Framework error!\nCan't use UI (new_window) while running server");
+            },
+        }
+    }
+
+    pub fn remove_window(&mut self, window_id: &str) {
+        match &mut self.ui {
+            Some(ui) => ui.remove_window(window_id),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (remove_window) while running server");
             },
         }
     }
