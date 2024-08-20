@@ -1,12 +1,21 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ComboBox, Context, Image, Label, ProgressBar, RichText, Slider, TextEdit, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Slider, TextEdit, TextureHandle, TextureId, Ui, Window};
 use glam::{Vec2, Vec3};
+use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
 use super::{assets::get_full_asset_path, debugger, physics::RenderColliderType, systems};
+
+pub struct ImageToLoad {
+    id: String,
+    bytes: Vec<u8>,
+    dimenstions: [u32; 2],
+}
 
 #[derive(Default)]
 pub struct UiManager {
     windows: HashMap<String, UiManagerWindow>,
+    images_to_load: Vec<ImageToLoad>,
+    textures: HashMap<String, TextureHandle>,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +70,22 @@ pub struct Widget {
 
 impl UiManager {
     pub fn render(&mut self, ctx: &Context) {
+        for image_to_load in &self.images_to_load {
+            if self.textures.contains_key(&image_to_load.id) == false {
+                println!("loading a texture {}", &image_to_load.id);
+                let dimenstions = image_to_load.dimenstions;
+                let width = dimenstions[0] as usize;
+                let height = dimenstions[1] as usize;
+                let texture = ctx.load_texture(
+                    image_to_load.id.clone(),
+                    egui::ImageData::from(ColorImage::from_rgba_unmultiplied([width, height], &image_to_load.bytes)),
+                    egui::TextureOptions::default()
+                );
+                self.textures.insert(image_to_load.id.clone(), texture);
+            }
+        }
+        self.images_to_load.clear();
+
         for (id, manager_window) in self.windows.iter_mut() {
             let mut window = match manager_window.transparent {
                 true => {
@@ -84,25 +109,25 @@ impl UiManager {
 
             window.show(ctx, |ui| {
                 for widget in &mut manager_window.widgets {
-                    Self::render_widget(ctx, ui, widget);
+                    Self::render_widget(&self.textures, ctx, ui, widget);
                 }
             });
         }
     }
 
-    fn render_widget(ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
+    fn render_widget(textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
         let egui_widget = match &mut widget.widget_data {
             WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str())),
             WidgetData::Label(contents, text_size) => ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size))),
             WidgetData::Horizontal => ui.horizontal(|ui| {
                 for widget in &mut widget.children {
-                    Self::render_widget(ctx, ui, widget);
+                    Self::render_widget(textures, ctx, ui, widget);
                 }
             }).response,
             WidgetData::Vertical => ui.vertical(|ui| {
                 for widget in &mut widget.children {
-                    Self::render_widget(ctx, ui, widget);
+                    Self::render_widget(textures, ctx, ui, widget);
                 }
             }).response,
             WidgetData::SinglelineTextEdit(contents) => ui.add_sized(size, TextEdit::singleline(contents)),
@@ -112,9 +137,11 @@ impl UiManager {
             WidgetData::IntSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
             WidgetData::ProgressBar(value) => ui.add_sized(size, ProgressBar::new(*value)),
             WidgetData::Image(image_path) => {
-                let uri = format!("file://{}", get_full_asset_path(image_path));
-                dbg!(&uri);
-                ui.add_sized(size, Image::new(uri))
+                let texture = textures.get(image_path);
+                match texture {
+                    Some(texture) => ui.add_sized(size, Image::new(texture)),
+                    None => ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path))),
+                }
             },
         };
 
@@ -695,15 +722,42 @@ impl UiManager {
     }
 
     pub fn add_image(&mut self, window_id: &str, widget_id: &str, image_path: &str, size: Vec2, parent: Option<&str>) {
-        let widget = Widget {
-            id: widget_id.into(),
-            size,
-            widget_data: WidgetData::Image(image_path.into()),
-            children: Vec::new(),
-            ..Default::default()
-        };
+        let image = image::open(get_full_asset_path(image_path));
+        match image {
+            Ok(image) => {
+                let bytes = image.to_rgba8().into_raw();
+                let dimenstions = image.dimensions().into();
 
-        self.add_widget("add_image", window_id, widget_id, widget, parent)
+                let widget = Widget {
+                    id: widget_id.into(),
+                    size,
+                    widget_data: WidgetData::Image(image_path.into()),
+                    children: Vec::new(),
+                    ..Default::default()
+                };
+
+                self.images_to_load.push(ImageToLoad {
+                    id: image_path.into(),
+                    bytes,
+                    dimenstions,
+                });
+
+                self.add_widget("add_image", window_id, widget_id, widget, parent)
+            },
+            Err(err) => {
+                debugger::error(&format!("add_image error!\nFailed to load the image '{}', error: {}", image_path, err));
+
+                let widget = Widget {
+                    id: widget_id.into(),
+                    size,
+                    widget_data: WidgetData::Label(format!("failed to load image '{}'", image_path), 14.0),
+                    children: Vec::new(),
+                    ..Default::default()
+                };
+
+                self.add_widget("add_image", window_id, widget_id, widget, parent)
+            },
+        }
     }
 }
 
