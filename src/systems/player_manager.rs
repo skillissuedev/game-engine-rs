@@ -10,7 +10,7 @@ use crate::{
     objects::Object,
 };
 use glam::Vec3;
-use winit::keyboard::KeyCode;
+use glium::winit::keyboard::KeyCode;
 
 pub struct PlayerManager {
     pub is_destroyed: bool,

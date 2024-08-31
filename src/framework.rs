@@ -20,11 +20,11 @@ use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, 
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
-    glutin::{
+    backend::glutin::SimpleWindowBuilder, glutin::{
+        self,
         context::NotCurrentGlContext,
         display::{GetGlDisplay, GlDisplay},
-    },
-    Display,
+    }, Display
 };
 use glutin::surface::GlSurface;
 use once_cell::sync::Lazy;
@@ -32,12 +32,12 @@ use raw_window_handle::HasRawWindowHandle;
 use std::{
     collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
-use winit::{
+use glium::winit::{
     dpi::PhysicalSize,
     event::{Event, MouseButton, WindowEvent},
     event_loop::{EventLoop, EventLoopBuilder},
     keyboard::KeyCode,
-    window::{CursorGrabMode, WindowBuilder},
+    window::CursorGrabMode,
 };
 
 pub static mut FRAMEWORK_POINTER: usize = 0;
@@ -46,7 +46,7 @@ static FONT: Lazy<Vec<u8>> =
 
 pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     dbg!(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf"));
-    let event_loop: EventLoop<_> = EventLoopBuilder::new()
+    let event_loop: EventLoop<_> = EventLoop::builder()
         .build()
         .expect("Event loop building failed");
     let (window, display) = new_window(&event_loop);
@@ -317,62 +317,17 @@ pub enum DebugMode {
 // https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
 // TODO: fix for Windows
 fn new_window<T>(
-    event_loop: &winit::event_loop::EventLoop<T>,
+    event_loop: &glium::winit::event_loop::EventLoop<T>,
 ) -> (
-    winit::window::Window,
+    glium::winit::window::Window,
     Display<glutin::surface::WindowSurface>,
 ) {
-    // First we start by opening a new Window
-    let window_builder = WindowBuilder::new()
-        .with_title("projectbaldej")
-        .with_inner_size(PhysicalSize::new(1280, 720));
-
-    let display_builder =
-        glutin_winit::DisplayBuilder::new().with_window_builder(Some(window_builder));
-
     let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
         .with_multisampling(4)
         .with_single_buffering(true);
 
-    let (window, gl_config) = display_builder
-        .build(&event_loop, config_template_builder, |mut configs| {
-            // Just use the first configuration since we don't have any special preferences here
-            configs.next().unwrap()
-        })
-        .unwrap();
-    let window = window.unwrap();
-
-    // Now we get the window size to use as the initial size of the Surface
-    let (width, height): (u32, u32) = window.inner_size().into();
-    let attrs = glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
-        .build(
-            window.raw_window_handle(),
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
-        );
-
-    // Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
-    let surface = unsafe {
-        gl_config
-            .display()
-            .create_window_surface(&gl_config, &attrs)
-            .unwrap()
-    };
-    let context_attributes =
-        glutin::context::ContextAttributesBuilder::new().build(Some(window.raw_window_handle()));
-    let current_context = Some(unsafe {
-        gl_config
-            .display()
-            .create_context(&gl_config, &context_attributes)
-            .expect("failed to create context")
-    })
-    .unwrap()
-    .make_current(&surface)
-    .unwrap();
-    surface
-        .set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait)
-        .unwrap();
-    let display = Display::from_context_surface(current_context, surface).unwrap();
+    let window_builder = SimpleWindowBuilder::new().with_config_template_builder(config_template_builder);
+    let (window, display) = window_builder.build(event_loop);
 
     (window, display)
 }

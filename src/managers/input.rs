@@ -1,7 +1,7 @@
 use super::debugger;
 use glam::Vec2;
 use std::collections::HashMap;
-use winit::{
+use glium::winit::{
     event::{DeviceEvent, ElementState, MouseButton, WindowEvent},
     keyboard::KeyCode,
 };

@@ -91,6 +91,8 @@ impl System for LuaSystem {
         match lua_option {
             Some(lua) => {
                 let _ = call_lua_function(self.system_id(), &lua, "client_update", Some(framework));
+                let _ = lua.gc_collect();
+                let _ = lua.gc_collect();
             }
             None => debugger::error("lua system client_update function error\ncan't get lua vm reference"),
         }
