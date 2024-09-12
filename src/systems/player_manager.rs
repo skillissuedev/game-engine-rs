@@ -143,7 +143,7 @@ impl System for PlayerManager {
     fn server_update(&mut self, _: &mut Framework) {}
 
     fn server_render(&mut self) {}
-    fn client_render(&mut self) {}
+    fn client_render(&mut self, _: &mut Framework) {}
 
     fn call(&self, _call_id: &str) {}
     fn call_mut(&mut self, _call_id: &str) {}

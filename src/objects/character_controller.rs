@@ -7,7 +7,7 @@ use crate::{
     },
     math_utils::{self, deg_to_rad},
 };
-use glam::{Mat4, Quat, Vec2, Vec3};
+use glam::{Vec2, Vec3};
 use rapier3d::{
     control::{CharacterLength, KinematicCharacterController},
     geometry::{ActiveCollisionTypes, ColliderHandle},

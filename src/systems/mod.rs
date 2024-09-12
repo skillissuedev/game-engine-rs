@@ -21,7 +21,7 @@ pub trait System {
     fn client_update(&mut self, framework: &mut Framework);
     fn server_update(&mut self, framework: &mut Framework);
     fn server_render(&mut self);
-    fn client_render(&mut self);
+    fn client_render(&mut self, framework: &mut Framework);
     fn call(&self, call_id: &str);
     fn call_mut(&mut self, call_id: &str);
     fn objects_list(&self) -> &Vec<Box<dyn Object>>;

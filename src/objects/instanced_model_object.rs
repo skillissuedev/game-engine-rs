@@ -127,9 +127,3 @@ impl Object for InstancedModelObject {
         &mut self.groups
     }
 }
-
-#[derive(Debug)]
-pub struct SetupMatrixResult {
-    pub mvp: Mat4,
-    pub model: Mat4,
-}

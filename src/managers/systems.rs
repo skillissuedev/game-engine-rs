@@ -67,7 +67,7 @@ pub fn render(framework: &mut Framework) {
             }
         } else {
             for system in &mut SYSTEMS {
-                system.client_render();
+                system.client_render(framework);
                 system.render_objects(framework);
             }
         }

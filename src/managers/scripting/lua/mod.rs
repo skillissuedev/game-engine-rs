@@ -1,7 +1,7 @@
 pub mod lua_functions;
 use crate::{
     assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
-        assets, debugger::{self, error}, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
+        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
@@ -121,11 +121,11 @@ impl System for LuaSystem {
         */
     }
 
-    fn client_render(&mut self) {
+    fn client_render(&mut self, framework: &mut Framework) {
         let lua_option = lua_vm_ref(self.system_id().into());
         match lua_option {
             Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "client_render", None);
+                let _ = call_lua_function(self.system_id(), &lua, "client_render", Some(framework));
             }
             None => debugger::error("lua system client_render function error\ncan't get lua vm reference"),
         }
@@ -328,15 +328,7 @@ fn call_lua_function(system_id: &str, lua: &Lua, function_name: &str, framework:
 #[derive(Debug)]
 pub enum LuaSystemError {
     ScriptLoadingError,
-    LuaExecutingError,
-    LuaCreationError,
 }
-
-/*#[derive(Debug, Clone)]
-  pub struct LuaObjectHandle {
-  pub object_name: String,
-  pub owner_system_name: String
-  }*/
 
 pub struct ObjectHandle {
     pub system_id: String,
@@ -1459,6 +1451,13 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("remove_global_system_value", 
+            |_, framework, key: String| {
+                framework.remove_global_system_value(&key);
+                Ok(())
+            }
+        );
+
         methods.add_method_mut("set_global_system_value", 
             |_, framework, (key, value): (String, Vec<SystemValue>)| {
                 framework.set_global_system_value(&key, value);
@@ -1550,6 +1549,13 @@ impl UserData for Framework {
         methods.add_method_mut("is_bind_released",
             |_, framework, name: String| {
                 Ok(framework.is_bind_released(&name))
+            }
+        );
+
+        methods.add_method_mut("mouse_position",
+            |_, framework, _: ()| {
+                let position = framework.mouse_position();
+                Ok(vec![position.x, position.y])
             }
         );
 
@@ -1691,6 +1697,11 @@ impl UserData for Framework {
         methods.add_method_mut("add_label",
             |_, framework, (window_id, widget_id, contents, text_size, size, parent): (String, String, String, Option<f32>, [f32; 2], Option<String>)| {
                 Ok(framework.add_label(&window_id, &widget_id, &contents, text_size, size.into(), parent.as_deref()))
+            }
+        );
+        methods.add_method_mut("set_widget_spacing",
+            |_, framework, (window_id, widget_id, spacing): (String, String, f32)| {
+                Ok(framework.set_widget_spacing(&window_id, &widget_id, spacing))
             }
         );
 

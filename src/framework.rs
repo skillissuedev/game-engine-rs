@@ -20,22 +20,16 @@ use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, 
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
-    backend::glutin::SimpleWindowBuilder, glutin::{
-        self,
-        context::NotCurrentGlContext,
-        display::{GetGlDisplay, GlDisplay},
-    }, Display
+    backend::glutin::SimpleWindowBuilder, glutin, Display
 };
-use glutin::surface::GlSurface;
 use once_cell::sync::Lazy;
-use raw_window_handle::HasRawWindowHandle;
+use winit::{event::ElementState, keyboard::PhysicalKey, window::Fullscreen};
 use std::{
     collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
 };
 use glium::winit::{
-    dpi::PhysicalSize,
     event::{Event, MouseButton, WindowEvent},
-    event_loop::{EventLoop, EventLoopBuilder},
+    event_loop::EventLoop,
     keyboard::KeyCode,
     window::CursorGrabMode,
 };
@@ -49,6 +43,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     let event_loop: EventLoop<_> = EventLoop::builder()
         .build()
         .expect("Event loop building failed");
+    //event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let (window, display) = new_window(&event_loop);
 
     let mut egui_glium =
@@ -104,6 +99,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
     game_main::start(args, &mut framework);
 
+    #[allow(deprecated)]
     event_loop
         .run(move |ev, window_target| {
             unsafe {
@@ -112,13 +108,11 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
             };
 
             match ev {
-                Event::AboutToWait => {
-                    window.request_redraw();
-                }
                 Event::DeviceEvent {
                     device_id: _,
                     event,
                 } => framework.input.reg_device_event(&event),
+                Event::AboutToWait => window.request_redraw(),
                 Event::WindowEvent {
                     window_id: _,
                     event,
@@ -196,7 +190,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 window_target.exit();
                                 networking::disconnect();
                                 return;
-                            }
+                            },
                             WindowEvent::Resized(size) => {
                                 framework.resolution =
                                     Vec2::new(size.width as f32, size.height as f32);
@@ -210,7 +204,19 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                                 framework.render.as_mut().unwrap().aspect_ratio =
                                     size.width as f32 / size.height as f32;
-                            }
+                            },
+                            WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
+                                // fullscreen on f11
+                                if let ElementState::Released = event.state {
+                                    if let PhysicalKey::Code(KeyCode::F11) = event.physical_key {
+                                        if let Some(_) = window.fullscreen() {
+                                            window.set_fullscreen(None);
+                                        } else {
+                                            window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                                        }
+                                    }
+                                }
+                            },
                             _ => (),
                         }
                     }
@@ -282,13 +288,6 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
-    /*
-    // Render to the closest cascade
-    systems::render(framework);
-    // Render to the furthest cascade
-    systems::render(framework);
-    // Render normally
-    systems::render(framework);*/
     framework.navigation.create_grids();
     if let Some(render) = &mut framework.render {
         render.finish_render();
@@ -313,21 +312,63 @@ pub enum DebugMode {
     Full,
 }
 
-// Glium's SimpleWindowBuilder's build function with a few changes
-// https://github.com/glium/glium/blob/master/src/backend/glutin/mod.rs#L351
-// TODO: fix for Windows
+// TODO: fix for Windows (?)
 fn new_window<T>(
     event_loop: &glium::winit::event_loop::EventLoop<T>,
 ) -> (
     glium::winit::window::Window,
     Display<glutin::surface::WindowSurface>,
 ) {
-    let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
+    let (window, display) = SimpleWindowBuilder::new().build(event_loop);
+    /*
+    let config_template_builder = ConfigTemplateBuilder::new()
         .with_multisampling(4)
         .with_single_buffering(true);
+    let window_attributes = WindowAttributes::default()
+        .with_title("Game");
 
-    let window_builder = SimpleWindowBuilder::new().with_config_template_builder(config_template_builder);
-    let (window, display) = window_builder.build(event_loop);
+    // First we start by opening a new Window
+    let display_builder =
+        glutin_winit::DisplayBuilder::new().with_window_attributes(Some(window_attributes));
+    let (window, gl_config) = display_builder
+        .build(event_loop, config_template_builder, |mut configs| {
+            // Just use the first configuration since we don't have any special preferences here
+            configs.next().unwrap()
+        })
+    .unwrap();
+    let window = window.unwrap();
+
+    // Now we get the window size to use as the initial size of the Surface
+    let (width, height): (u32, u32) = window.inner_size().into();
+    let attrs =
+        glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
+        .build(
+            window.window_handle().expect("couldn't obtain raw window handle").into(),
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
+
+    // Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
+    let surface = unsafe {
+        gl_config
+            .display()
+            .create_window_surface(&gl_config, &attrs)
+            .unwrap()
+    };
+    let context_attributes = glutin::context::ContextAttributesBuilder::new()
+        .with_context_api(glutin::context::ContextApi::OpenGl(Some(glutin::context::Version { major: 3, minor: 3 })))
+        .build(Some(window.window_handle().expect("Couldn't obtain raw window handle").into()));
+    let current_context = Some(unsafe {
+        gl_config
+            .display()
+            .create_context(&gl_config, &context_attributes)
+            .expect("Failed to create context")
+    })
+    .unwrap()
+        .make_current(&surface)
+        .unwrap();
+    surface.set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait).unwrap();
+    let display = Display::from_context_surface(current_context, surface).unwrap();*/
 
     (window, display)
 }
@@ -344,8 +385,8 @@ pub struct Framework {
     pub physics: PhysicsManager, // done + api is not required
     pub saves: SavesManager, // done + api is ready
     pub assets: AssetManager, // done + api is ready
-    pub render: Option<RenderManager>, // done + api is not required
-    pub ui: Option<UiManager>,
+    pub render: Option<RenderManager>, // done + api is ready
+    pub ui: Option<UiManager>, // done + api is ready
     // todo: networking??
 }
 
@@ -375,6 +416,10 @@ impl Framework {
             Some(value) => Some(value.clone()),
             None => None,
         }
+    }
+
+    pub fn remove_global_system_value(&mut self, key: &str) {
+        self.system_globals.remove(key);
     }
 
     // render
@@ -546,6 +591,10 @@ impl Framework {
 
     pub fn mouse_position_from_center(&self) -> Vec2 {
         self.input.mouse_position_from_center()
+    }
+
+    pub fn mouse_position(&self) -> Vec2 {
+        self.input.mouse_position()
     }
 
     pub fn mouse_delta(&self) -> Vec2 {
@@ -738,6 +787,15 @@ impl Framework {
             Some(ui) => ui.set_window_position(window_id, position),
             None => {
                 debugger::error("Framework error!\nCan't use UI (set_window_position) while running server");
+            },
+        }
+    }
+
+    pub fn set_widget_spacing(&mut self, window_id: &str, widget_id: &str, spacing: f32) {
+        match &mut self.ui {
+            Some(ui) => ui.set_widget_spacing(window_id, widget_id, spacing),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (set_widget_spacing) while running server");
             },
         }
     }

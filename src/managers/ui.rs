@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Slider, TextEdit, TextureHandle, TextureId, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Slider, TextEdit, TextureHandle, Ui, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -59,13 +59,27 @@ pub struct UiManagerWindow {
     show_close_button: bool,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Widget {
     id: String,
     size: Vec2,
     widget_data: WidgetData,
     children: Vec<Widget>,
     state: WidgetState,
+    spacing: f32
+}
+
+impl Default for Widget {
+    fn default() -> Self {
+        Widget {
+            id: String::new(),
+            size: Vec2::ZERO,
+            widget_data: WidgetData::Label(String::new(), 14.0),
+            children: Vec::new(),
+            state: WidgetState::default(),
+            spacing: 10.0,
+        }
+    }
 }
 
 impl UiManager {
@@ -117,6 +131,9 @@ impl UiManager {
 
     fn render_widget(textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
+        //dbg!(widget.spacing);
+        ui.spacing_mut().item_spacing.x = widget.spacing;
+        ui.spacing_mut().item_spacing.y = widget.spacing;
         let egui_widget = match &mut widget.widget_data {
             WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str())),
             WidgetData::Label(contents, text_size) => ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size))),
@@ -139,7 +156,7 @@ impl UiManager {
             WidgetData::Image(image_path) => {
                 let texture = textures.get(image_path);
                 match texture {
-                    Some(texture) => ui.add_sized(size, Image::new(texture)),
+                    Some(texture) => ui.add_sized(size, Image::new(texture).fit_to_exact_size(size)),
                     None => ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path))),
                 }
             },
@@ -402,7 +419,40 @@ impl UiManager {
 
 
 
+    fn set_child_widget_spacing(widget: &mut Widget, widget_id: &str, spacing: f32) {
+        if &widget.id == widget_id {
+            widget.spacing = spacing;
+            return
+        }
 
+        for widget in &mut widget.children {
+            Self::set_child_widget_spacing(widget, widget_id, spacing);
+        }
+    }
+        
+
+    pub fn set_widget_spacing(&mut self, window_id: &str, widget_id: &str, spacing: f32) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                for widget in &mut window.widgets {
+                    Self::set_child_widget_spacing(widget, widget_id, spacing);
+                }
+
+                debugger::error(
+                    &format!(
+                        "set_widget_spacing error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "set_widget_spacing error!\nFailed to get the window with id '{}' to get widget with id '{}'", window_id, widget_id
+                    )
+                );
+            },
+        }
+    }
 
 
 

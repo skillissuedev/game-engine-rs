@@ -648,7 +648,6 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                         };
 
                     } else if let networking::NetworkingMode::Client(_) = networking::get_current_networking_mode() {
-                        dbg!(networking::get_id());
                         let message = Message::new_from_client(MessageContents::Custom(contents), system_id_for_functions.clone(), message_id);
                         let _ = system.send_message(reliability, message);
                     }
