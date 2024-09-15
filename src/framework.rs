@@ -809,6 +809,15 @@ impl Framework {
         }
     }
 
+    pub fn set_window_on_top(&mut self, window_id: &str, show_on_top: bool) {
+        match &mut self.ui {
+            Some(ui) => ui.set_window_on_top(window_id, show_on_top),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (set_window_on_top) while running server");
+            },
+        }
+    }
+
     pub fn remove_window(&mut self, window_id: &str) {
         match &mut self.ui {
             Some(ui) => ui.remove_window(window_id),

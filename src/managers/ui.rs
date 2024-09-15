@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Slider, TextEdit, TextureHandle, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Sense, Slider, TextEdit, TextureHandle, Ui, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -57,6 +57,7 @@ pub struct UiManagerWindow {
     transparent: bool,
     show_title_bar: bool,
     show_close_button: bool,
+    show_on_top: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -86,7 +87,7 @@ impl UiManager {
     pub fn render(&mut self, ctx: &Context) {
         for image_to_load in &self.images_to_load {
             if self.textures.contains_key(&image_to_load.id) == false {
-                println!("loading a texture {}", &image_to_load.id);
+                println!("ui manager: loading a texture {}", &image_to_load.id);
                 let dimenstions = image_to_load.dimenstions;
                 let width = dimenstions[0] as usize;
                 let height = dimenstions[1] as usize;
@@ -101,21 +102,26 @@ impl UiManager {
         self.images_to_load.clear();
 
         for (id, manager_window) in self.windows.iter_mut() {
-            let mut window = match manager_window.transparent {
-                true => {
-                    Window::new(id)
-                        .frame(egui::Frame::none())
-                        .title_bar(false)
-                        .resizable(false)
-                        .scroll(false)
-                },
-                false => {
-                    Window::new(id)
-                        .resizable(false)
-                        .title_bar(manager_window.show_title_bar)
-                        .collapsible(manager_window.show_close_button)
-                },
-            };
+            let egui_id = egui::Id::new(id);
+            let mut window = Window::new(id)
+                .id(egui_id)
+                .resizable(false);
+            
+            if manager_window.transparent {
+                window = window
+                    .frame(egui::Frame::none())
+                    .title_bar(false)
+                    .scroll(false)
+            } else {
+                window = window
+                    .title_bar(manager_window.show_title_bar)
+                    .collapsible(manager_window.show_close_button)
+            }
+
+            if manager_window.show_on_top {
+                let layer_id = egui::LayerId::new(egui::Order::Middle, egui_id);
+                ctx.move_to_top(layer_id);
+            }
 
             if let Some(position) = manager_window.position {
                 window = window.fixed_pos([position.x, position.y]);
@@ -131,22 +137,26 @@ impl UiManager {
 
     fn render_widget(textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
-        //dbg!(widget.spacing);
         ui.spacing_mut().item_spacing.x = widget.spacing;
         ui.spacing_mut().item_spacing.y = widget.spacing;
         let egui_widget = match &mut widget.widget_data {
             WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str())),
-            WidgetData::Label(contents, text_size) => ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size))),
-            WidgetData::Horizontal => ui.horizontal(|ui| {
-                for widget in &mut widget.children {
-                    Self::render_widget(textures, ctx, ui, widget);
-                }
-            }).response,
-            WidgetData::Vertical => ui.vertical(|ui| {
-                for widget in &mut widget.children {
-                    Self::render_widget(textures, ctx, ui, widget);
-                }
-            }).response,
+            WidgetData::Label(contents, text_size) => 
+                ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag())),
+            WidgetData::Horizontal => {
+                ui.horizontal(|ui| {
+                    for widget in &mut widget.children {
+                        Self::render_widget(textures, ctx, ui, widget);
+                    }
+                }).response
+            },
+            WidgetData::Vertical => {
+                ui.vertical(|ui| {
+                    for widget in &mut widget.children {
+                        Self::render_widget(textures, ctx, ui, widget);
+                    }
+                }).response
+            },
             WidgetData::SinglelineTextEdit(contents) => ui.add_sized(size, TextEdit::singleline(contents)),
             WidgetData::MultilineTextEdit(contents) => ui.add_sized(size, TextEdit::multiline(contents)),
             WidgetData::Checkbox(value, text) => ui.add_sized(size, Checkbox::new(value, text.as_str())),
@@ -156,8 +166,8 @@ impl UiManager {
             WidgetData::Image(image_path) => {
                 let texture = textures.get(image_path);
                 match texture {
-                    Some(texture) => ui.add_sized(size, Image::new(texture).fit_to_exact_size(size)),
-                    None => ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path))),
+                    Some(texture) => ui.add_sized(size, Image::new(texture).fit_to_exact_size(size).sense(Sense::click_and_drag())),
+                    None => ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path)).sense(Sense::click_and_drag()))
                 }
             },
         };
@@ -638,7 +648,21 @@ impl UiManager {
             transparent,
             show_title_bar: true,
             show_close_button: true,
+            show_on_top: false,
         });
+    }
+
+    pub fn set_window_on_top(&mut self, window_id: &str, show_on_top: bool) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => window.show_on_top = show_on_top,
+            None => {
+                debugger::error(
+                    &format!(
+                        "set_window_on_top error!\nFailed to get the window with id '{}'", window_id
+                    )
+                )
+            },
+        }
     }
 
     pub fn remove_window(&mut self, id: &str) {

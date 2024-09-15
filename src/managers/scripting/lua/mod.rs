@@ -923,7 +923,7 @@ impl UserData for ObjectHandle {
         });
 
         methods.add_method("is_intersecting", |_, this, _: ()| {
-            let framework = unsafe { &mut *get_framework_pointer() };
+            let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
@@ -1708,6 +1708,12 @@ impl UserData for Framework {
         methods.add_method_mut("new_window",
             |_, framework, (window_id, transparent): (String, bool)| {
                 Ok(framework.new_window(&window_id, transparent))
+            }
+        );
+
+        methods.add_method_mut("set_window_on_top",
+            |_, framework, (window_id, show_on_top): (String, bool)| {
+                Ok(framework.set_window_on_top(&window_id, show_on_top))
             }
         );
 
