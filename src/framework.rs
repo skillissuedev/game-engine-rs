@@ -481,11 +481,11 @@ impl Framework {
         }
     }
 
-    pub fn get_camera_right(&self) -> Option<Vec3> {
+    pub fn get_camera_left(&self) -> Option<Vec3> {
         match self.render.as_ref() {
-            Some(render) => Some(render.get_camera_right()),
+            Some(render) => Some(render.get_camera_left()),
             None => {
-                debugger::error("Failed to call get_camera_right, render is None (probably running a server!)");
+                debugger::error("Failed to call get_camera_left, render is None (probably running a server!)");
                 None
             },
         }

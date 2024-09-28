@@ -1847,9 +1847,9 @@ impl UserData for Framework {
             }
         );
 
-        methods.add_method_mut("get_camera_right",
+        methods.add_method_mut("get_camera_left",
             |_, framework, (): ()| {
-                let result = framework.get_camera_right();
+                let result = framework.get_camera_left();
                 match result {
                     Some(vector) => Ok(Some([vector.x, vector.y, vector.z])),
                     None => Ok(None),

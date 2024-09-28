@@ -42,7 +42,7 @@ pub struct CameraLocation {
     pub rotation: Vec3,
     pub fov: f32,
     pub front: Vec3,
-    right: Vec3,
+    left: Vec3,
     up: Vec3,
 }
 
@@ -139,17 +139,12 @@ impl Cascades {
 
 impl SunCamera {
     fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
-        //dbg!(corners.min_x, corners.max_x);
-        //dbg!(corners.min_y, corners.max_y);
-        //dbg!(corners.min_z, corners.max_z);
-
         Mat4::orthographic_rh_gl(
             corners.min_x - 50.0,
             corners.max_x + 20.0,
             corners.min_y - 50.0,
             corners.max_y + 50.0,
             corners.min_z - 100.0,
-            //corners.min_z + corners.max_z / 2.0,
             corners.max_z + 200.0,
         )
     }
@@ -172,7 +167,6 @@ impl SunCamera {
 
         let sun_camera_position =
             light_dir + view_center + Vec3::new(0.0, 20.0, 0.0) + additional_y; //Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
-                                                                                //dbg!(&sun_camera_position);
 
         let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
 
@@ -235,7 +229,6 @@ impl CameraCorners {
             vec3_frustum_corners.push(Vec3::new(corner.x, corner.y, corner.z));
         }
 
-        //dbg!(&vec3_frustum_corners);
         vec3_frustum_corners
     }
 
@@ -250,7 +243,6 @@ impl CameraCorners {
             Some(distance) => distance,
             None => 500.0,
         };
-        //dbg!(start_distance, end_distance);
         Mat4::perspective_rh_gl(fov, aspect_ratio, start_distance, end_distance)
     }
 
@@ -269,7 +261,6 @@ impl CameraCorners {
             Self::get_camera_proj(fov, aspect_ratio, start_distance, end_distance),
             view,
         );
-        //dbg!(&corners);
 
         let mut min_x = 0.0;
         let mut min_y = 0.0;
@@ -378,14 +369,6 @@ impl RenderManager {
         let collider_cuboid_index_buffer =
             IndexBuffer::new(&display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap();
         let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
-        /*let mut closest_shadow_fbo =
-            SimpleFrameBuffer::depth_only(&display, &shadow_textures.closest).unwrap();
-        closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
-        closest_shadow_fbo.clear_depth(1.0);
-        let mut furthest_shadow_fbo =
-            SimpleFrameBuffer::depth_only(&display, &shadow_textures.furthest).unwrap();
-        furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
-        furthest_shadow_fbo.clear_depth(1.0);*/
 
         Self {
             light_direction: Vec3::new(-1.0, 0.0, 0.0),
@@ -394,12 +377,10 @@ impl RenderManager {
                 rotation: Vec3::ZERO,
                 fov: 90.0,
                 front: DEFAULT_FRONT_VECTOR,
-                right: Vec3::ZERO,
+                left: Vec3::ZERO,
                 up: DEFAULT_UP_VECTOR,
             },
             aspect_ratio: 1.0,
-            /*closest_shadow_fbo,
-            furthest_shadow_fbo,*/
             shadow_textures,
             display,
             target: None,
@@ -435,14 +416,12 @@ impl RenderManager {
     }
 
     pub fn get_view_matrix(&self) -> Mat4 {
-        let mut camera_position = self.camera_location.position.clone();
-        camera_position.x = -camera_position.x;
-        camera_position.z = -camera_position.z;
-        Mat4::look_at_lh(
-            camera_position,
-            camera_position + self.camera_location.front,
-            DEFAULT_UP_VECTOR,
-        )
+        let mut translation = self.camera_location.position;
+        translation.y = -translation.y;
+        Mat4::from_rotation_x(self.camera_location.rotation.x.to_radians())
+            * Mat4::from_rotation_y(self.camera_location.rotation.y.to_radians())
+            * Mat4::from_rotation_z(self.camera_location.rotation.z.to_radians())
+            * Mat4::from_translation(translation)
     }
 
     pub fn get_projection_matrix(&self) -> Mat4 {
@@ -450,24 +429,33 @@ impl RenderManager {
     }
 
     fn update_camera_vectors(&mut self) {
+        let mut translation = self.camera_location.position;
+        translation.y = -translation.y;
+        let transformations = Mat4::from_rotation_x(self.camera_location.rotation.x.to_radians())
+            * Mat4::from_rotation_y(self.camera_location.rotation.y.to_radians())
+            * Mat4::from_rotation_z(self.camera_location.rotation.z.to_radians())
+            * Mat4::from_translation(translation);
+        let left_row = transformations.row(0);
+        let up_row = transformations.row(1);
+        let front_row = transformations.row(2);
+
         let front = Vec3 {
-            x: -self.camera_location.rotation.y.to_radians().sin()
-                * self.camera_location.rotation.x.to_radians().cos(),
-            y: -(self.camera_location.rotation.x).to_radians().sin(),
-            z: -(self.camera_location.rotation.y).to_radians().cos()
-                * -(self.camera_location.rotation.x).to_radians().cos(),
+            x: front_row.x,
+            y: front_row.y,
+            z: front_row.z,
         };
         self.camera_location.front = front.normalize();
-        self.camera_location.right = self
-            .camera_location
-            .front
-            .cross(DEFAULT_UP_VECTOR)
-            .normalize();
-        self.camera_location.up = self
-            .camera_location
-            .right
-            .cross(self.camera_location.front)
-            .normalize();
+        self.camera_location.left = Vec3 {
+            x: -left_row.x,
+            y: -left_row.y,
+            z: -left_row.z,
+        }.normalize();
+
+        self.camera_location.up = Vec3 {
+            x: up_row.x,
+            y: up_row.y,
+            z: up_row.z,
+        }.normalize();
     }
 
     pub fn get_camera_position(&self) -> Vec3 {
@@ -475,13 +463,11 @@ impl RenderManager {
     }
 
     pub fn get_camera_front(&mut self) -> Vec3 {
-        let mut front = self.camera_location.front;
-        front.y = -front.y;
-        front
+        self.camera_location.front
     }
 
-    pub fn get_camera_right(&self) -> Vec3 {
-        self.camera_location.right
+    pub fn get_camera_left(&self) -> Vec3 {
+        self.camera_location.left
     }
 
     pub fn get_camera_rotation(&self) -> Vec3 {
@@ -643,10 +629,6 @@ impl RenderManager {
                 0, 1, 2, 1, 3, 2, 4, 5, 6, 6, 7, 5, 0, 2, 4, 0, 2, 6, 1, 3, 5, 1, 3, 7, 0, 1, 4, 0,
                 1, 5, 2, 3, 6, 2, 3, 7, 4, 5, 8, 4, 6, 8, 5, 7, 8, 6, 7, 8,
             ];
-
-            //dbg!(ray);
-            //dbg!(origin);
-            //dbg!(dir);
 
             let vert_buffer = VertexBuffer::new(&self.display, &verts_list)
                 .expect("failed to create vertex buffer while debug rendering rays");

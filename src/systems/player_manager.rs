@@ -91,7 +91,7 @@ impl System for PlayerManager {
         let speed = 420.0 * delta_time;
 
         let camera_front = render.get_camera_front();
-        let camera_right = render.get_camera_right();
+        let camera_right = render.get_camera_left();
         let mut camera_position = render.get_camera_position();
 
         if framework.input.is_bind_down("cam_up") {

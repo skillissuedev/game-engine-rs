@@ -62,6 +62,7 @@ pub struct AnimationChannel {
     pub x_axis_spline: Spline<f32, f32>,
     pub y_axis_spline: Spline<f32, f32>,
     pub z_axis_spline: Spline<f32, f32>,
+    pub w_axis_spline: Option<Spline<f32, f32>>,
 }
 
 #[derive(Debug, Clone)]
@@ -246,12 +247,14 @@ impl ModelAsset {
                                 x_axis_spline,
                                 y_axis_spline,
                                 z_axis_spline,
+                                w_axis_spline: None,
                             });
                         },
                         gltf::animation::util::ReadOutputs::Rotations(rotation) => {
                             let mut x_axis_keys: Vec<Key<f32, f32>> = vec![];
                             let mut y_axis_keys: Vec<Key<f32, f32>> = vec![];
                             let mut z_axis_keys: Vec<Key<f32, f32>> = vec![];
+                            let mut w_axis_keys: Vec<Key<f32, f32>> = vec![];
 
                             let rot_iter = rotation.into_f32();
                             let mut current_keyframe_id = 0;
@@ -261,12 +264,14 @@ impl ModelAsset {
                                 x_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[0], splines::Interpolation::Linear));
                                 y_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[1], splines::Interpolation::Linear));
                                 z_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[2], splines::Interpolation::Linear));
+                                w_axis_keys.push(Key::new(keyframe_timestamps[current_keyframe_id], rot[3], splines::Interpolation::Linear));
                                 current_keyframe_id += 1;
                             });
 
                             let x_axis_spline = Spline::from_vec(x_axis_keys);
                             let y_axis_spline = Spline::from_vec(y_axis_keys);
                             let z_axis_spline = Spline::from_vec(z_axis_keys);
+                            let w_axis_spline = Spline::from_vec(w_axis_keys);
 
                             channels.push(AnimationChannel {
                                 channel_type: AnimationChannelType::Rotation,
@@ -274,6 +279,7 @@ impl ModelAsset {
                                 x_axis_spline,
                                 y_axis_spline,
                                 z_axis_spline,
+                                w_axis_spline: Some(w_axis_spline),
                             });
                         }
                         gltf::animation::util::ReadOutputs::Scales(scale) => {
@@ -302,6 +308,7 @@ impl ModelAsset {
                                 x_axis_spline,
                                 y_axis_spline,
                                 z_axis_spline,
+                                w_axis_spline: None,
                             });
                         },
                         gltf::animation::util::ReadOutputs::MorphTargetWeights(_) => (),

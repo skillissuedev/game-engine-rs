@@ -18,7 +18,7 @@ use rapier3d::{
     },
     math::{Point, Real},
     na::vector,
-    pipeline::{ActiveEvents, PhysicsPipeline, QueryFilter, QueryPipeline},
+    pipeline::{ActiveEvents, PhysicsPipeline, QueryFilter, QueryPipeline}, prelude::DefaultBroadPhase,
 };
 
 const GRAVITY: Vector3<f32> = vector![0.0, -9.81, 0.0];
@@ -30,7 +30,7 @@ pub struct PhysicsManager {
     //IntegrationParameters::default()
     pub physics_pipeline: PhysicsPipeline, // = Lazy::new(|| PhysicsPipeline::new());
     pub island_manager: IslandManager,     // = Lazy::new(|| IslandManager::new());
-    pub broad_phase: BroadPhase,           // = Lazy::new(|| BroadPhase::new());
+    pub broad_phase: DefaultBroadPhase,           // = Lazy::new(|| BroadPhase::new());
     pub narrow_phase: NarrowPhase,         // = Lazy::new(|| NarrowPhase::new());
     pub impulse_joint_set: ImpulseJointSet, // = Lazy::new(|| ImpulseJointSet::new());
     pub multibody_joint_set: MultibodyJointSet, // =
@@ -47,7 +47,7 @@ impl Default for PhysicsManager {
             integration_parameters: IntegrationParameters::default(),
             physics_pipeline: PhysicsPipeline::new(),
             island_manager: IslandManager::new(),
-            broad_phase: BroadPhase::new(),
+            broad_phase: DefaultBroadPhase::new(),
             narrow_phase: NarrowPhase::new(),
             impulse_joint_set: ImpulseJointSet::new(),
             multibody_joint_set: MultibodyJointSet::new(),
@@ -75,7 +75,7 @@ impl PhysicsManager {
             &(),
         );
         self.query_pipeline
-            .update(&mut self.rigid_body_set, &mut self.collider_set);
+            .update(&mut self.collider_set);
     }
 
     pub fn remove_rigid_body(&mut self, body_parameters: &mut ObjectBodyParameters) {

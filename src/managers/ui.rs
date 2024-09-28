@@ -140,7 +140,7 @@ impl UiManager {
         ui.spacing_mut().item_spacing.x = widget.spacing;
         ui.spacing_mut().item_spacing.y = widget.spacing;
         let egui_widget = match &mut widget.widget_data {
-            WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str())),
+            WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str()).sense(Sense::click_and_drag())),
             WidgetData::Label(contents, text_size) => 
                 ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag())),
             WidgetData::Horizontal => {

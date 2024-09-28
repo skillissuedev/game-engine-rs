@@ -11,7 +11,7 @@ use crate::{
         physics::ObjectBodyParameters,
         render::{CurrentCascade, RenderManager},
     },
-    math_utils::deg_to_rad,
+    math_utils::{deg_vec_to_rad, rad_vec_to_deg},
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
@@ -63,15 +63,12 @@ impl ModelObject {
                     let node_local_transform_mat = Mat4::from_cols_array_2d(&node.transform);
                     let node_scale_rotation_translation =
                         node_local_transform_mat.to_scale_rotation_translation();
-                    let node_rotation = node_scale_rotation_translation
-                        .1
-                        .to_euler(glam::EulerRot::XYZ);
 
                     nodes_transforms.push(NodeTransform {
                         local_position: node_scale_rotation_translation.2,
-                        local_rotation: node_rotation.into(),
+                        local_rotation: node_scale_rotation_translation.1,
                         local_scale: node_scale_rotation_translation.0,
-                        global_transform: None,
+                        global_transform: Mat4::IDENTITY,
                         node_id: node.node_index,
                         parent_global_transform: None,
                     });
@@ -578,10 +575,7 @@ impl ModelObject {
             warn("model object warning! model contains more than 128 joints!\nonly 100 joints would be used");
         }
         joints_vec.into_iter().for_each(|joint| {
-            match joint.global_transform {
-                Some(global_tr) => joints_mat_options_vec.insert(joint.node_id, Some(global_tr.to_cols_array_2d())),
-                None => warn("model object warning\njoints_transforms_vec_to_array(): joint's global transform is none")
-            }
+            joints_mat_options_vec.insert(joint.node_id, Some(joint.global_transform.to_cols_array_2d()));
         });
 
         for joint_idx in 0..joints_mat_options_vec.len() {
@@ -637,57 +631,21 @@ impl ModelObject {
         render: &RenderManager,
         node_transform: &NodeTransform,
     ) -> SetupMatrixResult {
-        match node_transform.global_transform {
-            Some(_) => (),
-            None => {
-                error("model object error\nerror in setup_mat()\nnode_transform's global_transform is None");
-                //return Mat4::IDENTITY;
-                return SetupMatrixResult {
-                    mvp: Mat4::IDENTITY,
-                    model: Mat4::IDENTITY,
-                };
-            }
-        }
-
-        let node_global_transform = node_transform.global_transform.unwrap();
-        let scale_rotation_translation = node_global_transform.to_scale_rotation_translation();
-        let rotation_vector = scale_rotation_translation.1.to_euler(glam::EulerRot::XYZ);
-        let translation_vector = scale_rotation_translation.2;
-        let scale_vector = scale_rotation_translation.0;
+        let node_global_transform = node_transform.global_transform;
 
         let model_object_translation: [f32; 3] = self.transform.position.into();
-        let model_object_rotation_vec: [f32; 3] = self.transform.rotation.into();
-        let model_object_scale: [f32; 3] = self.transform.scale.into();
-        let model_object_rotation_vec = [
-            deg_to_rad(model_object_rotation_vec[0]),
-            deg_to_rad(model_object_rotation_vec[1]),
-            deg_to_rad(model_object_rotation_vec[2]),
-        ];
+        let model_object_rotation_vec = deg_vec_to_rad(self.transform.rotation.into());
+        let model_object_scale = self.transform.scale;
+        let model_object_translation = [-model_object_translation[0], model_object_translation[1], -model_object_translation[2]];
 
-        let full_translation = Vec3::new(
-            model_object_translation[0] + translation_vector.x,
-            model_object_translation[1] + translation_vector.y,
-            -(model_object_translation[2] + translation_vector.z),
-        );
-        let full_scale = Vec3::new(
-            model_object_scale[0] + scale_vector.x,
-            model_object_scale[1] + scale_vector.y,
-            model_object_scale[2] + scale_vector.z,
-        );
-        let full_rotation = [
-            model_object_rotation_vec[0] + rotation_vector.0,
-            model_object_rotation_vec[1] + rotation_vector.1,
-            model_object_rotation_vec[2] + rotation_vector.2,
-        ];
-        let rotation_quat = Quat::from_euler(
-            glam::EulerRot::XYZ,
-            full_rotation[0],
-            full_rotation[1],
-            full_rotation[2],
-        );
 
-        let transform =
-            Mat4::from_scale_rotation_translation(full_scale, rotation_quat, full_translation);
+        let rotation = model_object_rotation_vec;//node_rotation.transform_vector3(model_object_rotation_vec);
+        let transform = Mat4::from_translation(Vec3::from_array(model_object_translation))
+            * Mat4::from_rotation_z(-rotation.z)
+            * Mat4::from_rotation_y(-rotation.y)
+            * Mat4::from_rotation_x(-rotation.x)
+            * Mat4::from_scale(model_object_scale);
+        let transform = transform * node_global_transform;
 
         let view = render.get_view_matrix();
         let proj = render.get_projection_matrix();
@@ -787,7 +745,8 @@ fn set_objects_anim_node_transform(
                         let x_rot = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let y_rot = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_rot = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.local_rotation = Vec3::new(x_rot, y_rot, z_rot);
+                        let w_rot = channel.w_axis_spline.as_ref().unwrap().clamped_sample(time_elapsed).unwrap();
+                        node.local_rotation = Quat::from_xyzw(x_rot, y_rot, z_rot, w_rot);
                     }
                 }
             }
@@ -808,7 +767,7 @@ fn set_objects_anim_node_transform(
 fn set_nodes_global_transform(
     node: &model_asset::Node,
     nodes_list: &Vec<model_asset::Node>,
-    parent_transform_mat: Option<Mat4>,
+    parent_transform: Option<Mat4>,
     nodes_transforms: &mut Vec<NodeTransform>,
 ) {
     let node_index = node.node_index;
@@ -827,28 +786,24 @@ fn set_nodes_global_transform(
     let node_transform = node_transform.expect("node transform was None(why)");
 
     let local_rotation = node_transform.local_rotation;
-    let local_rotation_quat = Quat::from_euler(
-        glam::EulerRot::XYZ,
-        local_rotation.x,
-        local_rotation.y,
-        local_rotation.z,
-    );
-    let local_transform = Mat4::from_scale_rotation_translation(
-        node_transform.local_scale,
-        local_rotation_quat,
-        node_transform.local_position,
-    );
+    let local_scale = node_transform.local_scale;
+    let local_transform = Mat4::from_translation(node_transform.local_position)
+        * Mat4::from_quat(local_rotation)
+        /* Mat4::from_rotation_z(-local_rotation.z)
+        * Mat4::from_rotation_y(-local_rotation.y)
+        * Mat4::from_rotation_x(-local_rotation.x)*/
+        * Mat4::from_scale(local_scale);
 
-    let global_transform_mat: Mat4;
-    match parent_transform_mat {
-        Some(parent_tr_mat) => {
-            global_transform_mat = parent_tr_mat * local_transform;
-            node_transform.parent_global_transform = Some(parent_tr_mat);
+    let global_transform: Mat4;
+    match parent_transform {
+        Some(parent_transform) => {
+            global_transform = parent_transform * local_transform;
         }
-        None => global_transform_mat = local_transform,
+        None => {
+            global_transform = local_transform;
+        },
     }
-
-    node_transform.global_transform = Some(global_transform_mat);
+    node_transform.global_transform = global_transform;
 
     let mut children_nodes: Vec<&model_asset::Node> = vec![];
     for child_id in &node.children_id {
@@ -863,7 +818,7 @@ fn set_nodes_global_transform(
         set_nodes_global_transform(
             child,
             nodes_list,
-            Some(global_transform_mat),
+            Some(global_transform),
             nodes_transforms,
         );
     }
@@ -885,10 +840,10 @@ struct SetupMatrixResult {
 #[derive(Debug)]
 pub struct NodeTransform {
     pub local_position: Vec3,
-    pub local_rotation: Vec3,
+    pub local_rotation: Quat,
     pub local_scale: Vec3,
-    pub global_transform: Option<Mat4>,
-    pub parent_global_transform: Option<Mat4>,
+    pub global_transform: Mat4,
+    pub parent_global_transform: Option<Transform>,
     pub node_id: usize,
 }
 
