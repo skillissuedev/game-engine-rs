@@ -111,6 +111,30 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         });
         add_function!("rotate_vector", rotate_vector, lua, system_id);
 
+        let system_id_for_functions = system_id.clone();
+        let does_object_exist = lua.create_function(move |_, name: String| {
+                match systems::get_system_mut_with_id(&system_id_for_functions) {
+                    Some(system) => match system.find_object(&name) {
+                        Some(object) => {
+                            for child in object.children_list() {
+                                if child.name() == name {
+                                    return Ok(true)
+                                }
+                            }
+                            if object.name() == name {
+                                return Ok(true)
+                            }
+
+                            return Ok(false)
+                        },
+                        None => return Ok(false),
+                    },
+                    None => return Ok(false)
+                }
+            },
+        );
+        add_function!("does_object_exist", does_object_exist, lua, system_id);
+
 
         // creating new objects
         let system_id_for_functions = system_id.clone();

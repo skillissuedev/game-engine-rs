@@ -1,4 +1,4 @@
-use super::{gen_object_id, Object, ObjectGroup, Transform};
+use super::{gen_object_id, Object, ObjectGroup, Transform, model_object::NodeTransform};
 use crate::{
     assets::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType},
@@ -62,15 +62,12 @@ impl MasterInstancedModelObject {
                     let node_local_transform_mat = Mat4::from_cols_array_2d(&node.transform);
                     let node_scale_rotation_translation =
                         node_local_transform_mat.to_scale_rotation_translation();
-                    let node_rotation = node_scale_rotation_translation
-                        .1
-                        .to_euler(glam::EulerRot::XYZ);
 
                     nodes_transforms.push(NodeTransform {
                         local_position: node_scale_rotation_translation.2,
-                        local_rotation: node_rotation.into(),
+                        local_rotation: node_scale_rotation_translation.1,
                         local_scale: node_scale_rotation_translation.0,
-                        global_transform: None,
+                        global_transform: Mat4::IDENTITY,
                         node_id: node.node_index,
                         parent_global_transform: None,
                     });
@@ -301,10 +298,6 @@ impl Object for MasterInstancedModelObject {
                     }
                 }
 
-                //let setup_mat_result = self.setup_mat(transform.unwrap());
-                //let mvp: Mat4 = setup_mat_result.mvp;
-                //let model: Mat4 = setup_mat_result.model;
-
                 let texture: &glium::texture::Texture2d;
                 match self.texture_asset_id.as_ref() {
                     Some(texture_id) => {
@@ -521,6 +514,11 @@ impl MasterInstancedModelObject {
         }
     }
 
+    pub fn stop_animation(&mut self) {
+        self.animation_settings.animation = None;
+        self.animation_settings.timer = None;
+    }
+
     pub fn play_animation(
         &mut self,
         framework: &mut Framework,
@@ -573,10 +571,7 @@ impl MasterInstancedModelObject {
             warn("model object warning! model contains more than 128 joints!\nonly 100 joints would be used");
         }
         joints_vec.into_iter().for_each(|joint| {
-            match joint.global_transform {
-                Some(global_tr) => joints_mat_options_vec.insert(joint.node_id, Some(global_tr.to_cols_array_2d())),
-                None => warn("model object warning\njoints_transforms_vec_to_array(): joint's global transform is none")
-            }
+            joints_mat_options_vec.insert(joint.node_id, Some(joint.global_transform.to_cols_array_2d()));
         });
 
         for joint_idx in 0..joints_mat_options_vec.len() {
@@ -714,7 +709,8 @@ fn set_objects_anim_node_transform(
                         let x_rot = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let y_rot = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_rot = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.local_rotation = Vec3::new(x_rot, y_rot, z_rot);
+                        let w_rot = channel.w_axis_spline.as_ref().unwrap().clamped_sample(time_elapsed).unwrap();
+                        node.local_rotation = Quat::from_xyzw(x_rot, y_rot, z_rot, w_rot);
                     }
                 }
             }
@@ -735,7 +731,7 @@ fn set_objects_anim_node_transform(
 fn set_nodes_global_transform(
     node: &model_asset::Node,
     nodes_list: &Vec<model_asset::Node>,
-    parent_transform_mat: Option<Mat4>,
+    parent_transform: Option<Mat4>,
     nodes_transforms: &mut Vec<NodeTransform>,
 ) {
     let node_index = node.node_index;
@@ -754,28 +750,24 @@ fn set_nodes_global_transform(
     let node_transform = node_transform.expect("node transform was None(why)");
 
     let local_rotation = node_transform.local_rotation;
-    let local_rotation_quat = Quat::from_euler(
-        glam::EulerRot::XYZ,
-        local_rotation.x,
-        local_rotation.y,
-        local_rotation.z,
-    );
-    let local_transform = Mat4::from_scale_rotation_translation(
-        node_transform.local_scale,
-        local_rotation_quat,
-        node_transform.local_position,
-    );
+    let local_scale = node_transform.local_scale;
+    let local_transform = Mat4::from_translation(node_transform.local_position)
+        * Mat4::from_quat(local_rotation)
+        /* Mat4::from_rotation_z(-local_rotation.z)
+        * Mat4::from_rotation_y(-local_rotation.y)
+        * Mat4::from_rotation_x(-local_rotation.x)*/
+        * Mat4::from_scale(local_scale);
 
-    let global_transform_mat: Mat4;
-    match parent_transform_mat {
-        Some(parent_tr_mat) => {
-            global_transform_mat = parent_tr_mat * local_transform;
-            node_transform.parent_global_transform = Some(parent_tr_mat);
+    let global_transform: Mat4;
+    match parent_transform {
+        Some(parent_transform) => {
+            global_transform = parent_transform * local_transform;
         }
-        None => global_transform_mat = local_transform,
+        None => {
+            global_transform = local_transform;
+        },
     }
-
-    node_transform.global_transform = Some(global_transform_mat);
+    node_transform.global_transform = global_transform;
 
     let mut children_nodes: Vec<&model_asset::Node> = vec![];
     for child_id in &node.children_id {
@@ -790,7 +782,7 @@ fn set_nodes_global_transform(
         set_nodes_global_transform(
             child,
             nodes_list,
-            Some(global_transform_mat),
+            Some(global_transform),
             nodes_transforms,
         );
     }
@@ -801,16 +793,6 @@ pub struct CurrentAnimationSettings {
     pub animation: Option<Animation>,
     pub looping: bool,
     pub timer: Option<Instant>,
-}
-
-#[derive(Debug)]
-pub struct NodeTransform {
-    pub local_position: Vec3,
-    pub local_rotation: Vec3,
-    pub local_scale: Vec3,
-    pub global_transform: Option<Mat4>,
-    pub parent_global_transform: Option<Mat4>,
-    pub node_id: usize,
 }
 
 #[derive(Debug)]

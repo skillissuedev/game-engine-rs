@@ -110,15 +110,15 @@ impl System for LuaSystem {
 
     fn server_render(&mut self) {
         /*
-        let lua_option = lua_vm_ref(self.system_id().into());
-        match lua_option {
-            Some(lua) => {
-                let _ = call_lua_function(self.system_id(), &lua, "server_render", None);
-            }
-            None => debugger::error("lua system server_render function error\ncan't get lua vm reference"),
-        }
-        do nothing lol
-        */
+           let lua_option = lua_vm_ref(self.system_id().into());
+           match lua_option {
+           Some(lua) => {
+           let _ = call_lua_function(self.system_id(), &lua, "server_render", None);
+           }
+           None => debugger::error("lua system server_render function error\ncan't get lua vm reference"),
+           }
+           do nothing lol
+           */
     }
 
     fn client_render(&mut self, framework: &mut Framework) {
@@ -566,7 +566,7 @@ impl UserData for ObjectHandle {
 
                 Ok(())
             },
-        );
+            );
 
         methods.add_method(
             "set_rotation",
@@ -774,6 +774,7 @@ impl UserData for ObjectHandle {
             },
             );
 
+
         methods.add_method(
             "find_object",
             |_, this, name: String| {
@@ -867,6 +868,33 @@ impl UserData for ObjectHandle {
                                             this.system_id, this.name, err));
                                 }
                             },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): play_animation failed in object: {}. this object is not ModelObject!", 
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: play_animation failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: play_animation failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("stop_animation", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<ModelObject>() {
+                            Some(object) => object.stop_animation(),
                             None => {
                                 debugger::error(
                                     &format!("lua error(system {}): play_animation failed in object: {}. this object is not ModelObject!", 

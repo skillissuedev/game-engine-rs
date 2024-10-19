@@ -11,7 +11,7 @@ use crate::{
         physics::ObjectBodyParameters,
         render::{CurrentCascade, RenderManager},
     },
-    math_utils::{deg_vec_to_rad, rad_vec_to_deg},
+    math_utils::deg_vec_to_rad,
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
@@ -524,6 +524,11 @@ impl ModelObject {
             Some(animation) => Some(&animation.name),
             None => None,
         }
+    }
+
+    pub fn stop_animation(&mut self) {
+        self.animation_settings.animation = None;
+        self.animation_settings.timer = None;
     }
 
     pub fn play_animation(
