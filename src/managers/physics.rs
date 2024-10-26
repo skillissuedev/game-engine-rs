@@ -428,6 +428,29 @@ impl PhysicsManager {
         }
         None
     }
+
+    pub fn get_ray_intersaction_object_id(
+        &self,
+        ray: Ray,
+        toi: f32,
+        query_filter: QueryFilter,
+    ) -> Option<u128> {
+        if let Some((collider_handle, _)) = self.query_pipeline.cast_ray(
+            &self.rigid_body_set,
+            &self.collider_set,
+            &ray,
+            toi,
+            true,
+            query_filter,
+        ) {
+            return match self.collider_set.get(collider_handle) {
+                Some(collider) => Some(collider.user_data),
+                None => None,
+            }
+        }
+
+        None
+    }
 }
 
 /// To use several CollisionGroups at once, use "|" between them.

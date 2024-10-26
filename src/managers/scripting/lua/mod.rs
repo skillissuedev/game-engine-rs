@@ -986,6 +986,37 @@ impl UserData for ObjectHandle {
             Ok(false)
         });
 
+        methods.add_method("intersection_object_name", |_, this, _: ()| {
+            let framework = &mut *get_framework_pointer();
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<Ray>() {
+                            Some(object) => {
+                                Ok(object.intersection_object_name(&framework.physics))
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): intersection_object_name failed in object: {}. This object is not a Ray!",
+                                    this.system_id, this.name));
+                                Ok(None)
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: intersection_object_name failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: intersection_object_name failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(None)
+        });
+
         methods.add_method("is_intersecting_with_group", |_, this, group: String| {
             let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {

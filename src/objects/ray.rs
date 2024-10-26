@@ -1,9 +1,7 @@
 use crate::{
     framework::{DebugMode, Framework},
     managers::{
-        self, debugger,
-        physics::{CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderRay},
-        ui::Vec3Inspector,
+        self, debugger, physics::{CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderRay}, systems, ui::Vec3Inspector
     },
 };
 use glam::Vec3;
@@ -141,11 +139,29 @@ impl Ray {
         let ray =
             rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());
 
-        //dbg!(toi);
-        //dbg!(rotated_direction.normalize());
-        //dbg!(query_filter.groups);
-
         physics.is_ray_intersecting(ray, toi, query_filter)
+    }
+
+    pub fn intersection_object_name(&self, physics: &PhysicsManager) -> Option<String> {
+        let global_transform = self.global_transform();
+        let toi = global_transform
+            .position
+            .distance(global_transform.position + self.direction);
+
+        let query_filter = QueryFilter::new().groups(InteractionGroups::new(
+            CollisionGroups::Group1.bits().into(),
+            self.mask.bits().into(),
+        ));
+
+        let ray =
+            rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());
+
+        let object_id = physics.get_ray_intersaction_object_id(ray, toi, query_filter);
+
+        match object_id {
+            Some(object_id) => systems::get_object_name_with_id(object_id),
+            None => None,
+        }
     }
 
     pub fn intersection_position(&self, physics: &PhysicsManager) -> Option<Vec3> {

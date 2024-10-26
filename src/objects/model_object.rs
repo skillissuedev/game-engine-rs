@@ -331,8 +331,9 @@ impl Object for ModelObject {
                 let camera_position: [f32; 3] = render.get_camera_position().into();
 
                 let sampler_behaviour = glium::uniforms::SamplerBehavior {
-                    minify_filter: MinifySamplerFilter::Nearest,
-                    magnify_filter: MagnifySamplerFilter::Nearest,
+                    minify_filter: MinifySamplerFilter::Linear,
+                    magnify_filter: MagnifySamplerFilter::Linear,
+                    max_anisotropy: 8,
                     wrap_function: (
                         SamplerWrapFunction::Repeat,
                         SamplerWrapFunction::Repeat,

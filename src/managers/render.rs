@@ -243,7 +243,7 @@ impl CameraCorners {
             Some(distance) => distance,
             None => 500.0,
         };
-        Mat4::perspective_rh_gl(fov, aspect_ratio, start_distance, end_distance)
+        Mat4::perspective_rh_gl(fov.to_radians(), aspect_ratio, start_distance, end_distance)
     }
 
     /*pub fn get_sun_eye(&self) -> Vec3 {
@@ -375,7 +375,7 @@ impl RenderManager {
             camera_location: CameraLocation {
                 position: Vec3::ZERO,
                 rotation: Vec3::ZERO,
-                fov: 90.0,
+                fov: 47.0,
                 front: DEFAULT_FRONT_VECTOR,
                 left: Vec3::ZERO,
                 up: DEFAULT_UP_VECTOR,
@@ -386,7 +386,7 @@ impl RenderManager {
             target: None,
             render_rays: Vec::new(),
             render_colliders: Vec::new(),
-            cascades: Cascades::new(90.0, 1.0, Vec3::new(-1.0, 0.0, 0.0), Mat4::IDENTITY),
+            cascades: Cascades::new(47.0, 1.0, Vec3::new(-1.0, 0.0, 0.0), Mat4::IDENTITY),
             ray_shader,
             collider_cuboid_shader,
             collider_cuboid_vertex_buffer,
@@ -425,7 +425,7 @@ impl RenderManager {
     }
 
     pub fn get_projection_matrix(&self) -> Mat4 {
-        Mat4::perspective_rh_gl(self.camera_location.fov, self.aspect_ratio, 0.001, 500.0)
+        Mat4::perspective_rh_gl(self.camera_location.fov.to_radians(), self.aspect_ratio, 0.001, 500.0)
     }
 
     fn update_camera_vectors(&mut self) {
@@ -463,7 +463,12 @@ impl RenderManager {
     }
 
     pub fn get_camera_front(&mut self) -> Vec3 {
-        self.camera_location.front
+        let front = self.camera_location.front;
+        Vec3 {
+            x: front.x,
+            y: -front.y,
+            z: front.z,
+        }
     }
 
     pub fn get_camera_left(&self) -> Vec3 {
