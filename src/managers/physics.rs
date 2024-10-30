@@ -259,8 +259,7 @@ impl PhysicsManager {
             match self.rigid_body_set.get_mut(body) {
                 Some(_) => {
                     self.set_body_position(body_parameters, position);
-                    self.set_body_rotation(body_parameters, rotation); // WTF WHY THERE WAS
-                                                                       // POSITION
+                    self.set_body_rotation(body_parameters, rotation);
                 }
                 None => debugger::error(&format!(
                     "set_body_transformations error\nfailed to get rigid body with handle {:?}",
@@ -277,6 +276,8 @@ impl PhysicsManager {
 
     pub fn set_body_position(&mut self, body_parameters: ObjectBodyParameters, position: Vec3) {
         if let Some(body) = body_parameters.rigid_body_handle {
+            let position = Vec3::new(-position.x, position.y, position.z);
+
             match self.rigid_body_set.get_mut(body) {
                 Some(body) => body.set_translation(position.into(), true),
                 None => debugger::error(&format!(
@@ -311,6 +312,8 @@ impl PhysicsManager {
     }
 
     pub fn set_rigidbody_position(&mut self, body: RigidBodyHandle, position: Vec3) {
+        let position = Vec3::new(-position.x, position.y, position.z);
+
         match self.rigid_body_set.get_mut(body) {
             Some(body) => body.set_translation(position.into(), true),
             None => debugger::error(&format!(

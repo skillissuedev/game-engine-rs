@@ -164,6 +164,28 @@ impl Ray {
         }
     }
 
+    pub fn intersection_object_groups(&self, physics: &PhysicsManager) -> Option<Vec<ObjectGroup>> {
+        let global_transform = self.global_transform();
+        let toi = global_transform
+            .position
+            .distance(global_transform.position + self.direction);
+
+        let query_filter = QueryFilter::new().groups(InteractionGroups::new(
+            CollisionGroups::Group1.bits().into(),
+            self.mask.bits().into(),
+        ));
+
+        let ray =
+            rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());
+
+        let object_id = physics.get_ray_intersaction_object_id(ray, toi, query_filter);
+
+        match object_id {
+            Some(object_id) => systems::get_object_groups_with_id(object_id),
+            None => None,
+        }
+    }
+
     pub fn intersection_position(&self, physics: &PhysicsManager) -> Option<Vec3> {
         let global_transform = self.global_transform();
         let toi = global_transform
