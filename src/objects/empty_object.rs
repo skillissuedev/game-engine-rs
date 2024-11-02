@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use egui_glium::egui_winit::egui;
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -12,6 +14,7 @@ pub struct EmptyObject {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl EmptyObject {
@@ -24,6 +27,7 @@ impl EmptyObject {
             body: None,
             id: gen_object_id(),
             groups: vec![],
+            object_properties: HashMap::new()
         }
     }
 }
@@ -94,5 +98,14 @@ impl Object for EmptyObject {
             println!("test message {}", args[0])
         }
         None
+    }
+
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
     framework::Framework,
@@ -16,6 +18,7 @@ pub struct InstancedModelObject {
     id: u128,
     groups: Vec<ObjectGroup>,
     instance: String,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl InstancedModelObject {
@@ -29,6 +32,7 @@ impl InstancedModelObject {
             body: None,
             id: gen_object_id(),
             instance: instance.into(),
+            object_properties: HashMap::new()
         }
     }
 }
@@ -125,5 +129,14 @@ impl Object for InstancedModelObject {
 
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
         &mut self.groups
+    }
+
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
     }
 }

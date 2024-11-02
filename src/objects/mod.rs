@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
     framework::{self, Framework},
     managers::{
         self,
         assets::AssetManager,
         physics::{BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-        render::{CurrentCascade, RenderManager},
+        render::{CurrentCascade, RenderManager}, systems::SystemValue,
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
@@ -57,7 +59,10 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn body_parameters(&self) -> Option<ObjectBodyParameters>;
     fn object_id(&self) -> &u128;
     fn inspector_ui(&mut self, framework: &mut Framework, ui: &mut Ui);
+    /// DO NOT MODIFY THIS DIRECTLY!
     fn groups_list(&mut self) -> &mut Vec<ObjectGroup>;
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<SystemValue>>);
+    fn object_properties(&self) -> &HashMap<String, Vec<SystemValue>>;
 
     fn call(&mut self, _name: &str, _args: Vec<&str>) -> Option<String> {
         println!("call function is not implemented in this object.");

@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::{
     framework::{DebugMode, Framework},
     managers::{
-        self, debugger, physics::{CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderRay}, systems, ui::Vec3Inspector
+        self, debugger, physics::{CollisionGroups, ObjectBodyParameters, PhysicsManager, RenderRay}, systems::{self, SystemValue}, ui::Vec3Inspector
     },
 };
 use glam::Vec3;
@@ -20,6 +22,7 @@ pub struct Ray {
     direction: Vec3,
     mask: CollisionGroups,
     inspector: Vec3Inspector,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl Ray {
@@ -39,11 +42,21 @@ impl Ray {
             direction,
             mask,
             inspector: Vec3Inspector::default(),
+            object_properties: HashMap::new()
         }
     }
 }
 
 impl Object for Ray {
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
+    }
+
     fn start(&mut self) {}
 
     fn update(&mut self, _: &mut Framework) {}
@@ -182,6 +195,28 @@ impl Ray {
 
         match object_id {
             Some(object_id) => systems::get_object_groups_with_id(object_id),
+            None => None,
+        }
+    }
+
+    pub fn intersection_object_properties(&self, physics: &PhysicsManager) -> Option<HashMap<String, Vec<SystemValue>>> {
+        let global_transform = self.global_transform();
+        let toi = global_transform
+            .position
+            .distance(global_transform.position + self.direction);
+
+        let query_filter = QueryFilter::new().groups(InteractionGroups::new(
+            CollisionGroups::Group1.bits().into(),
+            self.mask.bits().into(),
+        ));
+
+        let ray =
+            rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());
+
+        let object_id = physics.get_ray_intersaction_object_id(ray, toi, query_filter);
+
+        match object_id {
+            Some(object_id) => systems::get_object_properties_with_id(object_id),
             None => None,
         }
     }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     framework::Framework,
     managers::{navigation::NavMeshObstacleTransform, physics::ObjectBodyParameters},
@@ -16,6 +18,7 @@ pub struct NavObstacle {
     id: u128,
     groups: Vec<ObjectGroup>,
     size: Vec3,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl NavObstacle {
@@ -29,6 +32,7 @@ impl NavObstacle {
             id: gen_object_id(),
             groups: vec![],
             size,
+            object_properties: HashMap::new()
         }
     }
 
@@ -38,6 +42,15 @@ impl NavObstacle {
 }
 
 impl Object for NavObstacle {
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
+    }
+
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {

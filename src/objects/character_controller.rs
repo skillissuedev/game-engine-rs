@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{
     framework::Framework,
     managers::{
         debugger,
-        physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager},
+        physics::{self, BodyColliderType, CollisionGroups, ObjectBodyParameters, PhysicsManager}, systems,
     },
     math_utils::{self, deg_to_rad},
 };
@@ -25,6 +27,7 @@ pub struct CharacterController {
     collider: ColliderHandle,
     movement: Option<CharacterControllerMovement>,
     last_path_point: Option<Vec3>,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 #[derive(Debug)]
@@ -86,6 +89,7 @@ impl CharacterController {
             id,
             movement: None,
             last_path_point: None,
+            object_properties: HashMap::new()
         }
     }
 }
@@ -185,6 +189,15 @@ impl Object for CharacterController {
     fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui_glium::egui_winit::egui::Ui) {
         ui.heading("CharacterController parameters");
         ui.label("this object type is made specifically for servers so there's noting to change here ._.");
+    }
+
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
     }
 }
 

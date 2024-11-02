@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use glam::Vec2;
 //use recast_rs::{util, Heightfield, CompactHeightfield, NoRegions, PolyMesh, ContourBuildFlags, ContourSet};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -15,7 +17,7 @@ pub struct NavigationGround {
     id: u128,
     groups: Vec<ObjectGroup>,
     dimensions: NavMeshDimensions,
-    //grid: Grid<Option<()>>
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl NavigationGround {
@@ -28,12 +30,21 @@ impl NavigationGround {
             id: gen_object_id(),
             groups: vec![],
             dimensions: NavMeshDimensions::new(Vec2::new(0.0, 0.0), area_size),
-            //grid: Grid::new(x_cells_count, z_cells_count, Some(())),
+            object_properties: HashMap::new()
         }
     }
 }
 
 impl Object for NavigationGround {
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
+    }
+
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {

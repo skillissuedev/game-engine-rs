@@ -8,7 +8,7 @@ use crate::{
 use core::f32;
 use ez_al::{SoundError, SoundSource, SoundSourceType};
 use glam::Vec3;
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 pub struct SoundEmitter {
     name: String,
@@ -23,6 +23,7 @@ pub struct SoundEmitter {
     max_distance_inspector: Option<String>,
     looping: bool,
     max_distance: f32,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl SoundEmitter {
@@ -61,6 +62,7 @@ impl SoundEmitter {
             max_distance_inspector: None,
             looping: false,
             max_distance: 50.0,
+            object_properties: HashMap::new(),
         }
     }
 
@@ -136,6 +138,7 @@ impl Object for SoundEmitter {
     fn name(&self) -> &str {
         self.name.as_str()
     }
+
     fn object_type(&self) -> &str {
         "SoundEmitter"
     }
@@ -143,7 +146,6 @@ impl Object for SoundEmitter {
     fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
     }
-
     fn local_transform(&self) -> Transform {
         self.transform
     }
@@ -226,6 +228,15 @@ impl Object for SoundEmitter {
 
     fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         &mut self.groups
+    }
+
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
     }
 
     fn call(&mut self, name: &str, _args: Vec<&str>) -> Option<String> {

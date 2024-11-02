@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     framework::Framework,
     managers::{
@@ -29,6 +31,7 @@ pub struct Trigger {
     collider_handle: ColliderHandle,
     render_collider: Option<RenderColliderType>,
     current_events: Vec<CollisionEvent>,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>,
 }
 
 impl Trigger {
@@ -87,11 +90,21 @@ impl Trigger {
             collider_handle,
             render_collider,
             current_events: Vec::new(),
+            object_properties: HashMap::new()
         }
     }
 }
 
 impl Object for Trigger {
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
+    }
+
     fn start(&mut self) {}
 
     fn update(&mut self, _: &mut Framework) {}

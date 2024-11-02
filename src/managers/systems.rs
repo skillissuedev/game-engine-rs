@@ -15,6 +15,7 @@ static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
 static mut OBJECTS_ID_NAMES: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
 static mut OBJECTS_ID_SYSTEMS: Lazy<HashMap<u128, String>> = Lazy::new(|| HashMap::new());
 static mut OBJECTS_ID_GROUPS: Lazy<HashMap<u128, Vec<ObjectGroup>>> = Lazy::new(|| HashMap::new());
+static mut OBJECTS_ID_PROPERTIES: Lazy<HashMap<u128, HashMap<String, Vec<SystemValue>>>> = Lazy::new(|| HashMap::new());
 
 pub fn get_system_with_id(id: &str) -> Option<&Box<dyn System>> {
     unsafe {
@@ -122,6 +123,19 @@ pub fn register_object_id_name(id: u128, name: &str) {
     }
 }
 
+pub fn register_object_id_properties(id: u128, properties: HashMap<String, Vec<SystemValue>>) {
+    unsafe {
+        match OBJECTS_ID_PROPERTIES.get_mut(&id) {
+            Some(properties_in_map) => {
+                *properties_in_map = properties;
+            }
+            None => {
+                OBJECTS_ID_PROPERTIES.insert(id, properties);
+            }
+        };
+    }
+}
+
 pub fn register_object_id_system(id: u128, system: &str) {
     unsafe {
         match OBJECTS_ID_SYSTEMS.get_mut(&id) {
@@ -150,6 +164,10 @@ pub fn register_object_id_groups(id: u128, groups: &Vec<ObjectGroup>) {
 
 pub fn get_object_groups_with_id(id: u128) -> Option<Vec<ObjectGroup>> {
     unsafe { OBJECTS_ID_GROUPS.get(&id).cloned() }
+}
+
+pub fn get_object_properties_with_id(id: u128) -> Option<HashMap<String, Vec<SystemValue>>> {
+    unsafe { OBJECTS_ID_PROPERTIES.get(&id).cloned() }
 }
 
 pub fn get_object_name_with_id(id: u128) -> Option<String> {

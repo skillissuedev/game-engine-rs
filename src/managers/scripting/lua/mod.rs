@@ -1017,6 +1017,37 @@ impl UserData for ObjectHandle {
             Ok(None)
         });
 
+        methods.add_method("intersection_object_properties", |_, this, _: ()| {
+            let framework = &mut *get_framework_pointer();
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        return match object.downcast_mut::<Ray>() {
+                            Some(object) => {
+                                Ok(object.intersection_object_properties(&framework.physics))
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): intersection_object_properties failed in object: {}. This object is not a Ray!",
+                                    this.system_id, this.name));
+                                Ok(None)
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: intersection_object_properties failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: intersection_object_properties failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(None)
+        });
+
         methods.add_method("intersection_object_groups", |_, this, _: ()| {
             let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
@@ -1327,6 +1358,44 @@ impl UserData for ObjectHandle {
             }
 
             Ok(())
+        });
+
+        methods.add_method("set_object_properties", |_, this, properties: HashMap<String, Vec<SystemValue>>| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        object.set_object_properties(properties);
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: set_object_properties failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: set_object_properties failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("object_properties", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => return Ok(object.object_properties().clone()),
+                    None => {
+                        debugger::error(
+                            &format!("lua error: object_properties failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: object_properties failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(HashMap::new())
         });
         // i could've used a macro
     }

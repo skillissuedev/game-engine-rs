@@ -23,7 +23,7 @@ use glium::{
     },
     Display, IndexBuffer, Program, Surface,
 };
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 pub struct ModelObject {
     name: String,
@@ -45,6 +45,7 @@ pub struct ModelObject {
     started: bool,
     error: bool,
     inspector_anim_name: String,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl ModelObject {
@@ -96,6 +97,7 @@ impl ModelObject {
                     body: None,
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
+                    object_properties: HashMap::new(),
                 }
             }
             None => {
@@ -122,6 +124,7 @@ impl ModelObject {
                     body: None,
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
+                    object_properties: HashMap::new(),
                 }
             }
         }
@@ -143,6 +146,15 @@ impl std::fmt::Debug for ModelObject {
 }
 
 impl Object for ModelObject {
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
+    }
+
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {

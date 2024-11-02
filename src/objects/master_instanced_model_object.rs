@@ -22,7 +22,7 @@ use glium::{
     },
     Display, IndexBuffer, Program, Surface,
 };
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 #[derive(Debug)]
 pub struct MasterInstancedModelObject {
@@ -43,6 +43,7 @@ pub struct MasterInstancedModelObject {
     started: bool,
     error: bool,
     inspector_anim_name: String,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
 impl MasterInstancedModelObject {
@@ -95,6 +96,7 @@ impl MasterInstancedModelObject {
                     body: None,
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
+                    object_properties: HashMap::new()
                 }
             }
             None => {
@@ -126,6 +128,7 @@ impl MasterInstancedModelObject {
                     body: None,
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
+                    object_properties: HashMap::new()
                 }
             }
         }
@@ -133,6 +136,15 @@ impl MasterInstancedModelObject {
 }
 
 impl Object for MasterInstancedModelObject {
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
+
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
+    }
+
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {
