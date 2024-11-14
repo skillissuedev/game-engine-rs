@@ -478,9 +478,11 @@ impl UiManager {
         }
 
         for widget in &mut widget.children {
-            Self::set_child_widget_theme(widget, widget_id, theme_id);
+            if Self::set_child_widget_theme(widget, widget_id, theme_id) == true {
+                return true
+            }
         }
-        return false
+        false
     }
         
 
@@ -518,9 +520,12 @@ impl UiManager {
         }
 
         for widget in &mut widget.children {
-            Self::set_child_widget_spacing(widget, widget_id, spacing);
+            if Self::set_child_widget_spacing(widget, widget_id, spacing) == true {
+                return true
+            }
         }
-        return false
+
+        false
     }
         
 
