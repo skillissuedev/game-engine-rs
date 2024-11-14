@@ -791,6 +791,24 @@ impl Framework {
         }
     }
 
+    pub fn add_theme(&mut self, theme_id: String, theme_json: String) {
+        match &mut self.ui {
+            Some(ui) => ui.add_theme(theme_id, theme_json),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_theme) while running server");
+            },
+        }
+    }
+    
+    pub fn set_widget_theme(&mut self, window_id: &str, widget_id: &str, theme: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.set_widget_theme(window_id, widget_id, theme),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (set_widget_theme) while running server");
+            },
+        }
+    }
+
     pub fn set_widget_spacing(&mut self, window_id: &str, widget_id: &str, spacing: f32) {
         match &mut self.ui {
             Some(ui) => ui.set_widget_spacing(window_id, widget_id, spacing),

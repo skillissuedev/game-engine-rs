@@ -32,7 +32,7 @@ glutin = { version = "0.31.0" }
 #glutin-winit = "0.5.0"
 raw-window-handle = "0.6.2"
 #egui_glium = "0.26.3"
-#egui_glium = { git = "https://github.com/skillissuedev/egui_glium" }
+egui_glium = { git = "https://github.com/skillissuedev/egui_glium", features = ["clipboard", "serde"] }
 glium = { version = "0.35.0", features = ["glutin-winit", "winit"] }
 winit = { version = "0.30.5", features = ["serde"] }
 
@@ -53,8 +53,3 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 2
-
-#[profile.release]
-#codegen-units = 1
-[dependencies.egui_glium]
-path = "../../egui_glium/"

@@ -19,6 +19,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c71b1793ee61086797f5c80b6efa2b8ffa6d5dd703f118545808a7f2e27f7046"
 
 [[package]]
+name = "accesskit"
+version = "0.16.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99b76d84ee70e30a4a7e39ab9018e2b17a6a09e31084176cc7c0b2dec036ba45"
+dependencies = [
+ "enumn",
+ "serde",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -52,6 +62,7 @@ dependencies = [
  "cfg-if",
  "getrandom",
  "once_cell",
+ "serde",
  "version_check",
  "zerocopy",
 ]
@@ -831,6 +842,7 @@ source = "git+https://github.com/emilk/egui#da04339f5ed75fd299c03b7d0fc3b6405be7
 dependencies = [
  "bytemuck",
  "emath",
+ "serde",
 ]
 
 [[package]]
@@ -838,11 +850,13 @@ name = "egui"
 version = "0.28.1"
 source = "git+https://github.com/emilk/egui#da04339f5ed75fd299c03b7d0fc3b6405be7b8c5"
 dependencies = [
+ "accesskit",
  "ahash",
  "emath",
  "epaint",
  "log",
  "nohash-hasher",
+ "serde",
 ]
 
 [[package]]
@@ -855,6 +869,7 @@ dependencies = [
  "egui",
  "log",
  "raw-window-handle 0.6.2",
+ "serde",
  "smithay-clipboard",
  "web-time",
  "webbrowser",
@@ -864,6 +879,7 @@ dependencies = [
 [[package]]
 name = "egui_glium"
 version = "0.28.1"
+source = "git+https://github.com/skillissuedev/egui_glium#81b554175cd75322f75e91f5d289aa49783d1921"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -884,6 +900,18 @@ version = "0.28.1"
 source = "git+https://github.com/emilk/egui#da04339f5ed75fd299c03b7d0fc3b6405be7b8c5"
 dependencies = [
  "bytemuck",
+ "serde",
+]
+
+[[package]]
+name = "enumn"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f9ed6b3789237c8a0c1c505af1c7eb2c560df6186f01b098c3a1064ea532f38"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.52",
 ]
 
 [[package]]
@@ -899,6 +927,7 @@ dependencies = [
  "log",
  "nohash-hasher",
  "parking_lot",
+ "serde",
 ]
 
 [[package]]

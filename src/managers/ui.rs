@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Sense, Slider, TextEdit, TextureHandle, Ui, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -16,6 +16,7 @@ pub struct UiManager {
     windows: HashMap<String, UiManagerWindow>,
     images_to_load: Vec<ImageToLoad>,
     textures: HashMap<String, TextureHandle>,
+    themes: HashMap<String, Visuals>,
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +59,7 @@ pub struct UiManagerWindow {
     show_title_bar: bool,
     show_close_button: bool,
     show_on_top: bool,
+    theme: Option<String>
 }
 
 #[derive(Clone, Debug)]
@@ -67,7 +69,8 @@ pub struct Widget {
     widget_data: WidgetData,
     children: Vec<Widget>,
     state: WidgetState,
-    spacing: f32
+    spacing: f32,
+    theme: Option<String>
 }
 
 impl Default for Widget {
@@ -79,6 +82,7 @@ impl Default for Widget {
             children: Vec::new(),
             state: WidgetState::default(),
             spacing: 10.0,
+            theme: None
         }
     }
 }
@@ -129,16 +133,28 @@ impl UiManager {
 
             window.show(ctx, |ui| {
                 for widget in &mut manager_window.widgets {
-                    Self::render_widget(&self.textures, ctx, ui, widget);
+                    Self::render_widget(&self.textures, ctx, ui, widget, &self.themes);
                 }
             });
         }
     }
 
-    fn render_widget(textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget) {
+    fn render_widget(textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget, themes: &HashMap<String, Visuals>) {
+        let theme = match &widget.theme {
+            Some(theme_id) => {
+                match themes.get(theme_id) {
+                    Some(visuals) => visuals.to_owned(),
+                    None => Visuals::default(),
+                }
+            },
+            None => Visuals::default(),
+        };
+        *ui.visuals_mut() = theme;
+
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
         ui.spacing_mut().item_spacing.x = widget.spacing;
         ui.spacing_mut().item_spacing.y = widget.spacing;
+
         let egui_widget = match &mut widget.widget_data {
             WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str()).sense(Sense::click_and_drag())),
             WidgetData::Label(contents, text_size) => 
@@ -146,14 +162,14 @@ impl UiManager {
             WidgetData::Horizontal => {
                 ui.horizontal(|ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget);
+                        Self::render_widget(textures, ctx, ui, widget, themes);
                     }
                 }).response
             },
             WidgetData::Vertical => {
                 ui.vertical(|ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget);
+                        Self::render_widget(textures, ctx, ui, widget, themes);
                     }
                 }).response
             },
@@ -296,7 +312,29 @@ impl UiManager {
 
 
 
+
     // Public methods:
+    pub fn add_theme(&mut self, theme_id: String, theme_json: String) {
+        if self.themes.contains_key(&theme_id) {
+            debugger::error(
+                &format!("UI manager: Failed to add a theme '{}'! Theme with this id already exists", theme_id)
+            );
+            return
+        }
+
+        let theme: Result<Visuals, serde_json::Error> = serde_json::from_str(&theme_json);
+        match theme {
+            Ok(theme) => {
+                self.themes.insert(theme_id, theme);
+            },
+            Err(err) => {
+                debugger::error(
+                    &format!("UI manager: Failed to add a theme '{}'! Failed to deserialize the JSON string! Err: {}", theme_id, err)
+                );
+            },
+        }
+    }
+
     pub fn show_title_bar(&mut self, window_id: &str, show: bool) {
         match self.windows.get_mut(window_id) {
             Some(window) => {
@@ -428,16 +466,61 @@ impl UiManager {
     }
 
 
+    fn set_child_widget_theme(widget: &mut Widget, widget_id: &str, theme_id: Option<&str>) -> bool {
+        if &widget.id == widget_id {
+            let string_option_theme = match theme_id {
+                Some(theme_id) => Some(theme_id.to_string()),
+                None => None,
+            };
 
-    fn set_child_widget_spacing(widget: &mut Widget, widget_id: &str, spacing: f32) {
+            widget.theme = string_option_theme;
+            return true
+        }
+
+        for widget in &mut widget.children {
+            Self::set_child_widget_theme(widget, widget_id, theme_id);
+        }
+        return false
+    }
+        
+
+    pub fn set_widget_theme(&mut self, window_id: &str, widget_id: &str, theme: Option<&str>) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                for widget in &mut window.widgets {
+                    if Self::set_child_widget_theme(widget, widget_id, theme) == true {
+                        return
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "set_widget_theme error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "set_widget_theme error!\nFailed to get the window with id '{}' to get widget with id '{}'", window_id, widget_id
+                    )
+                );
+            },
+        }
+    }
+
+
+
+    fn set_child_widget_spacing(widget: &mut Widget, widget_id: &str, spacing: f32) -> bool {
         if &widget.id == widget_id {
             widget.spacing = spacing;
-            return
+            return true
         }
 
         for widget in &mut widget.children {
             Self::set_child_widget_spacing(widget, widget_id, spacing);
         }
+        return false
     }
         
 
@@ -445,7 +528,9 @@ impl UiManager {
         match self.windows.get_mut(window_id) {
             Some(window) => {
                 for widget in &mut window.widgets {
-                    Self::set_child_widget_spacing(widget, widget_id, spacing);
+                    if Self::set_child_widget_spacing(widget, widget_id, spacing) == true {
+                        return
+                    }
                 }
 
                 debugger::error(
@@ -649,6 +734,7 @@ impl UiManager {
             show_title_bar: true,
             show_close_button: true,
             show_on_top: false,
+            theme: None
         });
     }
 
