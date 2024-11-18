@@ -149,7 +149,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                     }
 
                                     systems::ui_render(ctx);
-                                    framework.ui.as_mut().unwrap().render(ctx);
+                                    framework.ui.as_mut().unwrap().render(ctx, framework.debug_mode);
                                 });
 
                                 {
@@ -796,6 +796,24 @@ impl Framework {
             Some(ui) => ui.add_theme(theme_id, theme_json),
             None => {
                 debugger::error("Framework error!\nCan't use UI (add_theme) while running server");
+            },
+        }
+    }
+
+    pub fn add_window_theme(&mut self, theme_id: String, theme_json: String) {
+        match &mut self.ui {
+            Some(ui) => ui.add_window_theme(theme_id, theme_json),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_window_theme) while running server");
+            },
+        }
+    }
+
+    pub fn set_window_theme(&mut self, window_id: &str, theme: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.set_window_theme(window_id, theme),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (set_window_theme) while running server");
             },
         }
     }

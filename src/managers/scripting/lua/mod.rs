@@ -5,7 +5,6 @@ use crate::{
     }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
-use egui_glium::egui_winit::egui::TextBuffer;
 use glam::{Vec2, Vec3};
 use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
@@ -1872,9 +1871,30 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("add_window_theme",
+            |_, framework, (theme_id, theme_json): (String, String)| {
+                Ok(framework.add_window_theme(theme_id, theme_json))
+            }
+        );
+
         methods.add_method_mut("add_theme",
             |_, framework, (theme_id, theme_json): (String, String)| {
                 Ok(framework.add_theme(theme_id, theme_json))
+            }
+        );
+
+        methods.add_method_mut("set_window_theme",
+            |_, framework, (window_id, theme_id): (String, Option<String>)| {
+                let theme_id_temp;
+                let theme_id = match theme_id {
+                    Some(theme_id) => {
+                        theme_id_temp = theme_id;
+                        Some(theme_id_temp.as_str())
+                    },
+                    None => None,
+                };
+
+                Ok(framework.set_window_theme(&window_id, theme_id))
             }
         );
 

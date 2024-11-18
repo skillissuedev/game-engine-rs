@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, ColorImage, ComboBox, Context, Image, Label, ProgressBar, RichText, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, Color32, ColorImage, ComboBox, Context, Frame, Image, Label, ProgressBar, RichText, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -17,6 +17,7 @@ pub struct UiManager {
     images_to_load: Vec<ImageToLoad>,
     textures: HashMap<String, TextureHandle>,
     themes: HashMap<String, Visuals>,
+    window_themes: HashMap<String, Frame>,
 }
 
 #[derive(Clone, Debug)]
@@ -88,7 +89,24 @@ impl Default for Widget {
 }
 
 impl UiManager {
-    pub fn render(&mut self, ctx: &Context) {
+    pub fn render(&mut self, ctx: &Context, debug_mode: DebugMode) {
+        match debug_mode {
+            DebugMode::Full => {
+                ctx.style_mut(|style| {
+                    style.debug.debug_on_hover = true;
+                    style.debug.debug_on_hover_with_all_modifiers = true;
+                    style.debug.hover_shows_next = true;
+                });
+            },
+            _ => {
+                ctx.style_mut(|style| {
+                    style.debug.debug_on_hover = false;
+                    style.debug.debug_on_hover_with_all_modifiers = false;
+                    style.debug.hover_shows_next = false;
+                });
+            }
+        }
+
         for image_to_load in &self.images_to_load {
             if self.textures.contains_key(&image_to_load.id) == false {
                 println!("ui manager: loading a texture {}", &image_to_load.id);
@@ -110,17 +128,51 @@ impl UiManager {
             let mut window = Window::new(id)
                 .id(egui_id)
                 .resizable(false);
-            
-            if manager_window.transparent {
-                window = window
-                    .frame(egui::Frame::none())
-                    .title_bar(false)
-                    .scroll(false)
-            } else {
-                window = window
-                    .title_bar(manager_window.show_title_bar)
-                    .collapsible(manager_window.show_close_button)
-            }
+
+            match &manager_window.theme {
+                Some(theme_id) => {
+                    match self.window_themes.get(theme_id) {
+                        Some(frame) => {
+                            if manager_window.transparent {
+                                window = window
+                                    .frame(egui::Frame::none())
+                                    .title_bar(false)
+                                    .scroll(false)
+                            } else {
+                                window = window
+                                    .title_bar(manager_window.show_title_bar)
+                                    .collapsible(manager_window.show_close_button)
+                                    .frame(*frame)
+                            }
+                        },
+                        None => {
+                            if manager_window.transparent {
+                                window = window
+                                    .frame(egui::Frame::none())
+                                    .title_bar(false)
+                                    .scroll(false)
+                            } else {
+                                window = window
+                                    .title_bar(manager_window.show_title_bar)
+                                    .collapsible(manager_window.show_close_button)
+                            }
+                        },
+                    }
+                },
+                None => {
+                    if manager_window.transparent {
+                        window = window
+                            .frame(egui::Frame::none())
+                            .title_bar(false)
+                            .scroll(false)
+                    } else {
+                        window = window
+                            .title_bar(manager_window.show_title_bar)
+                            .collapsible(manager_window.show_close_button)
+                    }
+                },
+            };
+
 
             if manager_window.show_on_top {
                 let layer_id = egui::LayerId::new(egui::Order::Middle, egui_id);
@@ -335,6 +387,27 @@ impl UiManager {
         }
     }
 
+    pub fn add_window_theme(&mut self, theme_id: String, theme_json: String) {
+        if self.window_themes.contains_key(&theme_id) {
+            debugger::error(
+                &format!("UI manager: Failed to add a window theme '{}'! Theme with this id already exists", theme_id)
+            );
+            return
+        }
+
+        let theme: Result<Frame, serde_json::Error> = serde_json::from_str(&theme_json);
+        match theme {
+            Ok(theme) => {
+                self.window_themes.insert(theme_id, theme);
+            },
+            Err(err) => {
+                debugger::error(
+                    &format!("UI manager: Failed to add a window theme '{}'! Failed to deserialize the JSON string! Err: {}", theme_id, err)
+                );
+            },
+        }
+    }
+
     pub fn show_title_bar(&mut self, window_id: &str, show: bool) {
         match self.windows.get_mut(window_id) {
             Some(window) => {
@@ -485,6 +558,26 @@ impl UiManager {
         false
     }
         
+
+    pub fn set_window_theme(&mut self, window_id: &str, theme: Option<&str>) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                let theme = match theme {
+                    Some(theme) => Some(theme.to_string()),
+                    None => None,
+                };
+
+                window.theme = theme;
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "set_window_theme error!\nFailed to get the window with id '{}'", window_id
+                    )
+                );
+            },
+        }
+    }
 
     pub fn set_widget_theme(&mut self, window_id: &str, widget_id: &str, theme: Option<&str>) {
         match self.windows.get_mut(window_id) {
