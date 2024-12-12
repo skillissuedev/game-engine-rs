@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, Button, Checkbox, Color32, ColorImage, ComboBox, Context, Frame, Image, Label, ProgressBar, RichText, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
+use egui_glium::egui_winit::egui::{self, scroll_area::{self, ScrollBarVisibility}, Button, Checkbox, ColorImage, ComboBox, Context, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -25,7 +25,10 @@ pub enum WidgetData {
     Button(String),
     Label(String, f32),
     Horizontal,
+    HorizontalScroll,
     Vertical,
+    VerticalScroll,
+    Scroll,
     SinglelineTextEdit(String),
     MultilineTextEdit(String),
     Checkbox(bool, String),
@@ -54,12 +57,12 @@ pub struct WidgetState {
 #[derive(Debug)]
 pub struct UiManagerWindow {
     position: Option<Vec2>,
-    size: Option<Vec2>,
     widgets: Vec<Widget>,
     transparent: bool,
     show_title_bar: bool,
     show_close_button: bool,
     show_on_top: bool,
+    size: Option<Vec2>,
     theme: Option<String>
 }
 
@@ -184,6 +187,11 @@ impl UiManager {
             }
 
             window.show(ctx, |ui| {
+                if let Some(size) = manager_window.size {
+                    ui.set_width(size.x);
+                    ui.set_height(size.y);
+                }
+
                 for widget in &mut manager_window.widgets {
                     Self::render_widget(&self.textures, ctx, ui, widget, &self.themes);
                 }
@@ -207,48 +215,77 @@ impl UiManager {
         ui.spacing_mut().item_spacing.x = widget.spacing;
         ui.spacing_mut().item_spacing.y = widget.spacing;
 
-        let egui_widget = match &mut widget.widget_data {
-            WidgetData::Button(contents) => ui.add_sized(size, Button::new(contents.as_str()).sense(Sense::click_and_drag())),
+        let egui_widget: Option<Response> = match &mut widget.widget_data {
+            WidgetData::Button(contents) => Some(ui.add_sized(size, Button::new(contents.as_str()).sense(Sense::click_and_drag()))),
             WidgetData::Label(contents, text_size) => 
-                ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag())),
+                Some(ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag()))),
             WidgetData::Horizontal => {
-                ui.horizontal(|ui| {
+                Some(ui.horizontal(|ui| {
                     for widget in &mut widget.children {
                         Self::render_widget(textures, ctx, ui, widget, themes);
                     }
-                }).response
+                }).response)
+            },
+            WidgetData::HorizontalScroll => {
+                // SCROLL BAR VISIBILITY FOR TESTING PURPOSES! remove later pls, future me
+                ScrollArea::horizontal().scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible).show(ui, |ui| {
+                    for widget in &mut widget.children {
+                        Self::render_widget(textures, ctx, ui, widget, themes);
+                    }
+                });
+                None
             },
             WidgetData::Vertical => {
-                ui.vertical(|ui| {
+                Some(ui.vertical(|ui| {
                     for widget in &mut widget.children {
                         Self::render_widget(textures, ctx, ui, widget, themes);
                     }
-                }).response
+                }).response)
             },
-            WidgetData::SinglelineTextEdit(contents) => ui.add_sized(size, TextEdit::singleline(contents)),
-            WidgetData::MultilineTextEdit(contents) => ui.add_sized(size, TextEdit::multiline(contents)),
-            WidgetData::Checkbox(value, text) => ui.add_sized(size, Checkbox::new(value, text.as_str())),
-            WidgetData::FloatSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
-            WidgetData::IntSlider(value, min, max) => ui.add_sized(size, Slider::new(value, *min..=*max)),
-            WidgetData::ProgressBar(value) => ui.add_sized(size, ProgressBar::new(*value)),
+            WidgetData::VerticalScroll => {
+                ScrollArea::vertical().show(ui, |ui| {
+                    for widget in &mut widget.children {
+                        Self::render_widget(textures, ctx, ui, widget, themes);
+                    }
+                });
+                None
+            },
+            WidgetData::Scroll => {
+                ScrollArea::both().show(ui, |ui| {
+                    for widget in &mut widget.children {
+                        Self::render_widget(textures, ctx, ui, widget, themes);
+                    }
+                });
+                None
+            },
+            WidgetData::SinglelineTextEdit(contents) => Some(ui.add_sized(size, TextEdit::singleline(contents))),
+            WidgetData::MultilineTextEdit(contents) => Some(ui.add_sized(size, TextEdit::multiline(contents))),
+            WidgetData::Checkbox(value, text) => Some(ui.add_sized(size, Checkbox::new(value, text.as_str()))),
+            WidgetData::FloatSlider(value, min, max) => Some(ui.add_sized(size, Slider::new(value, *min..=*max))),
+            WidgetData::IntSlider(value, min, max) => Some(ui.add_sized(size, Slider::new(value, *min..=*max))),
+            WidgetData::ProgressBar(value) => Some(ui.add_sized(size, ProgressBar::new(*value))),
             WidgetData::Image(image_path) => {
                 let texture = textures.get(image_path);
                 match texture {
-                    Some(texture) => ui.add_sized(size, Image::new(texture).fit_to_exact_size(size).sense(Sense::click_and_drag())),
-                    None => ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path)).sense(Sense::click_and_drag()))
+                    Some(texture) => Some(ui.add_sized(size, Image::new(texture).fit_to_exact_size(size).sense(Sense::click_and_drag()))),
+                    None => Some(ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path)).sense(Sense::click_and_drag())))
                 }
             },
         };
 
-        let state = WidgetState {
-            left_clicked: egui_widget.clicked(),
-            right_clicked: egui_widget.secondary_clicked(),
-            hovered: egui_widget.hovered(),
-            dragged: egui_widget.dragged(),
-            changed: egui_widget.changed(),
-            double_clicked: egui_widget.double_clicked(),
-        };
-
+        let state = match egui_widget {
+            Some(state) => {
+                WidgetState {
+                    left_clicked: state.clicked(),
+                    right_clicked: state.secondary_clicked(),
+                    hovered: state.hovered(),
+                    dragged: state.dragged(),
+                    changed: state.changed(),
+                    double_clicked: state.double_clicked(),
+                }
+            },
+            None => WidgetState::default(),
+        };        
         widget.state = state;
     }
 
@@ -486,6 +523,17 @@ impl UiManager {
             },
             None => {
                 debugger::error(&format!("set_window_position error!\nFailed to get the window with id '{}'", window_id));
+            },
+        }
+    }
+
+    pub fn set_window_size(&mut self, window_id: &str, size: Option<Vec2>) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                window.size = size;
+            },
+            None => {
+                debugger::error(&format!("set_window_size error!\nFailed to get the window with id '{}'", window_id));
             },
         }
 
@@ -794,8 +842,13 @@ impl UiManager {
 
     pub fn is_widget_hovered(&self, window_id: &str, widget_id: &str) -> bool {
         match self.get_widget_state(window_id, widget_id) {
-            Some(value) => value.hovered,
-            None => false,
+            Some(value) => {
+                value.hovered
+            },
+            None => {
+                debugger::error(&format!("is_widget_hovered error! Failed to get a widget with id {} in a window with id {}", widget_id, window_id));
+                false
+            },
         }
     }
 
@@ -826,9 +879,9 @@ impl UiManager {
         }
         self.windows.insert(id.into(), UiManagerWindow {
             position: None,
-            size: None,
             widgets: Vec::new(),
             transparent,
+            size: None,
             show_title_bar: true,
             show_close_button: true,
             show_on_top: false,
@@ -895,6 +948,18 @@ impl UiManager {
         self.add_widget("add_horizontal", window_id, widget_id, widget, parent)
     }
 
+    pub fn add_horizontal_scroll(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::HorizontalScroll,
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_horizontal_scroll", window_id, widget_id, widget, parent)
+    }
+
     pub fn add_vertical(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
@@ -905,6 +970,30 @@ impl UiManager {
         };
 
         self.add_widget("add_vertical", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_vertical_scroll(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::VerticalScroll,
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_vertical_scroll", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_scroll(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Scroll,
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_scroll", window_id, widget_id, widget, parent)
     }
 
     pub fn add_singleline_text_edit(&mut self, window_id: &str, widget_id: &str, contents: &str, size: Vec2, parent: Option<&str>) {

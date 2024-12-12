@@ -737,6 +737,33 @@ impl Framework {
         }
     }
 
+    pub fn add_horizontal_scroll(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_horizontal_scroll(window_id, widget_id, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_horizontal_scroll) while running server");
+            },
+        }
+    }
+
+    pub fn add_vertical_scroll(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_vertical_scroll(window_id, widget_id, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_vertical_scroll) while running server");
+            },
+        }
+    }
+
+    pub fn add_scroll(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_scroll(window_id, widget_id, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_scroll) while running server");
+            },
+        }
+    }
+
     pub fn add_horizontal(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
         match &mut self.ui {
             Some(ui) => ui.add_horizontal(window_id, widget_id, size, parent),
@@ -787,6 +814,15 @@ impl Framework {
             Some(ui) => ui.set_window_position(window_id, position),
             None => {
                 debugger::error("Framework error!\nCan't use UI (set_window_position) while running server");
+            },
+        }
+    }
+
+    pub fn set_window_size(&mut self, window_id: &str, size: Option<Vec2>) {
+        match &mut self.ui {
+            Some(ui) => ui.set_window_size(window_id, size),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (set_window_size) while running server");
             },
         }
     }

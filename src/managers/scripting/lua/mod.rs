@@ -1836,6 +1836,24 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("add_horizontal_scroll",
+            |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_horizontal_scroll(&window_id, &widget_id, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_vertical_scroll",
+            |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_vertical_scroll(&window_id, &widget_id, size.into(), parent.as_deref()))
+            }
+        );
+
+        methods.add_method_mut("add_scroll",
+            |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_scroll(&window_id, &widget_id, size.into(), parent.as_deref()))
+            }
+        );
+
         methods.add_method_mut("add_horizontal",
             |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
                 Ok(framework.add_horizontal(&window_id, &widget_id, size.into(), parent.as_deref()))
@@ -1976,6 +1994,17 @@ impl UserData for Framework {
                 };
 
                 Ok(framework.set_window_position(&window_id, position))
+            }
+        );
+
+        methods.add_method_mut("set_window_size",
+            |_, framework, (window_id, size): (String, Option<[f32; 2]>)| {
+                let size = match size {
+                    Some(size) => Some(Vec2::new(size[0], size[1])),
+                    None => None,
+                };
+
+                Ok(framework.set_window_size(&window_id, size))
             }
         );
 
