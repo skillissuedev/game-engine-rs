@@ -9,7 +9,7 @@ use crate::{
         navigation::NavigationManager,
         networking,
         physics::{self, BodyColliderType, CollisionGroups, PhysicsManager},
-        render::{CurrentCascade, RenderManager},
+        render::{CurrentCascade, RenderLayers, RenderManager},
         saves::SavesManager,
         sound::set_listener_transform,
         systems::{self, SystemValue}, ui::UiManager,
@@ -85,7 +85,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
-        render: Some(RenderManager::new(display)),
+        render: Some(RenderManager::new(display, [1280, 720])),
         ui: Some(UiManager::default())
     };
 
@@ -152,6 +152,8 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                     framework.ui.as_mut().unwrap().render(ctx, framework.debug_mode);
                                 });
 
+                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
+                                
                                 {
                                     let render = framework.render.as_mut().unwrap();
 
@@ -161,7 +163,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                         render.get_camera_front(),
                                     );
 
-                                    render.draw();
+                                    render.draw(&framework.assets);
                                 }
 
                                 systems::shadow_render(
@@ -174,7 +176,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                     &framework.assets,
                                     &CurrentCascade::Furthest,
                                 );
-                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
 
                                 {
                                     let render = framework.render.as_mut().unwrap();
@@ -204,6 +205,9 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                                 framework.render.as_mut().unwrap().aspect_ratio =
                                     size.width as f32 / size.height as f32;
+                                framework.render.as_mut().unwrap().resolution =
+                                    [size.width as u32, size.height as u32];
+                                framework.render.as_mut().unwrap().resize_layers_textures();
                             },
                             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
                                 // fullscreen on f11
@@ -1000,8 +1004,10 @@ impl Framework {
         model_asset_id: ModelAssetId,
         texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
+        is_transparent: bool,
+        layer: RenderLayers
     ) -> ModelObject {
-        ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+        ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset, is_transparent, layer)
     }
 
     pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {

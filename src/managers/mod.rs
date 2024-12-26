@@ -4,6 +4,7 @@ pub mod input;
 pub mod navigation;
 pub mod networking;
 pub mod physics;
+pub mod object_render;
 pub mod render;
 pub mod scripting;
 pub mod saves;

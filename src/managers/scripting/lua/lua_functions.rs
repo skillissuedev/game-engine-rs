@@ -6,7 +6,7 @@ use crate::{
         self,
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, scripting::lua::get_framework_pointer, systems::{self, SystemValue}
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayers, scripting::lua::get_framework_pointer, systems::{self, SystemValue}
     }, math_utils, objects::{
         Object, Transform
     }, systems::System
@@ -225,8 +225,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
         let system_id_for_functions = system_id.clone();
         let new_model_object = lua.create_function_mut(
-            move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path):
-            (String, String, Option<String>, Option<String>, Option<String>)| {
+            move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, is_transparent, layer):
+            (String, String, Option<String>, Option<String>, Option<String>, bool, Option<u8>)| {
                 let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
                 let framework_ptr = get_framework_pointer();
                 let framework = &mut *framework_ptr;
@@ -262,7 +262,25 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                 let model_asset = framework.get_model_asset(&model_asset_id);
                                 match model_asset {
                                     Some(model_asset) => {
-                                        let object = framework.new_model_object(&name, model_asset, texture_asset, shader_asset);
+                                        let layer = match layer {
+                                            Some(layer) => match layer {
+                                                0 => RenderLayers::Layer1,
+                                                1 => RenderLayers::Layer1,
+                                                2 => RenderLayers::Layer2,
+                                                _ => {
+                                                    debugger::error(
+                                                        &format!("{} {}",
+                                                            "lua error: new_model_object: Failed to convert integer to a RenderLayer!",
+                                                            "The number should be >= 0 and <= 2. Defaulting to Layer 1"
+                                                        )
+                                                    );
+                                                    RenderLayers::Layer1
+                                                },
+                                            },
+                                            None => RenderLayers::Layer1
+                                        };
+
+                                        let object = framework.new_model_object(&name, model_asset, texture_asset, shader_asset, is_transparent, layer);
                                         add_to_system_or_parent(lua, system, Box::new(object));
                                     },
                                     None => 

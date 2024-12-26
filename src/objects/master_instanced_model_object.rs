@@ -1,4 +1,4 @@
-use super::{gen_object_id, Object, ObjectGroup, Transform, model_object::NodeTransform};
+use super::{gen_object_id, model_object::{CurrentAnimationSettings, NodeTransform}, Object, ObjectGroup, Transform};
 use crate::{
     assets::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType},
@@ -254,6 +254,7 @@ impl Object for MasterInstancedModelObject {
     }
 
     fn render(&mut self, framework: &mut Framework) {
+        /*
         let render = framework.render.as_mut().expect(
             "wtf there is no display in a framework and it's still calling render() in a system?",
         );
@@ -405,6 +406,7 @@ impl Object for MasterInstancedModelObject {
                     .unwrap();
             }
         }
+    */
     }
 
     fn shadow_render(
@@ -798,13 +800,6 @@ fn set_nodes_global_transform(
             nodes_transforms,
         );
     }
-}
-
-#[derive(Debug)]
-pub struct CurrentAnimationSettings {
-    pub animation: Option<Animation>,
-    pub looping: bool,
-    pub timer: Option<Instant>,
 }
 
 #[derive(Debug)]

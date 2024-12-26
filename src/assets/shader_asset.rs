@@ -8,6 +8,9 @@ use crate::{
 pub static mut DEFAULT_VERTEX_SHADER_PATH: &str = "shaders/default.vert";
 pub static mut DEFAULT_FRAGMENT_SHADER_PATH: &str = "shaders/default.frag";
 
+pub static mut DEFAULT_FRAMEBUFFER_VERTEX_SHADER_PATH: &str = "shaders/default_framebuffer.vert";
+pub static mut DEFAULT_FRAMEBUFFER_FRAGMENT_SHADER_PATH: &str = "shaders/default_framebuffer.frag";
+
 pub static mut DEFAULT_INSTANCED_VERTEX_SHADER_PATH: &str = "shaders/default_instanced.vert";
 pub static mut DEFAULT_INSTANCED_FRAGMENT_SHADER_PATH: &str = "shaders/default_instanced.frag";
 
@@ -28,6 +31,15 @@ impl ShaderAsset {
         let shader_path = ShaderAssetPath {
             vertex_shader_path: get_default_vertex_shader_path().to_string(),
             fragment_shader_path: get_default_fragment_shader_path().to_string(),
+        };
+
+        ShaderAsset::load_from_file(&shader_path)
+    }
+
+    pub fn load_default_framebuffer_shader() -> Result<ShaderAsset, ShaderError> {
+        let shader_path = ShaderAssetPath {
+            vertex_shader_path: get_default_framebuffer_vertex_shader_path().to_string(),
+            fragment_shader_path: get_default_framebuffer_fragment_shader_path().to_string(),
         };
 
         ShaderAsset::load_from_file(&shader_path)
@@ -115,6 +127,14 @@ pub fn get_default_vertex_shader_path() -> String {
 
 pub fn get_default_fragment_shader_path() -> String {
     unsafe { DEFAULT_FRAGMENT_SHADER_PATH.into() }
+}
+
+pub fn get_default_framebuffer_vertex_shader_path() -> String {
+    unsafe { DEFAULT_FRAMEBUFFER_VERTEX_SHADER_PATH.into() }
+}
+
+pub fn get_default_framebuffer_fragment_shader_path() -> String {
+    unsafe { DEFAULT_FRAMEBUFFER_FRAGMENT_SHADER_PATH.into() }
 }
 
 pub fn get_default_instanced_vertex_shader_path() -> String {

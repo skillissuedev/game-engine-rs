@@ -1,15 +1,34 @@
 use std::collections::HashMap;
 
-use super::physics::{RenderColliderType, RenderRay};
-use crate::math_utils::deg_to_rad;
+use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad, objects::{model_object::{CurrentAnimationSettings, NodeTransform}, Transform}};
+
+use super::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, object_render, physics::{RenderColliderType, RenderRay}};
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
-    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex,
-    index::PrimitiveType, texture::DepthTexture2d, uniform, Display, Frame, IndexBuffer, Program,
-    Surface, VertexBuffer,
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::{DepthTexture2d, SrgbTexture2d}, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, VertexBuffer
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Clone)]
+pub enum RenderLayers {
+    Layer1,
+    Layer2
+}
+
+#[derive(Debug)]
+pub struct ModelData {
+    pub transform: Transform,
+    pub model_asset_id: ModelAssetId,
+    pub nodes_transforms: Vec<NodeTransform>,
+    pub animation_settings: CurrentAnimationSettings,
+    pub shader_asset: ShaderAsset,
+    pub texture_asset_id: Option<TextureAssetId>,
+    pub programs: Vec<Program>,
+    pub layer: RenderLayers,
+    pub started: bool,
+    pub error: bool,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
@@ -336,6 +355,7 @@ pub struct RenderManager {
     pub light_direction: Vec3,
     pub camera_location: CameraLocation,
     pub aspect_ratio: f32,
+    pub resolution: [u32; 2],
     pub display: Display<WindowSurface>,
     pub shadow_textures: ShadowTextures,
     pub target: Option<Frame>,
@@ -347,10 +367,14 @@ pub struct RenderManager {
     pub collider_cuboid_vertex_buffer: VertexBuffer<Vertex>,
     pub collider_cuboid_index_buffer: IndexBuffer<u32>,
     pub instanced_positions: HashMap<String, Vec<Mat4>>,
+    pub opaque_models_list: HashMap<u128, ModelData>,
+    pub transparent_models_list: HashMap<u128, ModelData>,
+    pub layers_textures: LayersTextures,
+    pub framebuffer_program: Program,
 }
 
 impl RenderManager {
-    pub fn new(display: Display<WindowSurface>) -> Self {
+    pub fn new(display: Display<WindowSurface>, resolution: [u32; 2]) -> Self {
         let ray_shader = Program::from_source(
             &display,
             include_str!("../assets/ray_shader.vert"),
@@ -369,6 +393,16 @@ impl RenderManager {
         let collider_cuboid_index_buffer =
             IndexBuffer::new(&display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap();
         let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
+        let layers_textures = LayersTextures {
+            layer1_texture: SrgbTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 1 SrgbTexture2d!"),
+            layer1_depth_texture: DepthTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 1 DepthTexture2d!"),
+            layer2_texture: SrgbTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 2 SrgbTexture2d!"),
+            layer2_depth_texture: DepthTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 2 DepthTexture2d!"),
+        };
+        let framebuffer_shader_asset = ShaderAsset::load_default_framebuffer_shader().expect("Failed to load the default framebuffer shader!");
+        let framebuffer_program =
+            Program::from_source(&display, &framebuffer_shader_asset.vertex_shader_source, &framebuffer_shader_asset.fragment_shader_source, None)
+            .expect("Failed to create a framebuffer Program!");
 
         Self {
             light_direction: Vec3::new(-1.0, 0.0, 0.0),
@@ -381,6 +415,7 @@ impl RenderManager {
                 up: DEFAULT_UP_VECTOR,
             },
             aspect_ratio: 1.0,
+            resolution,
             shadow_textures,
             display,
             target: None,
@@ -392,6 +427,10 @@ impl RenderManager {
             collider_cuboid_vertex_buffer,
             collider_cuboid_index_buffer,
             instanced_positions: HashMap::new(),
+            opaque_models_list: HashMap::new(),
+            transparent_models_list: HashMap::new(),
+            layers_textures,
+            framebuffer_program,
         }
     }
 
@@ -483,32 +522,104 @@ impl RenderManager {
         self.camera_location.fov
     }
 
-    pub fn draw(&mut self) {
-        //target.clear_color_and_depth((0.6, 0.91, 0.88, 1.0), 1.0);
-        let mut target = self.display.draw();
-        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
-        self.target = Some(target);
+    pub fn draw(&mut self, assets: &AssetManager) {
         let display = &self.display;
         let shadow_textures = &self.shadow_textures;
 
+        // Creating the first framebuffer (layer 1)
+        let layer1_texture = &self.layers_textures.layer1_texture;
+        let layer1_depth_texture = &self.layers_textures.layer1_depth_texture;
+        let mut layer_1 = SimpleFrameBuffer::with_depth_buffer(display, layer1_texture, layer1_depth_texture).expect("RenderManager: Layer 2 Framebuffer Error!");
+        layer_1.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+
+        let layer2_texture = &self.layers_textures.layer2_texture;
+        let layer2_depth_texture = &self.layers_textures.layer2_depth_texture;
+        let mut layer_2 = SimpleFrameBuffer::with_depth_buffer(display, layer2_texture, layer2_depth_texture).expect("RenderManager: Layer 2 Framebuffer Error!");
+        layer_2.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+
+        // The actual framebuffer the game is rendered to
+        let mut target = self.display.draw();
+        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
+        self.target = Some(target);
+
+        // First shadow framebuffer (the closest cascade)
         let mut closest_shadow_fbo =
             SimpleFrameBuffer::depth_only(display, &shadow_textures.closest).unwrap();
         closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
         closest_shadow_fbo.clear_depth(1.0);
 
+        // Second shadow framebuffer (the furthest cascade)
         let mut furthest_shadow_fbo =
             SimpleFrameBuffer::depth_only(display, &shadow_textures.furthest).unwrap();
         furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
         furthest_shadow_fbo.clear_depth(1.0);
 
-        let view = self.get_view_matrix();
-        self.update_camera_vectors();
-        self.cascades = Cascades::new(
-            self.get_camera_fov(),
-            self.aspect_ratio,
+        object_render::render_opaque_models(
+            &self.cascades,
+            &self.shadow_textures,
+            display,
+            &mut layer_1,
+            &mut layer_2,
+            assets,
+            &self.opaque_models_list,
             self.get_light_direction(),
-            view,
+            self.get_camera_position(),
+            self.get_view_matrix(),
+            self.get_projection_matrix()
         );
+
+        object_render::render_transparent_models(
+            &self.cascades,
+            &self.shadow_textures,
+            display,
+            &mut layer_1,
+            &mut layer_2,
+            assets,
+            &self.opaque_models_list,
+            self.get_light_direction(),
+            self.get_camera_position(),
+            self.get_view_matrix(),
+            self.get_projection_matrix()
+        );
+
+        self.target.as_mut().unwrap().clear_depth(0.0);
+        self.draw_layer_framebuffers();
+    }
+
+    pub fn add_opaque_model(&mut self, object_id: u128, model_data: ModelData) {
+        self.opaque_models_list.insert(object_id, model_data);
+    }
+
+    pub fn add_transparent_model(&mut self, object_id: u128, model_data: ModelData) {
+        self.transparent_models_list.insert(object_id, model_data);
+    }
+
+    pub fn remove_opaque_model(&mut self, object_id: u128) {
+        self.opaque_models_list.remove(&object_id);
+    }
+
+    pub fn remove_transparent_model(&mut self, object_id: u128) {
+        self.transparent_models_list.remove(&object_id);
+    }
+
+    pub fn set_opaque_model_transform(&mut self, object_id: u128, transform: Transform, nodes_transforms: Vec<NodeTransform>) {
+        match self.opaque_models_list.get_mut(&object_id) {
+            Some(model) => {
+                model.transform = transform;
+                model.nodes_transforms = nodes_transforms;
+            },
+            None => debugger::error("set_opaque_model_transform error: failed to get the model from the hashmap!"),
+        }
+    }
+
+    pub fn set_transparent_model_transform(&mut self, object_id: u128, transform: Transform, nodes_transforms: Vec<NodeTransform>) {
+        match self.transparent_models_list.get_mut(&object_id) {
+            Some(model) => {
+                model.transform = transform;
+                model.nodes_transforms = nodes_transforms;
+            },
+            None => debugger::error("set_transparent_model_transform error: failed to get the model from the hashmap!"),
+        }
     }
 
     /// Call only after drawing everything.
@@ -827,9 +938,49 @@ impl RenderManager {
         furthest_shadow_fbo.clear_depth(1.0);
         furthest_shadow_fbo
     }
+
+    pub fn resize_layers_textures(&mut self) {
+        let resolution = self.resolution;
+        let display = &self.display;
+        self.layers_textures = LayersTextures {
+            layer1_texture: SrgbTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 1 SrgbTexture2d!"),
+            layer1_depth_texture: DepthTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 1 DepthTexture2d!"),
+            layer2_texture: SrgbTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 2 SrgbTexture2d!"),
+            layer2_depth_texture: DepthTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 2 DepthTexture2d!"),
+        };
+    }
+
+    pub fn draw_layer_framebuffers(&mut self) {
+        let target = self.target.as_mut().expect("No target to render layers!");
+        let vertices_list = vec![Vertex { position: [-1.0, -1.0, 0.0], tex_coords: [0.0, 0.0], ..Default::default() },
+            Vertex { position: [1.0, 1.0, 0.0], tex_coords: [1.0, 1.0], ..Default::default() },
+            Vertex { position: [1.0, -1.0, 0.0], tex_coords: [1.0, 0.0], ..Default::default() },
+            Vertex { position: [-1.0, 1.0, 0.0], tex_coords: [0.0, 1.0], ..Default::default() }
+        ];
+        let indices_list: Vec<u8> = vec![0, 3, 1, 1, 2, 3];
+        let vertices = VertexBuffer::new(&self.display, &vertices_list).expect("Failed to create a VertexBuffer to render layers");
+        let indices = IndexBuffer::new(&self.display, PrimitiveType::TriangleFan, &indices_list).expect("Failed to create a IndexBuffer to render layers");
+        // drawing layer 1
+        target.draw(&vertices, &indices, &self.framebuffer_program, 
+            &uniform! {tex: &self.layers_textures.layer1_texture},
+            &DrawParameters { blend: glium::draw_parameters::Blend::alpha_blending(), ..Default::default() }
+        ).expect("Failed to render the layer 1!");
+        // drawing layer 2
+        target.draw(&vertices, &indices, &self.framebuffer_program, 
+            &uniform! {tex: &self.layers_textures.layer2_texture},
+            &DrawParameters { blend: glium::draw_parameters::Blend::alpha_blending(), ..Default::default() }
+        ).expect("Failed to render the layer 2!");
+    }
 }
 
 pub enum CurrentCascade {
     Closest,
     Furthest,
+}
+
+pub struct LayersTextures {
+    layer1_texture: SrgbTexture2d,
+    layer1_depth_texture: DepthTexture2d,
+    layer2_texture: SrgbTexture2d,
+    layer2_depth_texture: DepthTexture2d,
 }

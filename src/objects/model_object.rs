@@ -4,24 +4,19 @@ use crate::{
         model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
         shader_asset::ShaderAsset,
     },
-    framework::Framework,
+    framework::{self, Framework},
     managers::{
         assets::{AssetManager, ModelAssetId, TextureAssetId},
         debugger::{self, error, warn},
         physics::ObjectBodyParameters,
-        render::{CurrentCascade, RenderManager},
+        render::{CurrentCascade, ModelData, RenderLayers, RenderManager},
     },
     math_utils::deg_vec_to_rad,
 };
 use egui_glium::egui_winit::egui::ComboBox;
 use glam::{Mat4, Quat, Vec3};
 use glium::{
-    glutin::surface::WindowSurface,
-    uniform,
-    uniforms::{
-        MagnifySamplerFilter, MinifySamplerFilter, Sampler, SamplerWrapFunction, UniformBuffer,
-    },
-    Display, IndexBuffer, Program, Surface,
+    uniform, IndexBuffer, Program, Surface,
 };
 use std::{collections::HashMap, time::Instant};
 
@@ -42,10 +37,29 @@ pub struct ModelObject {
     //vertex_buffer: Vec<VertexBuffer<Vertex>>,
     programs: Vec<Program>,
     shadow_programs: Vec<Program>,
+    is_transparent: bool,
     started: bool,
     error: bool,
+    layer: RenderLayers,
     inspector_anim_name: String,
     object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
+}
+
+impl Drop for ModelObject {
+    fn drop(&mut self) {
+        let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
+        let framework = unsafe { &mut *framework_ptr };
+        let framework = &mut *framework;
+        match &mut framework.render {
+            Some(render) => {
+                match self.is_transparent {
+                    false => render.remove_opaque_model(*self.object_id()),
+                    true => render.remove_transparent_model(*self.object_id())
+                }
+            },
+            None => debugger::warn("Model Object was freed but there was no render manager!"),
+        }
+    }
 }
 
 impl ModelObject {
@@ -55,6 +69,8 @@ impl ModelObject {
         model_asset_id: ModelAssetId,
         texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
+        is_transparent: bool,
+        layer: RenderLayers
     ) -> Self {
         let mut nodes_transforms: Vec<NodeTransform> = vec![];
         let asset = framework.assets.get_model_asset(&model_asset_id);
@@ -98,6 +114,8 @@ impl ModelObject {
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
                     object_properties: HashMap::new(),
+                    is_transparent,
+                    layer
                 }
             }
             None => {
@@ -125,6 +143,8 @@ impl ModelObject {
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
                     object_properties: HashMap::new(),
+                    is_transparent,
+                    layer
                 }
             }
         }
@@ -158,12 +178,6 @@ impl Object for ModelObject {
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {
-        self.update_animation();
-        if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
-            for node in &asset.root_nodes {
-                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
-            }
-        }
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -264,156 +278,21 @@ impl Object for ModelObject {
     }
 
     fn render(&mut self, framework: &mut Framework) {
-        let render = framework.render.as_mut().expect(
-            "wtf there is no display in a framework and it's still calling render() in a system?",
-        );
-
-        if self.error {
-            return;
-        }
+        let render = framework.render.as_mut().expect("ModelObject: render() was called, but there's no RenderManager.");
         if !self.started {
-            self.start_mesh(&render.display, &framework.assets);
+            self.start_mesh(&framework.assets, render);
         }
 
-        let closest_shadow_view_proj_cols = render.cascades.closest_view_proj.to_cols_array_2d();
-        let furthest_shadow_view_proj_cols = render.cascades.furthest_view_proj.to_cols_array_2d();
-
+        self.update_animation();
         if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
-            let vertex_buffers = &asset.vertex_buffers.as_ref().unwrap();
-            for i in 0..asset.objects.len() {
-                let vertex_buffer = &vertex_buffers[i];
-                let object = &asset.objects[i];
-
-                let indices = IndexBuffer::new(
-                    &render.display,
-                    glium::index::PrimitiveType::TrianglesList,
-                    &object.indices,
-                );
-
-                let mut transform: Option<&NodeTransform> = None;
-                for tr in &self.nodes_transforms {
-                    if tr.node_id == asset.objects[i].node_index {
-                        transform = Some(tr);
-                        break;
-                    }
-                }
-
-                match transform {
-                    Some(_) => (),
-                    None => {
-                        error("no node transform found!");
-                        return;
-                    }
-                }
-
-                let setup_mat_result = self.setup_mat(&render, transform.unwrap());
-                let mvp: Mat4 = setup_mat_result.mvp;
-                let model: Mat4 = setup_mat_result.model;
-
-                let texture: &glium::texture::Texture2d;
-                match self.texture_asset_id.as_ref() {
-                    Some(texture_id) => {
-                        match framework.assets.get_texture_asset(texture_id) {
-                            Some(texture_asset) => texture = &texture_asset.texture,
-                            None => texture = &framework
-                                .assets
-                                .get_default_texture_asset()
-                                .expect(
-                                    "Failed to get default texture asset from preloaded assets!",
-                                )
-                                .texture,
-                        };
-                    }
-                    None => {
-                        texture = &framework
-                            .assets
-                            .get_default_texture_asset()
-                            .expect("Failed to get default texture asset from preloaded assets!")
-                            .texture
-                    }
-                }
-
-                let mvp_cols = mvp.to_cols_array_2d();
-                let model_cols = model.to_cols_array_2d();
-
-                let joints =
-                    UniformBuffer::new(&render.display, self.get_joints_transforms(asset)).unwrap();
-                let inverse_bind_mats =
-                    UniformBuffer::new(&render.display, asset.joints_inverse_bind_mats).unwrap();
-                let camera_position: [f32; 3] = render.get_camera_position().into();
-
-                let sampler_behaviour = glium::uniforms::SamplerBehavior {
-                    minify_filter: MinifySamplerFilter::Linear,
-                    magnify_filter: MagnifySamplerFilter::Linear,
-                    max_anisotropy: 8,
-                    wrap_function: (
-                        SamplerWrapFunction::Repeat,
-                        SamplerWrapFunction::Repeat,
-                        SamplerWrapFunction::Repeat,
-                    ),
-                    ..Default::default()
-                };
-
-                let uniforms = uniform! {
-                    is_instanced: false,
-                    jointsMats: &joints,
-                    jointsInverseBindMats: &inverse_bind_mats,
-                    mesh: object.transform,
-                    mvp: [
-                        mvp_cols[0],
-                        mvp_cols[1],
-                        mvp_cols[2],
-                        mvp_cols[3],
-                    ],
-                    model: [
-                        model_cols[0],
-                        model_cols[1],
-                        model_cols[2],
-                        model_cols[3],
-                    ],
-                    tex: Sampler(texture, sampler_behaviour),
-                    lightPos: render.get_light_direction().to_array(),
-                    closestShadowTexture: &render.shadow_textures.closest,
-                    furthestShadowTexture: &render.shadow_textures.furthest,
-                    closestShadowViewProj: [
-                        closest_shadow_view_proj_cols[0],
-                        closest_shadow_view_proj_cols[1],
-                        closest_shadow_view_proj_cols[2],
-                        closest_shadow_view_proj_cols[3],
-                    ],
-                    furthestShadowViewProj: [
-                        furthest_shadow_view_proj_cols[0],
-                        furthest_shadow_view_proj_cols[1],
-                        furthest_shadow_view_proj_cols[2],
-                        furthest_shadow_view_proj_cols[3],
-                    ],
-                    cameraPosition: camera_position,
-                };
-
-                let draw_params = glium::DrawParameters {
-                    depth: glium::Depth {
-                        test: glium::draw_parameters::DepthTest::IfLess,
-                        write: true,
-                        ..Default::default()
-                    },
-                    blend: glium::draw_parameters::Blend::alpha_blending(),
-                    backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-                    polygon_mode: glium::draw_parameters::PolygonMode::Fill,
-                    ..Default::default()
-                };
-
-                if let Some(target) = &mut render.target {
-                    target
-                        .draw(
-                            vertex_buffer,
-                            &indices.unwrap(),
-                            &self.programs[i],
-                            &uniforms,
-                            &draw_params,
-                        )
-                        .unwrap();
-                }
+            for node in &asset.root_nodes {
+                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
             }
+        }
+
+        match self.is_transparent {
+            false => render.set_opaque_model_transform(*self.object_id(), self.transform, self.nodes_transforms.clone()),
+            true => render.set_transparent_model_transform(*self.object_id(), self.transform, self.nodes_transforms.clone()),
         }
     }
 
@@ -424,7 +303,7 @@ impl Object for ModelObject {
         current_cascade: &CurrentCascade,
     ) {
         if !self.started {
-            self.start_mesh(&render.display, assets);
+            self.start_mesh(assets, render);
         }
 
         if self.error {
@@ -635,7 +514,6 @@ impl ModelObject {
                     } else {
                         anim_settings.animation = None;
                         anim_settings.timer = None;
-                        //return;
                         ()
                     }
                 }
@@ -676,8 +554,9 @@ impl ModelObject {
         }
     }
 
-    fn start_mesh(&mut self, display: &Display<WindowSurface>, assets: &AssetManager) {
+    fn start_mesh(&mut self, assets: &AssetManager, render: &mut RenderManager) {
         let shadow_shader = ShaderAsset::load_shadow_shader();
+        let display = &render.display;
 
         let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
             shadow_shader
@@ -694,6 +573,8 @@ impl ModelObject {
         let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
 
         let asset = assets.get_model_asset(&self.model_asset_id);
+        let mut programs = Vec::new();
+        let mut shadow_programs = Vec::new();
         if let Some(asset) = asset {
             for _ in &asset.objects {
                 let program = Program::from_source(
@@ -711,7 +592,7 @@ impl ModelObject {
                 );
 
                 match program {
-                    Ok(prog) => self.programs.push(prog),
+                    Ok(prog) => programs.push(prog),
                     Err(err) => {
                         error(&format!(
                             "ModelObject error:\nprogram creation error!\nErr: {}",
@@ -723,7 +604,7 @@ impl ModelObject {
                 }
 
                 match shadow_program {
-                    Ok(prog) => self.shadow_programs.push(prog),
+                    Ok(prog) => shadow_programs.push(prog),
                     Err(err) => {
                         error(&format!(
                             "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
@@ -735,7 +616,26 @@ impl ModelObject {
                 }
             }
 
+            self.shadow_programs = shadow_programs;
             self.started = true;
+            match self.is_transparent {
+                true => {
+                },
+                false => {
+                    render.add_opaque_model(*self.object_id(), ModelData {
+                        transform: self.global_transform(),
+                        model_asset_id: self.model_asset_id.clone(),
+                        nodes_transforms: self.nodes_transforms.clone(),
+                        animation_settings: self.animation_settings.clone(),
+                        shader_asset: self.shader_asset.clone(),
+                        texture_asset_id: self.texture_asset_id.clone(),
+                        programs,
+                        layer: self.layer.clone(),
+                        started: self.started,
+                        error: self.error,
+                    });
+                },
+            }
         }
     }
 }
@@ -745,6 +645,7 @@ fn set_objects_anim_node_transform(
     nodes_transforms: &mut Vec<NodeTransform>,
     time_elapsed: f32,
 ) {
+    println!("set_object_anim_node_transform");
     for channel in channels {
         match channel.channel_type {
             AnimationChannelType::Translation => {
@@ -754,6 +655,7 @@ fn set_objects_anim_node_transform(
                         let y_pos = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_pos = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
                         node.local_position = Vec3::new(x_pos, y_pos, z_pos);
+                        break
                     }
                 }
             }
@@ -765,6 +667,7 @@ fn set_objects_anim_node_transform(
                         let z_rot = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let w_rot = channel.w_axis_spline.as_ref().unwrap().clamped_sample(time_elapsed).unwrap();
                         node.local_rotation = Quat::from_xyzw(x_rot, y_rot, z_rot, w_rot);
+                        break
                     }
                 }
             }
@@ -775,6 +678,7 @@ fn set_objects_anim_node_transform(
                         let y_scale = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
                         let z_scale = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
                         node.local_scale = Vec3::new(x_scale, y_scale, z_scale);
+                        break
                     }
                 }
             }
@@ -842,7 +746,7 @@ fn set_nodes_global_transform(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CurrentAnimationSettings {
     pub animation: Option<Animation>,
     pub looping: bool,
@@ -855,7 +759,7 @@ struct SetupMatrixResult {
     pub model: Mat4,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NodeTransform {
     pub local_position: Vec3,
     pub local_rotation: Quat,

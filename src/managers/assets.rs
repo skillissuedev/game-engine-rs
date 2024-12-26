@@ -180,7 +180,7 @@ pub enum AssetManagerError {
     AssetCreationError,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModelAssetId {
     id: String,
 }
@@ -202,7 +202,7 @@ impl SoundAssetId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TextureAssetId {
     id: String,
 }
