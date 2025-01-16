@@ -73,7 +73,9 @@ impl InstancedModelTransformHolder {
 impl Object for InstancedModelTransformHolder {
     fn start(&mut self) {}
 
-    fn update(&mut self, framework: &mut Framework) {
+    fn update(&mut self, _: &mut Framework) {}
+
+    fn render(&mut self, framework: &mut Framework) {
         match &mut framework.render {
             Some(render) => render.add_instance_positions_vec(&self.instance, &self.mats),
             None => debugger::warn("InstancedModelTransformHolder is useless without render!"),

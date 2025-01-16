@@ -620,6 +620,19 @@ impl ModelObject {
             self.started = true;
             match self.is_transparent {
                 true => {
+                    render.add_transparent_model(*self.object_id(), ModelData {
+                        transform: self.global_transform(),
+                        model_asset_id: self.model_asset_id.clone(),
+                        nodes_transforms: self.nodes_transforms.clone(),
+                        animation_settings: self.animation_settings.clone(),
+                        shader_asset: self.shader_asset.clone(),
+                        texture_asset_id: self.texture_asset_id.clone(),
+                        programs,
+                        layer: self.layer.clone(),
+                        started: self.started,
+                        error: self.error,
+                        master_object_id: None,
+                    });
                 },
                 false => {
                     render.add_opaque_model(*self.object_id(), ModelData {
@@ -633,6 +646,7 @@ impl ModelObject {
                         layer: self.layer.clone(),
                         started: self.started,
                         error: self.error,
+                        master_object_id: None,
                     });
                 },
             }
@@ -645,7 +659,6 @@ fn set_objects_anim_node_transform(
     nodes_transforms: &mut Vec<NodeTransform>,
     time_elapsed: f32,
 ) {
-    println!("set_object_anim_node_transform");
     for channel in channels {
         match channel.channel_type {
             AnimationChannelType::Translation => {

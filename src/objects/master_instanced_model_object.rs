@@ -9,7 +9,7 @@ use crate::{
         assets::{AssetManager, ModelAssetId, TextureAssetId},
         debugger::{error, warn},
         physics::ObjectBodyParameters,
-        render::{CurrentCascade, RenderManager},
+        render::{CurrentCascade, Instance, ModelData, RenderLayers, RenderManager},
     },
 };
 use egui_glium::egui_winit::egui::ComboBox;
@@ -43,7 +43,9 @@ pub struct MasterInstancedModelObject {
     started: bool,
     error: bool,
     inspector_anim_name: String,
-    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>,
+    layer: RenderLayers,
+    is_transparent: bool,
 }
 
 impl MasterInstancedModelObject {
@@ -53,6 +55,8 @@ impl MasterInstancedModelObject {
         model_asset_id: ModelAssetId,
         texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
+        is_transparent: bool,
+        layer: RenderLayers,
     ) -> Self {
         let mut nodes_transforms: Vec<NodeTransform> = vec![];
 
@@ -96,7 +100,9 @@ impl MasterInstancedModelObject {
                     body: None,
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
-                    object_properties: HashMap::new()
+                    object_properties: HashMap::new(),
+                    layer,
+                    is_transparent,
                 }
             }
             None => {
@@ -128,7 +134,9 @@ impl MasterInstancedModelObject {
                     body: None,
                     id: gen_object_id(),
                     inspector_anim_name: "None".into(),
-                    object_properties: HashMap::new()
+                    object_properties: HashMap::new(),
+                    layer,
+                    is_transparent,
                 }
             }
         }
@@ -147,14 +155,7 @@ impl Object for MasterInstancedModelObject {
 
     fn start(&mut self) {}
 
-    fn update(&mut self, framework: &mut Framework) {
-        self.update_animation();
-        if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
-            for node in &asset.root_nodes {
-                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
-            }
-        }
-    }
+    fn update(&mut self, _: &mut Framework) {}
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children
@@ -254,159 +255,19 @@ impl Object for MasterInstancedModelObject {
     }
 
     fn render(&mut self, framework: &mut Framework) {
-        /*
-        let render = framework.render.as_mut().expect(
-            "wtf there is no display in a framework and it's still calling render() in a system?",
-        );
+        let render = framework.render.as_mut().expect("MasterInstancedModelObject: render(): There's no RenderManager!");
 
-        if self.error {
-            return;
-        }
-        if !self.started {
-            self.start_mesh(&render.display, &framework.assets);
-        }
-
-        let closest_shadow_view_proj_cols = render.cascades.closest_view_proj.to_cols_array_2d();
-        let furthest_shadow_view_proj_cols = render.cascades.furthest_view_proj.to_cols_array_2d();
-
-        let matrices = match render.get_instance_positions(&self.name) {
-            Some(matrices) => matrices,
-            None => return,
-        };
-        let mut per_instance_data = Vec::new();
-
-        for matrix in matrices {
-            per_instance_data.push(Instance {
-                model: matrix.to_cols_array_2d(),
-            });
-        }
-        let per_instance_buffer =
-            glium::vertex::VertexBuffer::dynamic(&render.display, &per_instance_data).unwrap();
-
+        self.update_animation();
         if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
-            let vertex_buffers = &asset.vertex_buffers.as_ref().unwrap();
-            for i in 0..asset.objects.len() {
-                let vertex_buffer = &vertex_buffers[i];
-                let object = &asset.objects[i];
-
-                let indices = IndexBuffer::new(
-                    &render.display,
-                    glium::index::PrimitiveType::TrianglesList,
-                    &object.indices,
-                );
-
-                let mut transform: Option<&NodeTransform> = None;
-                for tr in &self.nodes_transforms {
-                    if tr.node_id == asset.objects[i].node_index {
-                        transform = Some(tr);
-                        break;
-                    }
-                }
-
-                match transform {
-                    Some(_) => (),
-                    None => {
-                        error("no node transform found!");
-                        return;
-                    }
-                }
-
-                let texture: &glium::texture::Texture2d;
-                match self.texture_asset_id.as_ref() {
-                    Some(texture_id) => {
-                        match framework.assets.get_texture_asset(texture_id) {
-                            Some(texture_asset) => texture = &texture_asset.texture,
-                            None => texture = &framework
-                                .assets
-                                .get_default_texture_asset()
-                                .expect(
-                                    "Failed to get 'default' texture asset from preloaded assets!",
-                                )
-                                .texture,
-                        };
-                    }
-                    None => {
-                        texture = &framework
-                            .assets
-                            .get_default_texture_asset()
-                            .expect("Failed to get 'default' texture asset from preloaded assets!")
-                            .texture
-                    }
-                }
-
-                let joints = UniformBuffer::new(
-                    &render.display,
-                    self.get_joints_transforms(&framework.assets),
-                )
-                .unwrap();
-                let inverse_bind_mats =
-                    UniformBuffer::new(&render.display, asset.joints_inverse_bind_mats).unwrap();
-
-                let camera_position: [f32; 3] = render.get_camera_position().into();
-
-                let sampler_behaviour = glium::uniforms::SamplerBehavior {
-                    minify_filter: MinifySamplerFilter::Nearest,
-                    magnify_filter: MagnifySamplerFilter::Nearest,
-                    wrap_function: (
-                        SamplerWrapFunction::Repeat,
-                        SamplerWrapFunction::Repeat,
-                        SamplerWrapFunction::Repeat,
-                    ),
-                    ..Default::default()
-                };
-
-                let uniforms = uniform! {
-                    view: render.get_view_matrix().to_cols_array_2d(),
-                    proj: render.get_projection_matrix().to_cols_array_2d(),
-                    jointsMats: &joints,
-                    jointsInverseBindMats: &inverse_bind_mats,
-                    mesh: object.transform,
-                    tex: Sampler(texture, sampler_behaviour),
-                    lightPos: render.get_light_direction().to_array(),
-                    closestShadowTexture: &render.shadow_textures.closest,
-                    furthestShadowTexture: &render.shadow_textures.furthest,
-                    closestShadowViewProj: [
-                        closest_shadow_view_proj_cols[0],
-                        closest_shadow_view_proj_cols[1],
-                        closest_shadow_view_proj_cols[2],
-                        closest_shadow_view_proj_cols[3],
-                    ],
-                    furthestShadowViewProj: [
-                        furthest_shadow_view_proj_cols[0],
-                        furthest_shadow_view_proj_cols[1],
-                        furthest_shadow_view_proj_cols[2],
-                        furthest_shadow_view_proj_cols[3],
-                    ],
-                    cameraPosition: camera_position,
-                };
-
-                let draw_params = glium::DrawParameters {
-                    depth: glium::Depth {
-                        test: glium::draw_parameters::DepthTest::IfLess,
-                        write: true,
-                        ..Default::default()
-                    },
-                    blend: glium::draw_parameters::Blend::alpha_blending(),
-                    backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-                    polygon_mode: glium::draw_parameters::PolygonMode::Fill,
-                    ..Default::default()
-                };
-
-                render
-                    .target
-                    .as_mut()
-                    .expect("Target shouldn't be None here")
-                    .draw(
-                        (vertex_buffer, per_instance_buffer.per_instance().unwrap()),
-                        &indices.unwrap(),
-                        &self.programs[i],
-                        &uniforms,
-                        &draw_params,
-                    )
-                    .unwrap();
+            for node in &asset.root_nodes {
+                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
             }
         }
-    */
+
+        match self.is_transparent {
+            false => render.set_opaque_model_transform(*self.object_id(), self.transform, self.nodes_transforms.clone()),
+            true => render.set_transparent_model_transform(*self.object_id(), self.transform, self.nodes_transforms.clone()),
+        }
     }
 
     fn shadow_render(
@@ -416,7 +277,7 @@ impl Object for MasterInstancedModelObject {
         current_cascade: &CurrentCascade,
     ) {
         if !self.started {
-            self.start_mesh(&render.display, assets);
+            self.start_mesh(assets, render);
         }
 
         if self.error {
@@ -636,8 +497,9 @@ impl MasterInstancedModelObject {
         }
     }
 
-    fn start_mesh(&mut self, display: &Display<WindowSurface>, assets: &AssetManager) {
-        let shadow_shader = ShaderAsset::load_shadow_shader();
+    fn start_mesh(&mut self, assets: &AssetManager, render: &mut RenderManager) {
+        let display = &render.display;
+        let shadow_shader = ShaderAsset::load_instanced_shadow_shader();
 
         let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
             shadow_shader
@@ -654,6 +516,7 @@ impl MasterInstancedModelObject {
         let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
 
         let asset = assets.get_model_asset(&self.model_asset_id);
+        let mut programs = Vec::new();
         if let Some(asset) = asset {
             for _ in &asset.objects {
                 let program = Program::from_source(
@@ -671,10 +534,10 @@ impl MasterInstancedModelObject {
                 );
 
                 match program {
-                    Ok(prog) => self.programs.push(prog),
+                    Ok(prog) => programs.push(prog),
                     Err(err) => {
                         error(&format!(
-                            "ModelObject error:\nprogram creation error!\nErr: {}",
+                            "MasterInstancedModelObject error:\nprogram creation error!\nErr: {}",
                             err
                         ));
                         self.error = true;
@@ -686,7 +549,7 @@ impl MasterInstancedModelObject {
                     Ok(prog) => self.shadow_programs.push(prog),
                     Err(err) => {
                         error(&format!(
-                            "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
+                            "MasterInstancedModelObject error:\nprogram creation error(shadow)!\nErr: {}",
                             err
                         ));
                         self.error = true;
@@ -695,6 +558,38 @@ impl MasterInstancedModelObject {
                 }
             }
 
+            match self.is_transparent {
+                true => {
+                    render.add_transparent_model(*self.object_id(), ModelData {
+                        transform: self.global_transform(),
+                        model_asset_id: self.model_asset_id.clone(),
+                        nodes_transforms: self.nodes_transforms.clone(),
+                        animation_settings: self.animation_settings.clone(),
+                        shader_asset: self.shader_asset.clone(),
+                        texture_asset_id: self.texture_asset_id.clone(),
+                        programs,
+                        layer: self.layer.clone(),
+                        started: self.started,
+                        error: self.error,
+                        master_object_id: Some(self.name.clone()),
+                    });
+                },
+                false => {
+                    render.add_opaque_model(*self.object_id(), ModelData {
+                        transform: self.global_transform(),
+                        model_asset_id: self.model_asset_id.clone(),
+                        nodes_transforms: self.nodes_transforms.clone(),
+                        animation_settings: self.animation_settings.clone(),
+                        shader_asset: self.shader_asset.clone(),
+                        texture_asset_id: self.texture_asset_id.clone(),
+                        programs,
+                        layer: self.layer.clone(),
+                        started: self.started,
+                        error: self.error,
+                        master_object_id: Some(self.name.clone()),
+                    });
+                },
+            }
             self.started = true;
         }
     }
@@ -806,10 +701,3 @@ fn set_nodes_global_transform(
 pub enum ModelObjectError {
     AnimationNotFound,
 }
-
-#[derive(Clone, Copy)]
-pub struct Instance {
-    model: [[f32; 4]; 4],
-}
-
-implement_vertex!(Instance, model);

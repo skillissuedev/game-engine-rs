@@ -16,7 +16,7 @@ use crate::{
     },
     objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
 };
-use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
+use egui_glium::egui_winit::egui::{self, ColorImage, FontData, FontDefinitions, FontFamily, Id, Window};
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
@@ -85,7 +85,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
-        render: Some(RenderManager::new(display, [1280, 720])),
+        render: Some(RenderManager::new(display, [1280, 720], 2.0)),
         ui: Some(UiManager::default())
     };
 
@@ -163,7 +163,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                         render.get_camera_front(),
                                     );
 
-                                    render.draw(&framework.assets);
+                                    render.prepare_for_shadow_render();
                                 }
 
                                 systems::shadow_render(
@@ -179,6 +179,8 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                                 {
                                     let render = framework.render.as_mut().unwrap();
+                                    render.draw(&framework.assets);
+
                                     render.debug_draw();
                                     egui_glium
                                         .paint(&render.display, render.target.as_mut().unwrap());
@@ -994,8 +996,10 @@ impl Framework {
         model_asset_id: ModelAssetId,
         texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
+        is_transparent: bool,
+        layer: RenderLayers,
     ) -> MasterInstancedModelObject {
-        MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset)
+        MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset, is_transparent, layer)
     }
 
     pub fn new_model_object(

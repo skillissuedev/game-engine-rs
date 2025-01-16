@@ -63,6 +63,15 @@ impl ShaderAsset {
         ShaderAsset::load_from_file(&shader_path)
     }
 
+    pub fn load_instanced_shadow_shader() -> Result<ShaderAsset, ShaderError> {
+        let shader_path = ShaderAssetPath {
+            vertex_shader_path: "shaders/shadow_map_instanced.vert".into(),
+            fragment_shader_path: "shaders/shadow_map_instanced.frag".into(),
+        };
+
+        ShaderAsset::load_from_file(&shader_path)
+    }
+
     pub fn load_from_file(path: &ShaderAssetPath) -> Result<ShaderAsset, ShaderError> {
         let vertex_shader_source = read_to_string(get_full_asset_path(&path.vertex_shader_path));
         let fragment_shader_source =

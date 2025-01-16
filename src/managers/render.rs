@@ -5,7 +5,7 @@ use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad, objects::
 use super::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, object_render, physics::{RenderColliderType, RenderRay}};
 use glam::{Mat4, Quat, Vec3, Vec4};
 use glium::{
-    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::{DepthTexture2d, SrgbTexture2d}, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, VertexBuffer
+    framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::PrimitiveType, texture::{DepthTexture2d, SrgbTexture2d}, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer
 };
 
 #[derive(Debug, Clone)]
@@ -14,6 +14,12 @@ pub enum RenderLayers {
     Layer2
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Instance {
+    pub model: [[f32; 4]; 4],
+}
+
+implement_vertex!(Instance, model);
 #[derive(Debug)]
 pub struct ModelData {
     pub transform: Transform,
@@ -26,6 +32,7 @@ pub struct ModelData {
     pub layer: RenderLayers,
     pub started: bool,
     pub error: bool,
+    pub master_object_id: Option<String>
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -134,22 +141,18 @@ struct SunCamera {
 }
 
 pub struct Cascades {
-    closest: SunCamera,
-    furthest: SunCamera,
     pub closest_view_proj: Mat4,
     pub furthest_view_proj: Mat4,
 }
 
 impl Cascades {
-    pub fn new(fov: f32, aspect_ratio: f32, light_dir: Vec3, view: Mat4) -> Cascades {
-        let closest = SunCamera::new(fov, aspect_ratio, light_dir, view, 0.0, Some(50.0), None);
-        let furthest = SunCamera::new(fov, aspect_ratio, light_dir, view, 50.0, None, None); //Some(100.0));
+    pub fn new(fov: f32, aspect_ratio: f32, light_dir: Vec3, view: Mat4, camera_position: Vec3) -> Cascades {
+        let closest = SunCamera::new(fov, aspect_ratio, camera_position, light_dir, view, 0.0, Some(75.0), None);
+        let furthest = SunCamera::new(fov, aspect_ratio, camera_position, light_dir, view, 50.0, None, None); //Some(100.0));
         let closest_view_proj = closest.as_mat4();
         let furthest_view_proj = furthest.as_mat4();
 
         Cascades {
-            closest,
-            furthest,
             closest_view_proj,
             furthest_view_proj,
         }
@@ -158,23 +161,24 @@ impl Cascades {
 
 impl SunCamera {
     fn get_sun_camera_projection_matrix(corners: &CameraCorners) -> Mat4 {
-        Mat4::orthographic_rh_gl(
+        let result = Mat4::orthographic_rh_gl(
             corners.min_x - 50.0,
             corners.max_x + 20.0,
             corners.min_y - 50.0,
             corners.max_y + 50.0,
             corners.min_z - 100.0,
             corners.max_z + 200.0,
-        )
+        );
+        result
     }
 
     fn get_sun_camera_view_matrix(
         light_dir: Vec3,
         corners: &CameraCorners,
         additional_y: Option<f32>,
+        camera_position: Vec3
     ) -> Mat4 {
         //let direction = get_light_direction().normalize();
-        let view_center = corners.get_center();
         let view_up = Vec3::new(0.0, 1.0, 0.0);
 
         //let main_camera_position = get_camera_position();
@@ -185,9 +189,9 @@ impl SunCamera {
         };
 
         let sun_camera_position =
-            light_dir + view_center + Vec3::new(0.0, 20.0, 0.0) + additional_y; //Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
+            camera_position - light_dir + Vec3::new(0.0, 30.0, 0.0) + additional_y; //Vec3::new(0.0, corners.max_y/* / 2.0*/, 0.0);
 
-        let view_matrix = Mat4::look_at_rh(sun_camera_position, view_center, view_up);
+        let view_matrix = Mat4::look_at_rh(sun_camera_position, camera_position, view_up);
 
         view_matrix
     }
@@ -195,6 +199,7 @@ impl SunCamera {
     pub fn new(
         fov: f32,
         aspect_ratio: f32,
+        camera_position: Vec3,
         light_dir: Vec3,
         view: Mat4,
         start_distance: f32,
@@ -203,7 +208,7 @@ impl SunCamera {
     ) -> SunCamera {
         let corners = CameraCorners::new(fov, aspect_ratio, start_distance, end_distance, view);
         let proj = Self::get_sun_camera_projection_matrix(&corners);
-        let view = Self::get_sun_camera_view_matrix(light_dir, &corners, additional_y);
+        let view = Self::get_sun_camera_view_matrix(light_dir, &corners, additional_y, camera_position);
         SunCamera { view, proj }
     }
 
@@ -224,8 +229,7 @@ struct CameraCorners {
 impl CameraCorners {
     // https://learnopengl.com/Guest-Articles/2021/CSM
     fn get_camera_corners(proj: Mat4, view: Mat4) -> Vec<Vec3> {
-        let proj_view = proj * view;
-        let inv = proj_view.inverse();
+        let inv = proj.inverse();
 
         let mut frustum_corners = Vec::new();
         let mut vec3_frustum_corners = Vec::new();
@@ -371,10 +375,11 @@ pub struct RenderManager {
     pub transparent_models_list: HashMap<u128, ModelData>,
     pub layers_textures: LayersTextures,
     pub framebuffer_program: Program,
+    pub downscale_divider: f32,
 }
 
 impl RenderManager {
-    pub fn new(display: Display<WindowSurface>, resolution: [u32; 2]) -> Self {
+    pub fn new(display: Display<WindowSurface>, resolution: [u32; 2], downscale_divider: f32) -> Self {
         let ray_shader = Program::from_source(
             &display,
             include_str!("../assets/ray_shader.vert"),
@@ -392,12 +397,16 @@ impl RenderManager {
         let collider_cuboid_vertex_buffer = VertexBuffer::new(&display, &CUBE_VERTS_LIST).unwrap();
         let collider_cuboid_index_buffer =
             IndexBuffer::new(&display, PrimitiveType::TrianglesList, &CUBE_INDICES_LIST).unwrap();
-        let shadow_textures = ShadowTextures::new(&display, 4096, 4096);
+        let shadow_textures = ShadowTextures::new(&display, 8192, 8912);
+
+        let final_resolution_x = (resolution[0] as f32 / downscale_divider) as u32;
+        let final_resolution_y = (resolution[1] as f32 / downscale_divider) as u32;
+
         let layers_textures = LayersTextures {
-            layer1_texture: SrgbTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 1 SrgbTexture2d!"),
-            layer1_depth_texture: DepthTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 1 DepthTexture2d!"),
-            layer2_texture: SrgbTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 2 SrgbTexture2d!"),
-            layer2_depth_texture: DepthTexture2d::empty(&display, resolution[0], resolution[1]).expect("Failed to create a layer 2 DepthTexture2d!"),
+            layer1_texture: Texture2d::empty(&display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 1 Texture2d!"),
+            layer1_depth_texture: DepthTexture2d::empty(&display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 1 DepthTexture2d!"),
+            layer2_texture: Texture2d::empty(&display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 2 Texture2d!"),
+            layer2_depth_texture: DepthTexture2d::empty(&display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 2 DepthTexture2d!"),
         };
         let framebuffer_shader_asset = ShaderAsset::load_default_framebuffer_shader().expect("Failed to load the default framebuffer shader!");
         let framebuffer_program =
@@ -405,7 +414,7 @@ impl RenderManager {
             .expect("Failed to create a framebuffer Program!");
 
         Self {
-            light_direction: Vec3::new(-1.0, 0.0, 0.0),
+            light_direction: Vec3::new(0.1, 0.0, 0.0),
             camera_location: CameraLocation {
                 position: Vec3::ZERO,
                 rotation: Vec3::ZERO,
@@ -421,7 +430,7 @@ impl RenderManager {
             target: None,
             render_rays: Vec::new(),
             render_colliders: Vec::new(),
-            cascades: Cascades::new(47.0, 1.0, Vec3::new(-1.0, 0.0, 0.0), Mat4::IDENTITY),
+            cascades: Cascades::new(47.0, 1.0, Vec3::new(-1.0, 0.0, 0.0), Mat4::IDENTITY, Vec3::ZERO),
             ray_shader,
             collider_cuboid_shader,
             collider_cuboid_vertex_buffer,
@@ -431,6 +440,7 @@ impl RenderManager {
             transparent_models_list: HashMap::new(),
             layers_textures,
             framebuffer_program,
+            downscale_divider
         }
     }
 
@@ -522,25 +532,10 @@ impl RenderManager {
         self.camera_location.fov
     }
 
-    pub fn draw(&mut self, assets: &AssetManager) {
+    pub fn prepare_for_shadow_render(&mut self) {
+        self.update_camera_vectors();
         let display = &self.display;
         let shadow_textures = &self.shadow_textures;
-
-        // Creating the first framebuffer (layer 1)
-        let layer1_texture = &self.layers_textures.layer1_texture;
-        let layer1_depth_texture = &self.layers_textures.layer1_depth_texture;
-        let mut layer_1 = SimpleFrameBuffer::with_depth_buffer(display, layer1_texture, layer1_depth_texture).expect("RenderManager: Layer 2 Framebuffer Error!");
-        layer_1.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-
-        let layer2_texture = &self.layers_textures.layer2_texture;
-        let layer2_depth_texture = &self.layers_textures.layer2_depth_texture;
-        let mut layer_2 = SimpleFrameBuffer::with_depth_buffer(display, layer2_texture, layer2_depth_texture).expect("RenderManager: Layer 2 Framebuffer Error!");
-        layer_2.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-
-        // The actual framebuffer the game is rendered to
-        let mut target = self.display.draw();
-        target.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
-        self.target = Some(target);
 
         // First shadow framebuffer (the closest cascade)
         let mut closest_shadow_fbo =
@@ -553,6 +548,28 @@ impl RenderManager {
             SimpleFrameBuffer::depth_only(display, &shadow_textures.furthest).unwrap();
         furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
         furthest_shadow_fbo.clear_depth(1.0);
+    }
+
+    pub fn draw(&mut self, assets: &AssetManager) {
+        self.cascades = Cascades::new(self.get_camera_fov(), self.aspect_ratio, self.get_light_direction(), self.get_view_matrix(), self.get_camera_position());
+
+        let display = &self.display;
+
+        // Creating the first framebuffer (layer 1)
+        let layer1_texture = &self.layers_textures.layer1_texture;
+        let layer1_depth_texture = &self.layers_textures.layer1_depth_texture;
+        let mut layer_1 = SimpleFrameBuffer::with_depth_buffer(display, layer1_texture, layer1_depth_texture).expect("RenderManager: Layer 2 Framebuffer Error!");
+        layer_1.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 1.0), 1.0);
+
+        let layer2_texture = &self.layers_textures.layer2_texture;
+        let layer2_depth_texture = &self.layers_textures.layer2_depth_texture;
+        let mut layer_2 = SimpleFrameBuffer::with_depth_buffer(display, layer2_texture, layer2_depth_texture).expect("RenderManager: Layer 2 Framebuffer Error!");
+        layer_2.clear_color_srgb_and_depth((0.7, 0.7, 0.9, 0.0), 1.0);
+
+        // The actual framebuffer the game is rendered to
+        let mut target = self.display.draw();
+        target.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+        self.target = Some(target);
 
         object_render::render_opaque_models(
             &self.cascades,
@@ -565,7 +582,8 @@ impl RenderManager {
             self.get_light_direction(),
             self.get_camera_position(),
             self.get_view_matrix(),
-            self.get_projection_matrix()
+            self.get_projection_matrix(),
+            &self.instanced_positions
         );
 
         object_render::render_transparent_models(
@@ -575,11 +593,12 @@ impl RenderManager {
             &mut layer_1,
             &mut layer_2,
             assets,
-            &self.opaque_models_list,
+            &self.transparent_models_list,
             self.get_light_direction(),
             self.get_camera_position(),
             self.get_view_matrix(),
-            self.get_projection_matrix()
+            self.get_projection_matrix(),
+            &self.instanced_positions
         );
 
         self.target.as_mut().unwrap().clear_depth(0.0);
@@ -896,7 +915,9 @@ impl RenderManager {
 
     pub fn add_instance_position(&mut self, instance: &str, position: Mat4) {
         match self.instanced_positions.get_mut(instance) {
-            Some(positions) => positions.push(position),
+            Some(positions) => {
+                positions.push(position)
+            },
             None => {
                 self.instanced_positions
                     .insert(instance.into(), vec![position]);
@@ -924,29 +945,29 @@ impl RenderManager {
     pub fn prepare_for_normal_render(&mut self) {}
 
     pub fn closest_shadow_fbo(&self) -> SimpleFrameBuffer<'_> {
-        let mut closest_shadow_fbo =
+        let closest_shadow_fbo =
             SimpleFrameBuffer::depth_only(&self.display, &self.shadow_textures.closest).unwrap();
-        closest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
-        closest_shadow_fbo.clear_depth(1.0);
         closest_shadow_fbo
     }
 
     pub fn furthest_shadow_fbo(&self) -> SimpleFrameBuffer<'_> {
-        let mut furthest_shadow_fbo =
+        let furthest_shadow_fbo =
             SimpleFrameBuffer::depth_only(&self.display, &self.shadow_textures.furthest).unwrap();
-        furthest_shadow_fbo.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
-        furthest_shadow_fbo.clear_depth(1.0);
         furthest_shadow_fbo
     }
 
     pub fn resize_layers_textures(&mut self) {
         let resolution = self.resolution;
         let display = &self.display;
+
+        let final_resolution_x = (resolution[0] as f32 / self.downscale_divider) as u32;
+        let final_resolution_y = (resolution[1] as f32 / self.downscale_divider) as u32;
+
         self.layers_textures = LayersTextures {
-            layer1_texture: SrgbTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 1 SrgbTexture2d!"),
-            layer1_depth_texture: DepthTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 1 DepthTexture2d!"),
-            layer2_texture: SrgbTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 2 SrgbTexture2d!"),
-            layer2_depth_texture: DepthTexture2d::empty(display, resolution[0], resolution[1]).expect("Failed to create a layer 2 DepthTexture2d!"),
+            layer1_texture: Texture2d::empty(display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 1 Texture2d!"),
+            layer1_depth_texture: DepthTexture2d::empty(display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 1 DepthTexture2d!"),
+            layer2_texture: Texture2d::empty(display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 2 Texture2d!"),
+            layer2_depth_texture: DepthTexture2d::empty(display, final_resolution_x, final_resolution_y).expect("Failed to create a layer 2 DepthTexture2d!"),
         };
     }
 
@@ -979,8 +1000,8 @@ pub enum CurrentCascade {
 }
 
 pub struct LayersTextures {
-    layer1_texture: SrgbTexture2d,
+    layer1_texture: Texture2d,
     layer1_depth_texture: DepthTexture2d,
-    layer2_texture: SrgbTexture2d,
+    layer2_texture: Texture2d,
     layer2_depth_texture: DepthTexture2d,
 }

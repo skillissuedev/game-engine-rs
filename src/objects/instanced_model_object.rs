@@ -56,23 +56,21 @@ impl InstancedModelObject {
         let transform =
             Mat4::from_scale_rotation_translation(scale_vector, rotation_quat, translation_vector);
         transform
-
-        //let view = render::get_view_matrix();
-        //let proj = render::get_projection_matrix();
-
-        //let mvp = proj * view * transform;
     }
 }
 
 impl Object for InstancedModelObject {
     fn start(&mut self) {}
 
-    fn update(&mut self, framework: &mut Framework) {
+    fn update(&mut self, _: &mut Framework) { }
+
+    fn render(&mut self, framework: &mut Framework) {
         match &mut framework.render {
             Some(render) => render.add_instance_position(&self.instance, self.setup_mat()),
             None => debugger::warn("InstancedModelObject is useless without render!"),
         }
     }
+
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
         &self.children

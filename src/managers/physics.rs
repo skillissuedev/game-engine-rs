@@ -636,9 +636,9 @@ pub fn collider_type_to_collider_builder(
                     object.vertices.iter().for_each(|vert| {
                         positions_nalgebra.push(
                             Vec3::new(
-                                vert.position[0] * 2.0,
-                                vert.position[1] * 2.0,
-                                vert.position[2] * 2.0,
+                                -vert.position[0],// * 2.0,
+                                vert.position[1],// * 2.0,
+                                -vert.position[2],// * 2.0,
                             )
                             .into(),
                         )

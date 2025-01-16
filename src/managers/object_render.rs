@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use glam::{Mat4, Vec3};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, SamplerWrapFunction, UniformBuffer}, Display, IndexBuffer, Surface};
 use crate::{assets::model_asset::ModelAsset, math_utils::deg_vec_to_rad, objects::{model_object::NodeTransform, Transform}};
-use super::{assets::AssetManager, debugger, render::{Cascades, ModelData, ShadowTextures}};
+use super::{assets::AssetManager, debugger, render::{Cascades, Instance, ModelData, ShadowTextures}};
 
 #[derive(Debug)]
 struct SetupMatrixResult {
@@ -21,7 +21,8 @@ pub fn render_opaque_models(
     light_direction: Vec3,
     camera_position: Vec3,
     view_mat: Mat4,
-    projection_mat: Mat4) {
+    projection_mat: Mat4,
+    instanced_positions: &HashMap<String, Vec<Mat4>>) {
 
     // Vec<(ModelData, distance)>
     let mut sorted: Vec<(&ModelData, f32)> = Vec::new();
@@ -110,8 +111,8 @@ pub fn render_opaque_models(
                 let camera_position: [f32; 3] = camera_position.into();
 
                 let sampler_behaviour = glium::uniforms::SamplerBehavior {
-                    minify_filter: MinifySamplerFilter::Linear,
-                    magnify_filter: MagnifySamplerFilter::Linear,
+                    minify_filter: MinifySamplerFilter::Nearest,
+                    magnify_filter: MagnifySamplerFilter::Nearest,
                     max_anisotropy: 8,
                     wrap_function: (
                         SamplerWrapFunction::Repeat,
@@ -122,26 +123,9 @@ pub fn render_opaque_models(
                 };
 
                 let uniforms = uniform! {
-                    is_instanced: false,
-                    jointsMats: &joints,
-                    jointsInverseBindMats: &inverse_bind_mats,
-                    mesh: object.transform,
-                    mvp: [
-                        mvp_matrix_cols[0],
-                        mvp_matrix_cols[1],
-                        mvp_matrix_cols[2],
-                        mvp_matrix_cols[3],
-                    ],
-                    model: [
-                        model_matrix_cols[0],
-                        model_matrix_cols[1],
-                        model_matrix_cols[2],
-                        model_matrix_cols[3],
-                    ],
                     tex: glium::uniforms::Sampler(texture, sampler_behaviour),
-                    lightPos: light_direction.to_array(),
-                    closestShadowTexture: &shadow_textures.closest,
-                    furthestShadowTexture: &shadow_textures.furthest,
+                    closestShadowTexture: glium::uniforms::Sampler(&shadow_textures.closest, sampler_behaviour),
+                    furthestShadowTexture: glium::uniforms::Sampler(&shadow_textures.furthest, sampler_behaviour),
                     closestShadowViewProj: [
                         closest_shadow_view_proj_cols[0],
                         closest_shadow_view_proj_cols[1],
@@ -154,6 +138,22 @@ pub fn render_opaque_models(
                         furthest_shadow_view_proj_cols[2],
                         furthest_shadow_view_proj_cols[3],
                     ],
+                    jointsMats: &joints,
+                    jointsInverseBindMats: &inverse_bind_mats,
+                    //mesh: object.transform,
+                    /*mvp: [
+                        mvp_matrix_cols[0],
+                        mvp_matrix_cols[1],
+                        mvp_matrix_cols[2],
+                        mvp_matrix_cols[3],
+                    ],
+                    model: [
+                        model_matrix_cols[0],
+                        model_matrix_cols[1],
+                        model_matrix_cols[2],
+                        model_matrix_cols[3],
+                    ],*/
+                    lightPos: light_direction.to_array(),
                     cameraPosition: camera_position,
                 };
 
@@ -171,26 +171,94 @@ pub fn render_opaque_models(
 
                 match model.layer {
                     crate::managers::render::RenderLayers::Layer1 => {
-                        layer_1
-                            .draw(
-                                vertex_buffer,
-                                &indices.unwrap(),
-                                &model.programs[i],
-                                &uniforms,
-                                &draw_params,
-                            )
-                            .unwrap();
+                        match &model.master_object_id {
+                            Some(master_id) => {
+                                match instanced_positions.get(master_id) {
+                                    Some(positions) => {
+                                        let uniforms = uniforms.add("view", view_mat.to_cols_array_2d());
+                                        let uniforms = uniforms.add("proj", projection_mat.to_cols_array_2d());
+                                        let mut per_instance_data = Vec::new();
+
+                                        for matrix in positions {
+                                            per_instance_data.push(Instance {
+                                                model: matrix.to_cols_array_2d(),
+                                            });
+                                        }
+                                        let per_instance_buffer =
+                                            glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+                                        layer_1
+                                            .draw(
+                                                (vertex_buffer, per_instance_buffer.per_instance().unwrap()),
+                                                &indices.unwrap(),
+                                                &model.programs[i],
+                                                &uniforms,
+                                                &draw_params,
+                                            )
+                                            .unwrap();
+                                        },
+                                    None => {},
+                                }
+                            },
+                            None => {
+                                let uniforms = uniforms.add("mvp", [mvp_matrix_cols[0], mvp_matrix_cols[1], mvp_matrix_cols[2], mvp_matrix_cols[3]]);
+                                let uniforms = uniforms.add("model", [model_matrix_cols[0], model_matrix_cols[1], model_matrix_cols[2], model_matrix_cols[3]]);
+
+                                layer_1
+                                    .draw(
+                                        vertex_buffer,
+                                        &indices.unwrap(),
+                                        &model.programs[i],
+                                        &uniforms,
+                                        &draw_params,
+                                    )
+                                    .unwrap();
+                            },
+                        }
                     },
                     crate::managers::render::RenderLayers::Layer2 => {
-                        layer_2
-                            .draw(
-                                vertex_buffer,
-                                &indices.unwrap(),
-                                &model.programs[i],
-                                &uniforms,
-                                &draw_params,
-                            )
-                            .unwrap();
+                        match &model.master_object_id {
+                            Some(master_id) => {
+                                match instanced_positions.get(master_id) {
+                                    Some(positions) => {
+                                        let uniforms = uniforms.add("view", view_mat.to_cols_array_2d());
+                                        let uniforms = uniforms.add("proj", projection_mat.to_cols_array_2d());
+                                        let mut per_instance_data = Vec::new();
+
+                                        for matrix in positions {
+                                            per_instance_data.push(Instance {
+                                                model: matrix.to_cols_array_2d(),
+                                            });
+                                        }
+                                        let per_instance_buffer =
+                                            glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+                                        layer_2
+                                            .draw(
+                                                (vertex_buffer, per_instance_buffer.per_instance().unwrap()),
+                                                &indices.unwrap(),
+                                                &model.programs[i],
+                                                &uniforms,
+                                                &draw_params,
+                                            )
+                                            .unwrap();
+                                        },
+                                    None => {},
+                                }
+                            },
+                            None => {
+                                let uniforms = uniforms.add("mvp", [mvp_matrix_cols[0], mvp_matrix_cols[1], mvp_matrix_cols[2], mvp_matrix_cols[3]]);
+                                let uniforms = uniforms.add("model", [model_matrix_cols[0], model_matrix_cols[1], model_matrix_cols[2], model_matrix_cols[3]]);
+
+                                layer_2
+                                    .draw(
+                                        vertex_buffer,
+                                        &indices.unwrap(),
+                                        &model.programs[i],
+                                        &uniforms,
+                                        &draw_params,
+                                    )
+                                    .unwrap();
+                            },
+                        }
                     },
                 };
             }
@@ -209,7 +277,8 @@ pub fn render_transparent_models(
     light_direction: Vec3,
     camera_position: Vec3,
     view_mat: Mat4,
-    projection_mat: Mat4) {
+    projection_mat: Mat4,
+    instanced_positions: &HashMap<String, Vec<Mat4>>) {
 
     // Vec<(ModelData, distance)>
     let mut sorted: Vec<(&ModelData, f32)> = Vec::new();
@@ -313,7 +382,7 @@ pub fn render_transparent_models(
                     is_instanced: false,
                     jointsMats: &joints,
                     jointsInverseBindMats: &inverse_bind_mats,
-                    mesh: object.transform,
+                    /*mesh: object.transform,
                     mvp: [
                         mvp_matrix_cols[0],
                         mvp_matrix_cols[1],
@@ -325,7 +394,7 @@ pub fn render_transparent_models(
                         model_matrix_cols[1],
                         model_matrix_cols[2],
                         model_matrix_cols[3],
-                    ],
+                    ],*/
                     tex: glium::uniforms::Sampler(texture, sampler_behaviour),
                     lightPos: light_direction.to_array(),
                     closestShadowTexture: &shadow_textures.closest,
@@ -359,26 +428,91 @@ pub fn render_transparent_models(
 
                 match model.layer {
                     crate::managers::render::RenderLayers::Layer1 => {
-                        layer_1
-                            .draw(
-                                vertex_buffer,
-                                &indices.unwrap(),
-                                &model.programs[i],
-                                &uniforms,
-                                &draw_params,
-                            )
-                            .unwrap();
+                        match &model.master_object_id {
+                            Some(master_id) => {
+                                match instanced_positions.get(master_id) {
+                                    Some(positions) => {
+                                        let mut per_instance_data = Vec::new();
+
+                                        for matrix in positions {
+                                            per_instance_data.push(Instance {
+                                                model: matrix.to_cols_array_2d(),
+                                            });
+                                        }
+                                        let per_instance_buffer =
+                                            glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+                                        layer_1
+                                            .draw(
+                                                (vertex_buffer, per_instance_buffer.per_instance().unwrap()),
+                                                &indices.unwrap(),
+                                                &model.programs[i],
+                                                &uniforms,
+                                                &draw_params,
+                                            )
+                                            .unwrap();
+                                        },
+                                    None => {
+                                    },
+                                }
+                            },
+                            None => {
+                                let uniforms = uniforms.add("mvp", [mvp_matrix_cols[0], mvp_matrix_cols[1], mvp_matrix_cols[2], mvp_matrix_cols[3]]);
+                                let uniforms = uniforms.add("model", [model_matrix_cols[0], model_matrix_cols[1], model_matrix_cols[2], model_matrix_cols[3]]);
+
+                                layer_1
+                                    .draw(
+                                        vertex_buffer,
+                                        &indices.unwrap(),
+                                        &model.programs[i],
+                                        &uniforms,
+                                        &draw_params,
+                                    )
+                                    .unwrap();
+                            },
+                        }
                     },
                     crate::managers::render::RenderLayers::Layer2 => {
-                        layer_2
-                            .draw(
-                                vertex_buffer,
-                                &indices.unwrap(),
-                                &model.programs[i],
-                                &uniforms,
-                                &draw_params,
-                            )
-                            .unwrap();
+                        match &model.master_object_id {
+                            Some(master_id) => {
+                                match instanced_positions.get(master_id) {
+                                    Some(positions) => {
+                                        let mut per_instance_data = Vec::new();
+
+                                        for matrix in positions {
+                                            per_instance_data.push(Instance {
+                                                model: matrix.to_cols_array_2d(),
+                                            });
+                                        }
+                                        let per_instance_buffer =
+                                            glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
+                                        layer_2
+                                            .draw(
+                                                (vertex_buffer, per_instance_buffer.per_instance().unwrap()),
+                                                &indices.unwrap(),
+                                                &model.programs[i],
+                                                &uniforms,
+                                                &draw_params,
+                                            )
+                                            .unwrap();
+                                        },
+                                    None => {},
+                                }
+                            },
+                            None => {
+                                let uniforms = uniforms.add("mvp", [mvp_matrix_cols[0], mvp_matrix_cols[1], mvp_matrix_cols[2], mvp_matrix_cols[3]]);
+                                let uniforms = uniforms.add("model", [model_matrix_cols[0], model_matrix_cols[1], model_matrix_cols[2], model_matrix_cols[3]]);
+
+                                layer_2
+                                    .draw(
+                                        vertex_buffer,
+                                        &indices.unwrap(),
+                                        &model.programs[i],
+                                        &uniforms,
+                                        &draw_params,
+                                    )
+                                    .unwrap();
+                            },
+                        }
                     },
                 };
             }

@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, time::Duration};
 
 use clap::Parser;
 use framework::DebugMode;
@@ -12,6 +12,8 @@ mod objects;
 mod systems;
 
 fn main() {
+    std::thread::sleep(Duration::from_millis(250));
+
     let mut args = Args::parse();
     println!("run args:\n{:#?}\n---\n\n", &args);
 
