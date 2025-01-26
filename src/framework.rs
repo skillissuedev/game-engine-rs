@@ -2,21 +2,11 @@ use crate::{
     assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
     game::game_main,
     managers::{
-        self,
-        assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId},
-        debugger,
-        input::{self, InputManager},
-        navigation::NavigationManager,
-        networking,
-        physics::{self, BodyColliderType, CollisionGroups, PhysicsManager},
-        render::{CurrentCascade, RenderLayers, RenderManager},
-        saves::SavesManager,
-        sound::set_listener_transform,
-        systems::{self, SystemValue}, ui::UiManager,
+        self, assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
     },
-    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
+    objects::{character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, Args,
 };
-use egui_glium::egui_winit::egui::{self, ColorImage, FontData, FontDefinitions, FontFamily, Id, Window};
+use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
@@ -39,11 +29,9 @@ static FONT: Lazy<Vec<u8>> =
     Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
 
 pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
-    dbg!(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf"));
     let event_loop: EventLoop<_> = EventLoop::builder()
         .build()
         .expect("Event loop building failed");
-    //event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let (window, display) = new_window(&event_loop);
 
     let mut egui_glium =
@@ -85,9 +73,10 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
-        render: Some(RenderManager::new(display, [1280, 720], 2.0)),
+        render: Some(RenderManager::new(display)),
         ui: Some(UiManager::default())
     };
+    let display = &framework.render.as_ref().unwrap().display;
 
     framework.set_debug_mode(debug_mode);
 
@@ -159,14 +148,14 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                                     set_listener_transform(
                                         framework.al.as_ref().unwrap(),
-                                        render.get_camera_position(),
-                                        render.get_camera_front(),
+                                        render.camera.translation,
+                                        render.camera.front(),
                                     );
 
-                                    render.prepare_for_shadow_render();
+                                    //render.prepare_for_shadow_render();
                                 }
 
-                                systems::shadow_render(
+                                /*systems::shadow_render(
                                     framework.render.as_mut().unwrap(),
                                     &framework.assets,
                                     &CurrentCascade::Closest,
@@ -175,16 +164,16 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                     framework.render.as_mut().unwrap(),
                                     &framework.assets,
                                     &CurrentCascade::Furthest,
-                                );
+                                );*/
 
                                 {
                                     let render = framework.render.as_mut().unwrap();
-                                    render.draw(&framework.assets);
+                                    render.render_scene(&framework.assets);
 
-                                    render.debug_draw();
-                                    egui_glium
-                                        .paint(&render.display, render.target.as_mut().unwrap());
-                                    render.finish_render();
+                                    //render.debug_draw();
+                                    //egui_glium
+                                        //.paint(&render.display, render.target.as_mut().unwrap());
+                                    //render.finish_render();
                                 }
 
                                 frames_count += 1;
@@ -197,19 +186,9 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                             WindowEvent::Resized(size) => {
                                 framework.resolution =
                                     Vec2::new(size.width as f32, size.height as f32);
-                                framework
-                                    .render
-                                    .as_mut()
-                                    .unwrap()
-                                    .display
+                                framework.render.as_mut().expect("No RenderManager! - Framework (WindowEvent::Resized)")
                                     .resize(size.into());
                                 let _ = window.request_inner_size(size);
-
-                                framework.render.as_mut().unwrap().aspect_ratio =
-                                    size.width as f32 / size.height as f32;
-                                framework.render.as_mut().unwrap().resolution =
-                                    [size.width as u32, size.height as u32];
-                                framework.render.as_mut().unwrap().resize_layers_textures();
                             },
                             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
                                 // fullscreen on f11
@@ -286,18 +265,18 @@ pub fn start_game_without_render(args: Args) {
 fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.delta_time = delta_time;
 
-    if let Some(render) = &mut framework.render {
+    /*if let Some(render) = &mut framework.render {
         render.update();
-    }
+    }*/
     framework.physics.update();
     networking::update(delta_time);
     framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
     framework.navigation.create_grids();
-    if let Some(render) = &mut framework.render {
+    /*if let Some(render) = &mut framework.render {
         render.finish_render();
-    }
+    }*/
 
     framework.input.update();
 }
@@ -326,55 +305,6 @@ fn new_window<T>(
     Display<glutin::surface::WindowSurface>,
 ) {
     let (window, display) = SimpleWindowBuilder::new().build(event_loop);
-    /*
-    let config_template_builder = ConfigTemplateBuilder::new()
-        .with_multisampling(4)
-        .with_single_buffering(true);
-    let window_attributes = WindowAttributes::default()
-        .with_title("Game");
-
-    // First we start by opening a new Window
-    let display_builder =
-        glutin_winit::DisplayBuilder::new().with_window_attributes(Some(window_attributes));
-    let (window, gl_config) = display_builder
-        .build(event_loop, config_template_builder, |mut configs| {
-            // Just use the first configuration since we don't have any special preferences here
-            configs.next().unwrap()
-        })
-    .unwrap();
-    let window = window.unwrap();
-
-    // Now we get the window size to use as the initial size of the Surface
-    let (width, height): (u32, u32) = window.inner_size().into();
-    let attrs =
-        glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
-        .build(
-            window.window_handle().expect("couldn't obtain raw window handle").into(),
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
-        );
-
-    // Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
-    let surface = unsafe {
-        gl_config
-            .display()
-            .create_window_surface(&gl_config, &attrs)
-            .unwrap()
-    };
-    let context_attributes = glutin::context::ContextAttributesBuilder::new()
-        .with_context_api(glutin::context::ContextApi::OpenGl(Some(glutin::context::Version { major: 3, minor: 3 })))
-        .build(Some(window.window_handle().expect("Couldn't obtain raw window handle").into()));
-    let current_context = Some(unsafe {
-        gl_config
-            .display()
-            .create_context(&gl_config, &context_attributes)
-            .expect("Failed to create context")
-    })
-    .unwrap()
-        .make_current(&surface)
-        .unwrap();
-    surface.set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait).unwrap();
-    let display = Display::from_context_surface(current_context, surface).unwrap();*/
 
     (window, display)
 }
@@ -385,15 +315,14 @@ pub struct Framework {
     pub system_globals: HashMap<String, Vec<SystemValue>>,
     pub resolution: Vec2,
 
-    pub al: Option<EzAl>, // done + api is not required
-    pub input: InputManager, // done + api is ready
-    pub navigation: NavigationManager, // done + api is not required
-    pub physics: PhysicsManager, // done + api is not required
-    pub saves: SavesManager, // done + api is ready
-    pub assets: AssetManager, // done + api is ready
-    pub render: Option<RenderManager>, // done + api is ready
-    pub ui: Option<UiManager>, // done + api is ready
-    // todo: networking??
+    pub al: Option<EzAl>,
+    pub input: InputManager,
+    pub navigation: NavigationManager,
+    pub physics: PhysicsManager,
+    pub saves: SavesManager,
+    pub assets: AssetManager,
+    pub render: Option<RenderManager>,
+    pub ui: Option<UiManager>,
 }
 
 impl Framework {
@@ -444,32 +373,35 @@ impl Framework {
     }
 
     pub fn set_camera_fov(&mut self, fov: f32) {
-        match self.render.as_mut() {
+        todo!();
+        /*match self.render.as_mut() {
             Some(render) => render.set_camera_fov(fov),
             None => debugger::error("Failed to call set_camera_fov, render is None (probably running a server!)"),
-        }
+        }*/
     }
 
     pub fn set_light_direction(&mut self, dir: Vec3) {
-        match self.render.as_mut() {
+        todo!();
+        /*match self.render.as_mut() {
             Some(render) => render.set_light_direction(dir),
             None => debugger::error("Failed to call set_light_direction, render is None (probably running a server!)"),
-        }
+        }*/
     }
 
     pub fn get_light_direction(&self) -> Option<Vec3> {
-        match self.render.as_ref() {
+        todo!();
+        /*match self.render.as_ref() {
             Some(render) => Some(render.get_light_direction()),
             None => {
                 debugger::error("Failed to call get_light_direction, render is None (probably running a server!)");
                 None
             },
-        }
+        }*/
     }
 
     pub fn get_camera_position(&self) -> Option<Vec3> {
         match self.render.as_ref() {
-            Some(render) => Some(render.get_camera_position()),
+            Some(render) => Some(render.camera_position()),
             None => {
                 debugger::error("Failed to call get_camera_position, render is None (probably running a server!)");
                 None
@@ -479,7 +411,7 @@ impl Framework {
 
     pub fn get_camera_front(&mut self) -> Option<Vec3> {
         match self.render.as_mut() {
-            Some(render) => Some(render.get_camera_front()),
+            Some(render) => Some(render.camera_front()),
             None => {
                 debugger::error("Failed to call get_camera_front, render is None (probably running a server!)");
                 None
@@ -489,7 +421,7 @@ impl Framework {
 
     pub fn get_camera_left(&self) -> Option<Vec3> {
         match self.render.as_ref() {
-            Some(render) => Some(render.get_camera_left()),
+            Some(render) => Some(render.camera_left()),
             None => {
                 debugger::error("Failed to call get_camera_left, render is None (probably running a server!)");
                 None
@@ -499,7 +431,7 @@ impl Framework {
 
     pub fn get_camera_rotation(&self) -> Option<Vec3> {
         match self.render.as_ref() {
-            Some(render) => Some(render.get_camera_rotation()),
+            Some(render) => Some(render.camera_rotation()),
             None => {
                 debugger::error("Failed to call get_camera_rotation, render is None (probably running a server!)");
                 None
@@ -617,7 +549,7 @@ impl Framework {
 
     // AssetManager
     pub fn preload_model_asset(&mut self, asset_id: String, gltf_path: &str) -> Result<(), ()> {
-        ModelAsset::preload_model_asset_from_gltf(self, &asset_id, gltf_path)
+        ModelAsset::preload_model_asset_from_gltf(self, asset_id, gltf_path)
     }
 
     pub fn preload_sound_asset(&mut self, asset_id: String, wav_path: &str) -> Result<(), ()> {
@@ -973,12 +905,14 @@ impl Framework {
         EmptyObject::new(name)
     }
 
+    /*
     pub fn new_instanced_model_object(
         &mut self,
         name: &str,
         instance: &str,
     ) -> InstancedModelObject {
-        InstancedModelObject::new(name, instance)
+        todo!()
+        //InstancedModelObject::new(name, instance)
     }
 
     pub fn new_instanced_model_transform_holder(
@@ -987,7 +921,8 @@ impl Framework {
         instance: &str,
         transforms: Vec<Transform>
     ) -> InstancedModelTransformHolder {
-        InstancedModelTransformHolder::new(name, instance, transforms)
+        todo!();
+        //InstancedModelTransformHolder::new(name, instance, transforms)
     }
 
     pub fn new_master_instanced_model_object(
@@ -999,8 +934,9 @@ impl Framework {
         is_transparent: bool,
         layer: RenderLayers,
     ) -> MasterInstancedModelObject {
-        MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset, is_transparent, layer)
-    }
+        todo!();
+        //MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset, is_transparent, layer)
+    }*/
 
     pub fn new_model_object(
         &mut self,
@@ -1009,9 +945,9 @@ impl Framework {
         texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
         is_transparent: bool,
-        layer: RenderLayers
+        layer: RenderLayer
     ) -> ModelObject {
-        ModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset, is_transparent, layer)
+        ModelObject::new(name, model_asset_id, texture_asset_id, shader_asset, layer, is_transparent)
     }
 
     pub fn new_nav_obstacle(&mut self, name: &str, size: Vec3) -> NavObstacle {

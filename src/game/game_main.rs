@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
+use glam::Vec3;
 use glium::winit::keyboard::KeyCode;
 
 use crate::{
-    framework::{DebugMode, Framework},
-    managers::{input::InputEventType, networking, scripting::lua::LuaSystem, systems::{add_system, SystemValue}}, Args//, systems::player_manager::PlayerManager, Args,
+    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, framework::{DebugMode, Framework}, managers::{assets::ModelAssetId, input::InputEventType, networking, render::{RenderLayer, RenderObjectData, RenderShader}, scripting::lua::LuaSystem, systems::{add_system, SystemValue}}, systems::main_system::MainSystem, Args//, systems::player_manager::PlayerManager, Args,
     //systems::player_manager::PlayerManager,
 };
 
@@ -33,12 +35,17 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
+        framework.preload_model_asset("test".into(), "models/cube.gltf");
+        let model_asset = framework.get_model_asset("test").unwrap();
+        let texture_asset = framework.get_texture_asset("default").unwrap();
+        let obj = framework.new_model_object("test", model_asset, Some(texture_asset), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
+        add_system(Box::new(MainSystem {objects: vec![Box::new(obj)]}), framework);
+        framework.set_camera_position(Vec3::new(0.0, 0.0, -2.0));
     }
 
-    //add_system(Box::new(TestSystem::new()));
     //add_system(Box::new(PlayerManager::new()), framework);
     //add_system(Box::new(WorldGenerator::new()));
-    add_system(Box::new(LuaSystem::new("player_menu", "scripts/lua/player_menu.lua").unwrap()), framework);
+    /*add_system(Box::new(LuaSystem::new("player_menu", "scripts/lua/player_menu.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("biomes", "scripts/lua/biomes.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("inventory", "scripts/lua/inventory.lua").unwrap()), framework);
     //add_system(Box::new(LuaSystem::new("world_generator", "scripts/lua/world_generation.lua").unwrap()), framework);
@@ -49,7 +56,7 @@ pub fn start(args: Args, framework: &mut Framework) {
     add_system(Box::new(LuaSystem::new("vanilla_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_items", "scripts/lua/vanilla_items.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("land_unlock", "scripts/lua/land_unlock.lua").unwrap()), framework);
-    add_system(Box::new(LuaSystem::new("land_placement", "scripts/lua/land_placement.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("land_placement", "scripts/lua/land_placement.lua").unwrap()), framework);*/
 }
 
 pub fn update(framework: &mut Framework) {

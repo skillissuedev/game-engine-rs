@@ -8,7 +8,7 @@ use crate::{
         assets::AssetManager,
         debugger,
         networking::{self, Message, MessageReliability, NetworkError},
-        render::{CurrentCascade, RenderManager},
+        render::{RenderManager},
         systems::{register_object_id_name, register_object_id_system, CallList, SystemValue},
     },
     objects::Object,
@@ -99,14 +99,14 @@ pub trait System {
         &mut self,
         render: &mut RenderManager,
         assets: &AssetManager,
-        cascade: &CurrentCascade,
+        //cascade: &CurrentCascade,
     ) {
-        self.objects_list_mut()
+        /*self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.shadow_render(render, assets, cascade));
         self.objects_list_mut()
             .into_iter()
-            .for_each(|object| object.shadow_render_children(render, assets, cascade));
+            .for_each(|object| object.shadow_render_children(render, assets, cascade));*/
     }
 
     fn destroy_system(&mut self) {

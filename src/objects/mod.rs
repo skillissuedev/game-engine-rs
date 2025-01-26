@@ -6,7 +6,7 @@ use crate::{
         self,
         assets::AssetManager,
         physics::{BodyType, CollisionGroups, ObjectBodyParameters, RenderColliderType},
-        render::{CurrentCascade, RenderManager}, systems::SystemValue,
+        render::RenderManager, systems::SystemValue,
     },
 };
 use downcast_rs::{impl_downcast, Downcast};
@@ -77,7 +77,7 @@ pub trait Object: std::fmt::Debug + Downcast {
         _target: &mut SimpleFrameBuffer*/
         _render: &mut RenderManager,
         _assets: &AssetManager,
-        _current_cascade: &CurrentCascade,
+        //_current_cascade: &CurrentCascade,
     ) {
     }
 
@@ -161,15 +161,16 @@ pub trait Object: std::fmt::Debug + Downcast {
         &mut self,
         render: &mut RenderManager,
         assets: &AssetManager,
-        current_cascade: &CurrentCascade,
+        //current_cascade: &CurrentCascade,
     ) {
-        self.children_list_mut().iter_mut().for_each(|child| {
+        /*self.children_list_mut().iter_mut().for_each(|child| {
             child.shadow_render(render, assets, &current_cascade);
             child.shadow_render_children(render, assets, &current_cascade);
-        });
+        });*/
     }
 
     fn debug_render(&self, framework: &mut Framework) {
+        /*
         // Adding collider to render manager's render colliders list if debug mode != None
         match framework.debug_mode() {
             framework::DebugMode::Full => {
@@ -188,7 +189,7 @@ pub trait Object: std::fmt::Debug + Downcast {
                     .for_each(|child| child.debug_render(framework));
             }
             _ => (),
-        }
+        }*/
     }
 
     fn set_position(

@@ -631,19 +631,19 @@ pub fn collider_type_to_collider_builder(
             let mut indices: Vec<[u32; 3]> = Vec::new();
             let mut temp_indices: Vec<u32> = Vec::new();
             let mut positions_nalgebra: Vec<Point<Real>> = Vec::new();
-            match asset.objects.get(0) {
-                Some(object) => {
-                    object.vertices.iter().for_each(|vert| {
+            for (_,object) in &asset.objects {
+                for primitive in &object.render_data {
+                    primitive.vertices.iter().for_each(|vert| {
                         positions_nalgebra.push(
                             Vec3::new(
-                                -vert.position[0],// * 2.0,
+                                vert.position[0],// * 2.0,
                                 vert.position[1],// * 2.0,
-                                -vert.position[2],// * 2.0,
+                                vert.position[2],// * 2.0,
                             )
                             .into(),
                         )
                     });
-                    object.indices.iter().for_each(|ind| {
+                    primitive.indices.iter().for_each(|ind| {
                         if temp_indices.len() < 3 {
                             temp_indices.push(*ind as u32);
                         } else {
@@ -652,8 +652,8 @@ pub fn collider_type_to_collider_builder(
                             temp_indices.push(*ind as u32);
                         }
                     });
+                    break
                 }
-                None => (),
             }
             //dbg!(&positions_nalgebra, &indices);
             collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);

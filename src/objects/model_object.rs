@@ -1,25 +1,18 @@
-use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{
-    assets::{
-        model_asset::{self, Animation, AnimationChannel, AnimationChannelType, ModelAsset},
-        shader_asset::ShaderAsset,
-    },
-    framework::{self, Framework},
-    managers::{
-        assets::{AssetManager, ModelAssetId, TextureAssetId},
-        debugger::{self, error, warn},
-        physics::ObjectBodyParameters,
-        render::{CurrentCascade, ModelData, RenderLayers, RenderManager},
-    },
-    math_utils::deg_vec_to_rad,
-};
-use egui_glium::egui_winit::egui::ComboBox;
-use glam::{Mat4, Quat, Vec3};
-use glium::{
-    uniform, IndexBuffer, Program, Surface,
-};
 use std::{collections::HashMap, time::Instant};
+use egui_glium::egui_winit::egui;
+use glam::{Mat4, Quat, Vec3};
+use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
+use super::{gen_object_id, Object, ObjectGroup, Transform};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}};
 
+#[derive(Debug)]
+pub struct CurrentAnimationData {
+    animation_name: String,
+    animation_timer: Instant,
+    looping: bool,
+}
+
+#[derive(Debug)]
 pub struct ModelObject {
     name: String,
     transform: Transform,
@@ -28,156 +21,81 @@ pub struct ModelObject {
     body: Option<ObjectBodyParameters>,
     id: u128,
     groups: Vec<ObjectGroup>,
-    //pub model_asset: ModelAsset,
-    pub model_asset_id: ModelAssetId,
-    pub nodes_transforms: Vec<NodeTransform>,
-    pub animation_settings: CurrentAnimationSettings,
-    pub shader_asset: ShaderAsset,
-    pub texture_asset_id: Option<TextureAssetId>,
-    //vertex_buffer: Vec<VertexBuffer<Vertex>>,
-    programs: Vec<Program>,
-    shadow_programs: Vec<Program>,
-    is_transparent: bool,
+    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>,
+    model_asset_id: ModelAssetId,
+    texture_asset_id: Option<TextureAssetId>,
+    shader: ShaderAsset,
+    layer: RenderLayer,
+    transparent: bool,
     started: bool,
     error: bool,
-    layer: RenderLayers,
-    inspector_anim_name: String,
-    object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
-}
-
-impl Drop for ModelObject {
-    fn drop(&mut self) {
-        let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
-        let framework = unsafe { &mut *framework_ptr };
-        let framework = &mut *framework;
-        match &mut framework.render {
-            Some(render) => {
-                match self.is_transparent {
-                    false => render.remove_opaque_model(*self.object_id()),
-                    true => render.remove_transparent_model(*self.object_id())
-                }
-            },
-            None => debugger::warn("Model Object was freed but there was no render manager!"),
-        }
-    }
+    objects_global_transforms: HashMap<usize, Mat4>,
+    animation_data: Option<CurrentAnimationData>,
 }
 
 impl ModelObject {
-    pub fn new(
-        name: &str,
-        framework: &mut Framework,
-        model_asset_id: ModelAssetId,
-        texture_asset_id: Option<TextureAssetId>,
-        shader_asset: ShaderAsset,
-        is_transparent: bool,
-        layer: RenderLayers
-    ) -> Self {
-        let mut nodes_transforms: Vec<NodeTransform> = vec![];
-        let asset = framework.assets.get_model_asset(&model_asset_id);
-        match asset {
-            Some(asset) => {
-                for node in &asset.nodes {
-                    let node_local_transform_mat = Mat4::from_cols_array_2d(&node.transform);
-                    let node_scale_rotation_translation =
-                        node_local_transform_mat.to_scale_rotation_translation();
+    pub fn new(name: &str, model_asset_id: ModelAssetId, texture_asset_id: Option<TextureAssetId>, shader_asset: ShaderAsset,
+            layer: RenderLayer, transparent: bool) -> Self {
+        let object_id = gen_object_id();
 
-                    nodes_transforms.push(NodeTransform {
-                        local_position: node_scale_rotation_translation.2,
-                        local_rotation: node_scale_rotation_translation.1,
-                        local_scale: node_scale_rotation_translation.0,
-                        global_transform: Mat4::IDENTITY,
-                        node_id: node.node_index,
-                        parent_global_transform: None,
-                    });
-                }
-
-                ModelObject {
-                    transform: Transform::default(),
-                    nodes_transforms,
-                    children: vec![],
-                    name: name.to_string(),
-                    parent_transform: None,
-                    groups: vec![],
-                    model_asset_id,
-                    texture_asset_id,
-                    shader_asset,
-                    programs: vec![],
-                    shadow_programs: vec![],
-                    started: false,
-                    error: false,
-                    animation_settings: CurrentAnimationSettings {
-                        animation: None,
-                        looping: false,
-                        timer: None,
-                    },
-                    body: None,
-                    id: gen_object_id(),
-                    inspector_anim_name: "None".into(),
-                    object_properties: HashMap::new(),
-                    is_transparent,
-                    layer
-                }
-            }
-            None => {
-                debugger::error(&format!("Failed to create a new ModelObject\nFailed to get ModelAsset!\nModelAsset id = {:?}", model_asset_id));
-                ModelObject {
-                    transform: Transform::default(),
-                    nodes_transforms,
-                    children: vec![],
-                    name: name.to_string(),
-                    parent_transform: None,
-                    groups: vec![],
-                    model_asset_id,
-                    texture_asset_id,
-                    shader_asset,
-                    programs: vec![],
-                    shadow_programs: vec![],
-                    started: true,
-                    error: true,
-                    animation_settings: CurrentAnimationSettings {
-                        animation: None,
-                        looping: false,
-                        timer: None,
-                    },
-                    body: None,
-                    id: gen_object_id(),
-                    inspector_anim_name: "None".into(),
-                    object_properties: HashMap::new(),
-                    is_transparent,
-                    layer
-                }
-            }
+        ModelObject {
+            transform: Transform::default(),
+            children: vec![],
+            name: name.to_string(),
+            parent_transform: None,
+            body: None,
+            id: object_id,
+            groups: vec![],
+            object_properties: HashMap::new(),
+            model_asset_id,
+            texture_asset_id,
+            shader: shader_asset,
+            layer,
+            transparent,
+            started: false,
+            error: false,
+            objects_global_transforms: HashMap::new(),
+            animation_data: None,
         }
-    }
-}
-
-impl std::fmt::Debug for ModelObject {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("ModelObject")
-            .field("name", &self.name)
-            .field("object_type", &self.object_type())
-            .field("transform", &self.transform)
-            .field("parent_transform", &self.parent_transform)
-            .field("children", &self.children)
-            .field("looping", &self.is_looping())
-            .finish()
     }
 }
 
 impl Object for ModelObject {
-    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
-        self.object_properties = properties.clone();
-        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
-    }
-
-    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
-        &self.object_properties
-    }
-
     fn start(&mut self) {}
 
-    fn update(&mut self, framework: &mut Framework) {
+    fn update(&mut self, _: &mut Framework) {}
+
+    fn render(&mut self, framework: &mut Framework) {
+        // we don't want to run render if the initialization of the object failed 
+        if self.error == true { return }
+
+
+        let assets = &framework.assets;
+        let asset = framework.assets.get_model_asset(&self.model_asset_id);
+        if let Some(asset) = asset {
+            let render = framework
+                .render.as_mut()
+                .expect("No render manager! - ModelObject(render)");
+
+            // initialize the object if it wasn't already
+            if self.started == false {
+                let shader_asset = self.shader.clone();
+                self.add_all_objects(assets, render, shader_asset);
+                self.started = true;
+            }
+
+            self.stop_animation_if_needed(asset);
+            self.update_all_object_transforms(asset);
+            self.update_all_render_objects(render, asset);
+        } else {
+            self.error = true;
+            debugger::error(
+                &format!(
+                    "Failed to get the model asset with id '{}'! - ModelObject(render)",
+                    self.model_asset_id.get_id()
+                )
+            );
+        };
     }
 
     fn children_list(&self) -> &Vec<Box<dyn Object>> {
@@ -228,561 +146,281 @@ impl Object for ModelObject {
         &self.id
     }
 
-    fn inspector_ui(
-        &mut self,
-        framework: &mut Framework,
-        ui: &mut egui_glium::egui_winit::egui::Ui,
-    ) {
-        ui.heading("ModelObject parameters");
-        ui.label(&format!("error: {}", self.error));
-        ui.label(&format!(
-            "model asset's id: {}",
-            self.model_asset_id.get_id()
-        ));
-        ui.label(&format!(
-            "texture asset: {}",
-            self.texture_asset_id.is_some()
-        ));
-
-        let anim_name = self.inspector_anim_name.clone();
-        ComboBox::from_label("animation")
-            .selected_text(&anim_name)
-            .show_ui(ui, |ui| {
-                if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
-                    for anim in asset.animations.clone() {
-                        if ui.selectable_label(false, &anim.name).clicked() {
-                            self.inspector_anim_name = anim.name;
-                        }
-                    }
-                }
-            });
-
-        ui.horizontal(|ui| {
-            if ui.button("play animation").clicked() {
-                let _ = self.play_animation(&anim_name, framework);
-            }
-            ui.checkbox(&mut self.animation_settings.looping, "loop");
-            if ui.button("stop").clicked() {
-                self.animation_settings.animation = None;
-                self.animation_settings.timer = None;
-            }
-            if let Some(timer) = &self.animation_settings.timer {
-                ui.label("time:");
-                ui.label(format!("{} s", timer.elapsed().as_secs_f32()));
-            }
-        });
+    fn inspector_ui(&mut self, _: &mut Framework, ui: &mut egui::Ui) {
+        ui.heading("ModelObject");
     }
 
-    fn groups_list(&mut self) -> &mut Vec<ObjectGroup> {
+    fn groups_list(&mut self) -> &mut Vec<super::ObjectGroup> {
         &mut self.groups
     }
 
-    fn render(&mut self, framework: &mut Framework) {
-        let render = framework.render.as_mut().expect("ModelObject: render() was called, but there's no RenderManager.");
-        if !self.started {
-            self.start_mesh(&framework.assets, render);
-        }
-
-        self.update_animation();
-        if let Some(asset) = framework.assets.get_model_asset(&self.model_asset_id) {
-            for node in &asset.root_nodes {
-                set_nodes_global_transform(&node, &asset.nodes, None, &mut self.nodes_transforms);
-            }
-        }
-
-        match self.is_transparent {
-            false => render.set_opaque_model_transform(*self.object_id(), self.transform, self.nodes_transforms.clone()),
-            true => render.set_transparent_model_transform(*self.object_id(), self.transform, self.nodes_transforms.clone()),
-        }
+    fn call(&mut self, _: &str, _: Vec<&str>) -> Option<String> {
+        None
     }
 
-    fn shadow_render(
-        &mut self,
-        render: &mut RenderManager,
-        assets: &AssetManager,
-        current_cascade: &CurrentCascade,
-    ) {
-        if !self.started {
-            self.start_mesh(assets, render);
-        }
+    fn set_object_properties(&mut self, properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>) {
+        self.object_properties = properties.clone();
+        crate::managers::systems::register_object_id_properties(self.object_id().to_owned(), properties);
+    }
 
-        if self.error {
-            return;
-        }
-
-        let asset = assets.get_model_asset(&self.model_asset_id);
-        if let Some(asset) = asset {
-            let vertex_buffers = asset.vertex_buffers.as_ref().expect(
-                "Asset's vertex buffer's vector is None! Probably running in a server mode",
-            );
-
-            for i in 0..asset.objects.len() {
-                let object = &asset.objects[i];
-
-                let indices = IndexBuffer::new(
-                    &render.display,
-                    glium::index::PrimitiveType::TrianglesList,
-                    &object.indices,
-                );
-
-                let mut transform: Option<&NodeTransform> = None;
-                for tr in &self.nodes_transforms {
-                    if tr.node_id == asset.objects[i].node_index {
-                        transform = Some(tr);
-                        break;
-                    }
-                }
-
-                match transform {
-                    Some(_) => (),
-                    None => {
-                        error("no node transform found!");
-                        return;
-                    }
-                }
-
-                let setup_mat_result = self.setup_mat(&render, transform.unwrap());
-                let model: Mat4 = setup_mat_result.model;
-
-                let model_cols = model.to_cols_array_2d();
-                let view_proj_cols = match current_cascade {
-                    CurrentCascade::Closest => render.cascades.closest_view_proj.to_cols_array_2d(),
-                    CurrentCascade::Furthest => {
-                        render.cascades.furthest_view_proj.to_cols_array_2d()
-                    }
-                };
-
-                let uniforms = uniform! {
-                    model: [
-                        model_cols[0],
-                        model_cols[1],
-                        model_cols[2],
-                        model_cols[3],
-                    ],
-                    view_proj: [
-                        view_proj_cols[0],
-                        view_proj_cols[1],
-                        view_proj_cols[2],
-                        view_proj_cols[3],
-                    ],
-                    lightPos: render.get_light_direction().to_array(),
-                };
-
-                let draw_params = glium::DrawParameters {
-                    depth: glium::Depth {
-                        test: glium::draw_parameters::DepthTest::IfLessOrEqual, // set to IfLess if it
-                        write: true,
-                        ..Default::default()
-                    },
-                    backface_culling:
-                        glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
-                    ..Default::default()
-                };
-
-                let mut target = match current_cascade {
-                    CurrentCascade::Closest => render.closest_shadow_fbo(),
-                    CurrentCascade::Furthest => render.furthest_shadow_fbo(),
-                };
-
-                target
-                    .draw(
-                        &vertex_buffers[i],
-                        &indices.unwrap(),
-                        &self.shadow_programs[i],
-                        &uniforms,
-                        &draw_params,
-                    )
-                    .unwrap();
-            }
-        }
+    fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
+        &self.object_properties
     }
 }
 
 impl ModelObject {
-    pub fn get_asset_id(&self) -> &ModelAssetId {
-        &self.model_asset_id
+    fn model_object_transform(&self) -> Mat4 {
+        let global_transform = self.global_transform();
+        let global_rotation = global_transform.rotation;
+        let global_rotation =
+            Quat::from_euler(glam::EulerRot::XYZ, global_rotation.x, global_rotation.y, global_rotation.z);
+
+        Mat4::from_scale_rotation_translation(global_transform.scale, global_rotation, global_transform.position)
     }
 
-    pub fn set_looping(&mut self, should_loop: bool) {
-        self.animation_settings.looping = should_loop;
-    }
-
-    pub fn is_looping(&self) -> bool {
-        self.animation_settings.looping
-    }
-
-    pub fn current_animation(&self) -> Option<&str> {
-        match &self.animation_settings.animation {
-            Some(animation) => Some(&animation.name),
-            None => None,
+    fn add_all_objects(&mut self, assets: &AssetManager, render: &mut RenderManager, shader: ShaderAsset) {
+        let mut objects_list: HashMap<usize, Vec<RenderObjectData>> = HashMap::new();
+        let asset = assets.get_model_asset(&self.model_asset_id);
+        if let Some(asset) = asset {
+            for (node_id, node) in &asset.objects {
+                self.add_objects_to_list(&shader, render, *node_id, node, &mut objects_list, None, self.model_object_transform());
+            }
         }
+
+        render.add_object(self.id, objects_list);
+    }
+
+    fn add_objects_to_list(&mut self, shader_asset: &ShaderAsset, render: &RenderManager, node_id: usize, node: &ModelAssetObject, objects_list: &mut HashMap<usize, Vec<RenderObjectData>>, parent_transform: Option<Mat4>, model_object_transform: Mat4) {
+        let transparent = self.transparent;
+        let layer = &self.layer;
+
+        let parent_transform = match parent_transform {
+            Some(parent_transform) => parent_transform,
+            None => Mat4::IDENTITY,
+        };
+        let transform = parent_transform * node.default_transform;
+        self.objects_global_transforms.insert(node_id, transform);
+        
+        objects_list.insert(node_id, Vec::new());
+        for render_data in &node.render_data {
+            let program = Program::from_source(
+                &render.display,
+                &shader_asset.vertex_shader_source,
+                &shader_asset.fragment_shader_source,
+                None
+            );
+
+            let program = match program {
+                Ok(program) => program,
+                Err(err) => {
+                    debugger::error(
+                        &format!(
+                            "Failed to compile the shader! Error: {}\n - ModelObject's update", 
+                            err
+                        )
+                    );
+                    self.error = true;
+                    return
+                },
+            };
+
+            let vbo = VertexBuffer::new(&render.display, &render_data.vertices)
+                .expect("Failed to create a VBO!");
+            let ibo = IndexBuffer::new(&render.display, PrimitiveType::TrianglesList, &render_data.indices)
+                .expect("Failed to create an IBO!");
+
+            let render_object_data = RenderObjectData {
+                transform,
+                transparent,
+                uniforms: HashMap::new(),
+                texture_asset_id: self.texture_asset_id.clone(),
+                shader: RenderShader::Program(program),
+                layer: layer.clone(),
+                vbo,
+                ibo,
+                model_object_transform,
+                // gotta do 'em after setting all transforms
+                joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 512],   
+                joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 512],
+            };
+
+            objects_list.get_mut(&node_id).expect("add_objects_to_list err").push(render_object_data);
+        }
+
+        for (child_idx, child) in &node.children {
+            self.add_objects_to_list(shader_asset, render, *child_idx, child, objects_list, Some(transform), model_object_transform);
+        }
+    }
+
+    fn update_all_object_transforms(&mut self, asset: &ModelAsset) {
+        for (node_id, node) in &asset.objects {
+            self.update_children_transforms(&asset.animations, *node_id, node, None)
+        }
+    }
+
+    fn update_children_transforms(&mut self, animations: &HashMap<String, ModelAssetAnimation>, node_id: usize, node: &ModelAssetObject, parent_transform: Option<Mat4>) {
+        let parent_transform = match parent_transform {
+            Some(parent_transform) => parent_transform,
+            None => Mat4::IDENTITY,
+        };
+
+        if let Some(animation_data) = &self.animation_data {
+            if let Some(animation) = animations.get(&animation_data.animation_name) {
+                if let Some(channel) = animation.channels.get(&node_id) {
+                    let animation_time = animation_data.animation_timer.elapsed().as_secs_f32();
+
+                    // OH NO-
+                    let translation = Vec3::new(
+                        channel.translation_x.sample(animation_time).unwrap_or_default(),
+                        channel.translation_y.sample(animation_time).unwrap_or_default(),
+                        channel.translation_z.sample(animation_time).unwrap_or_default(),
+                    );
+                    let rotation = Quat::from_xyzw(
+                        channel.rotation_x.sample(animation_time).unwrap_or_default(),
+                        channel.rotation_y.sample(animation_time).unwrap_or_default(),
+                        channel.rotation_z.sample(animation_time).unwrap_or_default(),
+                        channel.rotation_w.sample(animation_time).unwrap_or_default(),
+                    );
+                    let scale = Vec3::new(
+                        channel.scale_x.sample(animation_time).unwrap_or_default(),
+                        channel.scale_y.sample(animation_time).unwrap_or_default(),
+                        channel.scale_z.sample(animation_time).unwrap_or_default(),
+                    );
+
+                    let local_transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+                    let transform = local_transform * parent_transform;
+                    self.objects_global_transforms.insert(node_id, transform);
+
+                    for (child_id, child) in &node.children {
+                        self.update_children_transforms(animations, *child_id, child, Some(transform));
+                    }
+
+                    return
+                }
+            }
+        }
+
+        let transform = node.default_transform * parent_transform;
+        self.objects_global_transforms.insert(node_id, transform);
+
+        for (child_id, child) in &node.children {
+            self.update_children_transforms(animations, *child_id, child, Some(transform));
+        }
+    }
+
+    fn stop_animation_if_needed(&mut self, asset: &ModelAsset) {
+        let mut should_stop = false;
+        let mut animation_len = 0.0;
+        if let Some(animation_data) = &mut self.animation_data {
+            let animation_name = &animation_data.animation_name;
+            match asset.animations.get(animation_name) {
+                Some(animation) => {
+                    for (_,channel) in &animation.channels {
+                        if let Some(last_key) = channel.translation_x.keys().last() {
+                            if last_key.t > animation_len {
+                                animation_len = last_key.t;
+                            }
+                        }
+                    }
+
+                    let timer = animation_data.animation_timer.elapsed().as_secs_f32();
+                    if timer > animation_len {
+                        if animation_data.looping == false {
+                            should_stop = true;
+                        } else {
+                            animation_data.animation_timer = Instant::now();
+                        }
+                    }
+                },
+                None => {
+                    should_stop = true;
+                    debugger::error(
+                        &format!("{}{}",
+                            format!("Animation with name '{}' not found in model asset '{}'!", animation_name, asset.path),
+                            "Setting current animation data to None - ModelObject (stop_animation_if_needed)"
+                        )
+                    )
+                },
+            }
+        }
+
+        if should_stop {
+            self.animation_data = None;
+        }
+    }
+
+    fn update_all_render_objects(&self, render: &mut RenderManager, asset: &ModelAsset) {
+        let model_object_transform = self.model_object_transform();
+
+        if let Some(render_object_list) = render.get_object(self.id) {
+            for (node_id, node) in &asset.objects {
+                self.update_children_render_objects(render_object_list, *node_id, node, model_object_transform)
+            }
+        }
+    }
+
+    fn update_children_render_objects(&self, render_object_list: &mut HashMap<usize, Vec<RenderObjectData>>, node_id: usize, node: &ModelAssetObject, model_object_transform: Mat4) {
+        if let Some(render_object) = render_object_list.get_mut(&node_id) {
+            for (node_data_idx, node_data) in node.render_data.iter().enumerate() {
+                // list of values to change
+                let mut joints = [[[0.0, 0.0, 0.0, 0.0]; 4]; 512];
+                let mut joint_inverse_bind_matrices = [[[0.0, 0.0, 0.0, 0.0]; 4]; 512];
+                // + transform, model_object_tranform
+
+                for (joint_obj_idx, joint_idx) in &node_data.joint_objects_idx {
+                    let inv_bind_matrix = &node_data.inverse_bind_matrices[joint_obj_idx];
+                    joint_inverse_bind_matrices[*joint_idx] = inv_bind_matrix.to_cols_array_2d();
+                    joints[*joint_idx] = self.objects_global_transforms[joint_obj_idx].to_cols_array_2d();
+                }
+
+                render_object[node_data_idx].joint_matrices = joints;
+                render_object[node_data_idx].joint_inverse_bind_matrices
+                    = joint_inverse_bind_matrices;
+                render_object[node_data_idx].transform
+                    = self.objects_global_transforms[&node_id];
+                render_object[node_data_idx].model_object_transform
+                    = model_object_transform;
+            }
+        }
+        for (child_id, child) in &node.children {
+            self.update_children_render_objects(render_object_list, *child_id, child, model_object_transform);
+        }
+    }
+
+    pub fn play_animation(&mut self, animation_name: String) {
+        let mut looping = false;
+        if let Some(animation_data) = &mut self.animation_data {
+            looping = animation_data.looping;
+        }
+
+        self.animation_data = Some(CurrentAnimationData {
+            animation_name,
+            animation_timer: Instant::now(),
+            looping,
+        });
     }
 
     pub fn stop_animation(&mut self) {
-        self.animation_settings.animation = None;
-        self.animation_settings.timer = None;
+        self.animation_data = None;
     }
 
-    pub fn play_animation(
-        &mut self,
-        anim_name: &str,
-        framework: &mut Framework,
-    ) -> Result<(), ModelObjectError> {
-        let asset = framework
-            .assets
-            .get_model_asset(&self.model_asset_id)
-            .expect("Failed to play the animation! Failed to get the asset.");
-        let anim_option = asset.find_animation(anim_name);
-
-        match anim_option {
-            Some(animation) => {
-                self.animation_settings = CurrentAnimationSettings {
-                    animation: Some(animation),
-                    looping: self.animation_settings.looping,
-                    timer: Some(Instant::now()),
-                };
-
-                Ok(())
-            }
-            None => Err(ModelObjectError::AnimationNotFound),
+    pub fn set_looping(&mut self, looping: bool) {
+        if let Some(animation_data) = &mut self.animation_data {
+            animation_data.looping = looping;
         }
     }
 
-    fn get_joints_transforms(&self, asset: &ModelAsset) -> [[[f32; 4]; 4]; 128] {
-        let mut joints_vec: Vec<&NodeTransform> = Vec::new();
-
-        for joint in &asset.joints {
-            for node_transform in &self.nodes_transforms {
-                if node_transform.node_id == joint.node_index {
-                    joints_vec.push(node_transform);
-                }
-            }
-        }
-
-        let identity_mat: [[f32; 4]; 4] = [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ];
-        let mut joints_mat_options_vec: Vec<Option<[[f32; 4]; 4]>> = vec![None; 200];
-        let mut joints_mat_vec: Vec<[[f32; 4]; 4]> = vec![identity_mat; 200];
-
-        if joints_vec.len() > 128 {
-            warn("model object warning! model contains more than 128 joints!\nonly 100 joints would be used");
-        }
-        joints_vec.into_iter().for_each(|joint| {
-            joints_mat_options_vec.insert(joint.node_id, Some(joint.global_transform.to_cols_array_2d()));
-        });
-
-        for joint_idx in 0..joints_mat_options_vec.len() {
-            match joints_mat_options_vec[joint_idx] {
-                Some(mat) => joints_mat_vec.insert(joint_idx, mat),
-                None => joints_mat_vec.insert(joint_idx, identity_mat),
-            }
-        }
-        joints_mat_vec.truncate(128);
-
-        let joints_array: [[[f32; 4]; 4]; 128] = joints_mat_vec
-            .try_into()
-            .expect("joints_vec_to_array failed!");
-        joints_array
-    }
-
-    fn update_animation(&mut self) {
-        let anim_settings = &mut self.animation_settings;
-        let animation_option = &mut anim_settings.animation;
-
-        match animation_option {
-            Some(ref mut animation) => {
-                let timer = &anim_settings.timer;
-                let time_elapsed = timer.expect("no timer(why)").elapsed().as_secs_f32();
-                set_objects_anim_node_transform(
-                    &mut animation.channels,
-                    &mut self.nodes_transforms,
-                    time_elapsed,
-                );
-
-                if time_elapsed >= animation.duration {
-                    if anim_settings.looping {
-                        set_objects_anim_node_transform(
-                            &mut animation.channels,
-                            &mut self.nodes_transforms,
-                            time_elapsed,
-                        );
-                        anim_settings.timer = Some(Instant::now());
-                    } else {
-                        anim_settings.animation = None;
-                        anim_settings.timer = None;
-                        ()
-                    }
-                }
-            }
-            None => (),
+    pub fn looping(&self) -> bool {
+        match &self.animation_data {
+            Some(animation_data) => animation_data.looping,
+            None => false,
         }
     }
 
-    fn setup_mat(
-        &self,
-        render: &RenderManager,
-        node_transform: &NodeTransform,
-    ) -> SetupMatrixResult {
-        let node_global_transform = node_transform.global_transform;
-
-        let model_object_translation: [f32; 3] = self.transform.position.into();
-        let model_object_rotation_vec = deg_vec_to_rad(self.transform.rotation.into());
-        let model_object_scale = self.transform.scale;
-        let model_object_translation = [-model_object_translation[0], model_object_translation[1], -model_object_translation[2]];
-
-
-        let rotation = model_object_rotation_vec;//node_rotation.transform_vector3(model_object_rotation_vec);
-        let transform = Mat4::from_translation(Vec3::from_array(model_object_translation))
-            * Mat4::from_rotation_z(-rotation.z)
-            * Mat4::from_rotation_y(-rotation.y)
-            * Mat4::from_rotation_x(-rotation.x)
-            * Mat4::from_scale(model_object_scale);
-        let transform = transform * node_global_transform;
-
-        let view = render.get_view_matrix();
-        let proj = render.get_projection_matrix();
-
-        let mvp = proj * view * transform;
-
-        SetupMatrixResult {
-            mvp,
-            model: transform,
+    pub fn current_animation(&self) -> Option<String> {
+        match &self.animation_data {
+            Some(animation_data) => Some(animation_data.animation_name.clone()),
+            None => None,
         }
     }
-
-    fn start_mesh(&mut self, assets: &AssetManager, render: &mut RenderManager) {
-        let shadow_shader = ShaderAsset::load_shadow_shader();
-        let display = &render.display;
-
-        let shadow_shader = if let Ok(shadow_shader) = shadow_shader {
-            shadow_shader
-        } else {
-            error("failed to load shadow shader!");
-            self.error = true;
-            return;
-        };
-
-        let vertex_shader_source = &self.shader_asset.vertex_shader_source;
-        let fragment_shader_source = &self.shader_asset.fragment_shader_source;
-
-        let vertex_shadow_shader_src = &shadow_shader.vertex_shader_source;
-        let fragment_shadow_shader_src = &shadow_shader.fragment_shader_source;
-
-        let asset = assets.get_model_asset(&self.model_asset_id);
-        let mut programs = Vec::new();
-        let mut shadow_programs = Vec::new();
-        if let Some(asset) = asset {
-            for _ in &asset.objects {
-                let program = Program::from_source(
-                    display,
-                    &vertex_shader_source,
-                    &fragment_shader_source,
-                    None,
-                );
-
-                let shadow_program = Program::from_source(
-                    display,
-                    &vertex_shadow_shader_src,
-                    &fragment_shadow_shader_src,
-                    None,
-                );
-
-                match program {
-                    Ok(prog) => programs.push(prog),
-                    Err(err) => {
-                        error(&format!(
-                            "ModelObject error:\nprogram creation error!\nErr: {}",
-                            err
-                        ));
-                        self.error = true;
-                        return;
-                    }
-                }
-
-                match shadow_program {
-                    Ok(prog) => shadow_programs.push(prog),
-                    Err(err) => {
-                        error(&format!(
-                            "ModelObject error:\nprogram creation error(shadow)!\nErr: {}",
-                            err
-                        ));
-                        self.error = true;
-                        return;
-                    }
-                }
-            }
-
-            self.shadow_programs = shadow_programs;
-            self.started = true;
-            match self.is_transparent {
-                true => {
-                    render.add_transparent_model(*self.object_id(), ModelData {
-                        transform: self.global_transform(),
-                        model_asset_id: self.model_asset_id.clone(),
-                        nodes_transforms: self.nodes_transforms.clone(),
-                        animation_settings: self.animation_settings.clone(),
-                        shader_asset: self.shader_asset.clone(),
-                        texture_asset_id: self.texture_asset_id.clone(),
-                        programs,
-                        layer: self.layer.clone(),
-                        started: self.started,
-                        error: self.error,
-                        master_object_id: None,
-                    });
-                },
-                false => {
-                    render.add_opaque_model(*self.object_id(), ModelData {
-                        transform: self.global_transform(),
-                        model_asset_id: self.model_asset_id.clone(),
-                        nodes_transforms: self.nodes_transforms.clone(),
-                        animation_settings: self.animation_settings.clone(),
-                        shader_asset: self.shader_asset.clone(),
-                        texture_asset_id: self.texture_asset_id.clone(),
-                        programs,
-                        layer: self.layer.clone(),
-                        started: self.started,
-                        error: self.error,
-                        master_object_id: None,
-                    });
-                },
-            }
-        }
-    }
-}
-
-fn set_objects_anim_node_transform(
-    channels: &mut Vec<AnimationChannel>,
-    nodes_transforms: &mut Vec<NodeTransform>,
-    time_elapsed: f32,
-) {
-    for channel in channels {
-        match channel.channel_type {
-            AnimationChannelType::Translation => {
-                for node in &mut *nodes_transforms {
-                    if node.node_id == channel.node_index {
-                        let x_pos = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let y_pos = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let z_pos = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.local_position = Vec3::new(x_pos, y_pos, z_pos);
-                        break
-                    }
-                }
-            }
-            AnimationChannelType::Rotation => {
-                for node in &mut *nodes_transforms {
-                    if node.node_id == channel.node_index {
-                        let x_rot = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let y_rot = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let z_rot = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let w_rot = channel.w_axis_spline.as_ref().unwrap().clamped_sample(time_elapsed).unwrap();
-                        node.local_rotation = Quat::from_xyzw(x_rot, y_rot, z_rot, w_rot);
-                        break
-                    }
-                }
-            }
-            AnimationChannelType::Scale => {
-                for node in &mut *nodes_transforms {
-                    if node.node_id == channel.node_index {
-                        let x_scale = channel.x_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let y_scale = channel.y_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        let z_scale = channel.z_axis_spline.clamped_sample(time_elapsed).unwrap();
-                        node.local_scale = Vec3::new(x_scale, y_scale, z_scale);
-                        break
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn set_nodes_global_transform(
-    node: &model_asset::Node,
-    nodes_list: &Vec<model_asset::Node>,
-    parent_transform: Option<Mat4>,
-    nodes_transforms: &mut Vec<NodeTransform>,
-) {
-    let node_index = node.node_index;
-    let mut node_transform: Option<&mut NodeTransform> = None;
-
-    for transform in nodes_transforms.into_iter() {
-        if transform.node_id == node_index {
-            node_transform = Some(transform);
-        }
-    }
-
-    if node_transform.is_none() {
-        error("model object error\ngot an error in set_nodes_global_transform()\nnode transform not found");
-        return;
-    }
-    let node_transform = node_transform.expect("node transform was None(why)");
-
-    let local_rotation = node_transform.local_rotation;
-    let local_scale = node_transform.local_scale;
-    let local_transform = Mat4::from_translation(node_transform.local_position)
-        * Mat4::from_quat(local_rotation)
-        /* Mat4::from_rotation_z(-local_rotation.z)
-        * Mat4::from_rotation_y(-local_rotation.y)
-        * Mat4::from_rotation_x(-local_rotation.x)*/
-        * Mat4::from_scale(local_scale);
-
-    let global_transform: Mat4;
-    match parent_transform {
-        Some(parent_transform) => {
-            global_transform = parent_transform * local_transform;
-        }
-        None => {
-            global_transform = local_transform;
-        },
-    }
-    node_transform.global_transform = global_transform;
-
-    let mut children_nodes: Vec<&model_asset::Node> = vec![];
-    for child_id in &node.children_id {
-        for current_node in nodes_list {
-            if &current_node.node_index == child_id {
-                children_nodes.push(current_node);
-            }
-        }
-    }
-
-    for child in children_nodes {
-        set_nodes_global_transform(
-            child,
-            nodes_list,
-            Some(global_transform),
-            nodes_transforms,
-        );
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CurrentAnimationSettings {
-    pub animation: Option<Animation>,
-    pub looping: bool,
-    pub timer: Option<Instant>,
-}
-
-#[derive(Debug)]
-struct SetupMatrixResult {
-    pub mvp: Mat4,
-    pub model: Mat4,
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeTransform {
-    pub local_position: Vec3,
-    pub local_rotation: Quat,
-    pub local_scale: Vec3,
-    pub global_transform: Mat4,
-    pub parent_global_transform: Option<Transform>,
-    pub node_id: usize,
-}
-
-#[derive(Debug)]
-pub enum ModelObjectError {
-    AnimationNotFound,
 }

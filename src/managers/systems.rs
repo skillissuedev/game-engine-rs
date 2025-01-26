@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     assets::AssetManager,
     debugger, networking,
-    render::{CurrentCascade, RenderManager},
+    render::RenderManager,
 };
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
@@ -83,7 +83,7 @@ pub fn ui_render(ctx: &Context) {
     }
 }
 
-pub fn shadow_render(render: &mut RenderManager, assets: &AssetManager, cascade: &CurrentCascade) {
+/*pub fn shadow_render(render: &mut RenderManager, assets: &AssetManager, cascade: &CurrentCascade) {
     unsafe {
         if !networking::is_server() {
             for system in &mut SYSTEMS {
@@ -91,7 +91,7 @@ pub fn shadow_render(render: &mut RenderManager, assets: &AssetManager, cascade:
             }
         }
     }
-}
+}*/
 
 pub fn add_system(system: Box<dyn System>, framework: &mut Framework) {
     unsafe {

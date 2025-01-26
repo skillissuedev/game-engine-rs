@@ -123,6 +123,7 @@ impl Object for Ray {
         &mut self.groups
     }
 
+    /*
     fn debug_render(&self, framework: &mut Framework) {
         if let DebugMode::Full = framework.debug_mode() {
             framework
@@ -134,7 +135,7 @@ impl Object for Ray {
                     direction: self.direction,
                 });
         }
-    }
+    }*/
 }
 
 impl Ray {

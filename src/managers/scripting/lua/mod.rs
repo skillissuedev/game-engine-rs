@@ -1,6 +1,6 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
+    framework::{self, DebugMode, Framework}, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
@@ -664,6 +664,8 @@ impl UserData for ObjectHandle {
                 Ok(())
             });
 
+
+        /*
         // body_type = "None"/"Fixed"/""/"Ball"/"Cylinder"
         // model_path - path to the GLTF model
         // render_collider_type = "None"/"Cuboid"/"Capsule"/"Ball"/"Cylinder"
@@ -722,7 +724,7 @@ impl UserData for ObjectHandle {
                 }
 
                 Ok(())
-            });
+            });*/
 
         methods.add_method(
             "object_id",
@@ -862,11 +864,7 @@ impl UserData for ObjectHandle {
                     Some(object) => {
                         match object.downcast_mut::<ModelObject>() {
                             Some(object) => {
-                                if let Err(err) = object.play_animation(&anim_name, framework) {
-                                    debugger::error(
-                                        &format!("lua error(system {}): play_animation failed! error in ModelObject '{}': {:?}", 
-                                            this.system_id, this.name, err));
-                                }
+                                object.play_animation(anim_name);
                             },
                             None => {
                                 debugger::error(
@@ -1158,10 +1156,10 @@ impl UserData for ObjectHandle {
                             Some(object) => Ok(object.is_looping()),
                             None => {
                                 match object.downcast_mut::<ModelObject>() {
-                                    Some(object) => Ok(object.is_looping()),
+                                    Some(object) => Ok(object.looping()),
                                     None => {
                                         debugger::error(
-                                            &format!("lua error(system {}): is_looping failed in object: {}. this object is neiter SoundEmitter nor ModelObject!",
+                                            &format!("lua error(system {}): looping failed in object: {}. this object is neiter SoundEmitter nor ModelObject!",
                                             this.system_id, this.name));
                                         Ok(false)
                                     },
@@ -1171,11 +1169,11 @@ impl UserData for ObjectHandle {
                     }
                     None => {
                         debugger::error(
-                            &format!("lua error: is_looping failed! failed to get object {} in system {}", this.name, this.system_id));
+                            &format!("lua error: looping failed! failed to get object {} in system {}", this.name, this.system_id));
                     },
                 },
                 None => debugger::error(&format!(
-                        "lua error: is_looping failed! failed to get system {} to find object {}",
+                        "lua error: looping failed! failed to get system {} to find object {}",
                         this.system_id, this.name
                 )),
             }
@@ -1590,7 +1588,6 @@ impl<'lua> IntoLua<'lua> for DebugMode {
     }
 }
 
-impl UserData for ModelAsset {}
 impl UserData for Framework {
     fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(_: &mut F) {}
 

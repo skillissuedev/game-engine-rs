@@ -54,6 +54,7 @@ impl System for PlayerManager {
     fn server_start(&mut self, _: &mut Framework) {}
 
     fn client_update(&mut self, framework: &mut Framework) {
+        /*
         //dbg!(serde_json::from_str::<VirtualKeyCode>("\"Grave\""));
         let camera_position;
         let delta_time = framework.delta_time();
@@ -137,7 +138,7 @@ impl System for PlayerManager {
         } else if render.get_camera_rotation().x < -89.0 {
             let rot = render.get_camera_rotation();
             render.set_camera_rotation(Vec3::new(-89.0, rot.y, rot.z));
-        }
+        }*/
     }
 
     fn server_update(&mut self, _: &mut Framework) {}

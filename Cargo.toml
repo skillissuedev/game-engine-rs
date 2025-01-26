@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 colored = "2.0.0"
 image = "0.24.6"
-gltf = { version = "1.2.0", features = ["extras", "names"] }
+gltf = { version = "=1.4.1", features = ["extras", "names"] }
 data-url = "0.1.1"
 splines = "4.2.0"
 glam = { version = "0.28", features = ["serde"] }

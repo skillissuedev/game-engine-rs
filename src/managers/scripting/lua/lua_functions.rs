@@ -6,7 +6,7 @@ use crate::{
         self,
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayers, scripting::lua::get_framework_pointer, systems::{self, SystemValue}
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::get_framework_pointer, systems::{self, SystemValue}
     }, math_utils, objects::{
         Object, Transform
     }, systems::System
@@ -264,9 +264,9 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                     Some(model_asset) => {
                                         let layer = match layer {
                                             Some(layer) => match layer {
-                                                0 => RenderLayers::Layer1,
-                                                1 => RenderLayers::Layer1,
-                                                2 => RenderLayers::Layer2,
+                                                0 => RenderLayer::Layer1,
+                                                1 => RenderLayer::Layer1,
+                                                2 => RenderLayer::Layer2,
                                                 _ => {
                                                     debugger::error(
                                                         &format!("{} {}",
@@ -274,10 +274,10 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                                             "The number should be >= 0 and <= 2. Defaulting to Layer 1"
                                                         )
                                                     );
-                                                    RenderLayers::Layer1
+                                                    RenderLayer::Layer1
                                                 },
                                             },
-                                            None => RenderLayers::Layer1
+                                            None => RenderLayer::Layer1
                                         };
 
                                         let object = framework.new_model_object(&name, model_asset, texture_asset, shader_asset, is_transparent, layer);
@@ -297,6 +297,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             });
         add_function!("new_model_object", new_model_object, lua, &system_id);
 
+        /*
         let system_id_for_functions = system_id.clone();
         let new_master_instanced_model_object = lua.create_function_mut(
             move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, is_transparent, layer):
@@ -338,9 +339,9 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                     Some(model_asset) => {
                                         let layer = match layer {
                                             Some(layer) => match layer {
-                                                0 => RenderLayers::Layer1,
-                                                1 => RenderLayers::Layer1,
-                                                2 => RenderLayers::Layer2,
+                                                0 => RenderLayer::Layer1,
+                                                1 => RenderLayer::Layer1,
+                                                2 => RenderLayer::Layer2,
                                                 _ => {
                                                     debugger::error(
                                                         &format!("{} {}",
@@ -348,10 +349,10 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                                             "The number should be >= 0 and <= 2. Defaulting to Layer 1"
                                                         )
                                                     );
-                                                    RenderLayers::Layer1
+                                                    RenderLayer::Layer1
                                                 },
                                             },
-                                            None => RenderLayers::Layer1
+                                            None => RenderLayer::Layer1
                                         };
 
                                         let object = 
@@ -414,7 +415,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 }
                 Ok(())
             });
-        add_function!("new_instanced_model_transform_holder", new_instanced_model_transform_holder, lua, system_id);
+        add_function!("new_instanced_model_transform_holder", new_instanced_model_transform_holder, lua, system_id);*/
 
         let system_id_for_functions = system_id.clone();
         let new_navigation_ground = lua.create_function_mut(move |lua, (name, size_x, size_z): (String, f32, f32)| {

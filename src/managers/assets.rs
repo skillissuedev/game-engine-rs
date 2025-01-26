@@ -1,6 +1,5 @@
 use crate::assets::{
-    model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset,
-    texture_asset::TextureAsset,
+    model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset
 };
 
 use super::debugger::{crash, error};
