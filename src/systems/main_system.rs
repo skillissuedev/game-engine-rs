@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 use crate::objects::Object;
 
 use super::System;
@@ -8,6 +10,7 @@ pub struct MainSystem {
 
 impl System for MainSystem {
     fn client_start(&mut self, framework: &mut crate::framework::Framework) {
+        self.objects[0].set_position(framework, Vec3::new(0.0, 0.0, -10.0), true);
     }
 
     fn server_start(&mut self, framework: &mut crate::framework::Framework) {

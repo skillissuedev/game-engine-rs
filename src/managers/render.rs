@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, texture::DepthTexture2d, Display, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{IndexBufferAny, NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 
 use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
 
@@ -26,6 +26,8 @@ pub(crate) struct RenderManager {
     pub(crate) camera: RenderCamera,
     pub(crate) pixelation_amount: f32,
     pub(crate) display: Display<WindowSurface>,
+    pub(crate) framebuffer_vbo: VertexBuffer<Vertex>,
+    pub(crate) framebuffer_program: Program,
 }
 
 impl RenderManager {
@@ -53,6 +55,24 @@ impl RenderManager {
         };
         let camera = RenderCamera::new((1280, 720));
 
+        let framebuffer_vbo = VertexBuffer::new(&display, &[
+            Vertex { position: [-1.0, 1.0, 0.0], tex_coords: [0.0, 1.0], ..Default::default() },
+            Vertex { position: [-1.0, -1.0, 0.0], tex_coords: [0.0, 0.0], ..Default::default() },
+            Vertex { position: [1.0, 1.0, 0.0], tex_coords: [1.0, 1.0], ..Default::default() },
+            Vertex { position: [1.0, 1.0, 0.0], tex_coords: [1.0, 1.0], ..Default::default() },
+            Vertex { position: [-1.0, -1.0, 0.0], tex_coords: [0.0, 0.0], ..Default::default() },
+            Vertex { position: [1.0, -1.0, 0.0], tex_coords: [1.0, 0.0], ..Default::default() },
+        ]).expect("Failed to create framebuffer_vbo - RenderManager (new)");
+
+        let framebuffer_shader_asset = ShaderAsset::load_default_framebuffer_shader()
+            .expect("Failed to load the default framebuffer shader - RenderManager (new)");
+        let framebuffer_program = Program::from_source(
+            &display,
+            &framebuffer_shader_asset.vertex_shader_source,
+            &framebuffer_shader_asset.fragment_shader_source,
+            None,
+        ).expect("Failed to make the default framebuffer program - RenderManager (new)");
+
         RenderManager {
             objects: HashMap::new(),
             window_size: (1280, 720),
@@ -60,6 +80,8 @@ impl RenderManager {
             camera,
             pixelation_amount,
             display,
+            framebuffer_vbo,
+            framebuffer_program,
         }
     }
 
@@ -79,7 +101,7 @@ impl RenderManager {
                 .expect("Failed to create a SimpleFrameBuffer for the 2nd layer (render_scene in render.rs)");
         
         // 1. Cleaning
-        frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+        frame.clear_color_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
         layer1_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
         layer2_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
 
@@ -96,11 +118,42 @@ impl RenderManager {
             &self.display
         );
 
-        frame.finish().expect("Swap buffer failed! - RenderManager(render_scene)");
+        self.render_framebuffer_plane(&mut frame);
+
+        frame.finish().expect("Frame finish failed! - RenderManager(render_scene)");
+    }
+
+    pub fn render_framebuffer_plane(&self, frame: &mut Frame) {
+        frame.draw(
+            &self.framebuffer_vbo, 
+            NoIndices(PrimitiveType::TrianglesList),
+            &self.framebuffer_program,
+            &uniform! {
+                tex: &self.textures.layer_1_texture
+            },
+            &DrawParameters {
+                blend: glium::Blend::alpha_blending(),
+                ..Default::default()
+            },
+        ).expect("Failed to render layer 1 framebuffer - RenderManager (render_framebuffer_plane)");
+
+        frame.draw(
+            &self.framebuffer_vbo, 
+            NoIndices(PrimitiveType::TrianglesList),
+            &self.framebuffer_program,
+            &uniform! {
+                tex: &self.textures.layer_2_texture
+            },
+            &DrawParameters {
+                blend: glium::Blend::alpha_blending(),
+                ..Default::default()
+            },
+        ).expect("Failed to render layer 2 framebuffer - RenderManager (render_framebuffer_plane)");
     }
 
     pub fn resize(&mut self, window_size: (u32, u32)) {
         let display = &self.display;
+        display.resize(window_size);
 
         self.window_size = window_size;
         let pixelation_amount = self.pixelation_amount;

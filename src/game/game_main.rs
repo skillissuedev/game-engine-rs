@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use glam::Vec3;
 use glium::winit::keyboard::KeyCode;
 
@@ -35,12 +33,18 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
-        framework.preload_model_asset("test".into(), "models/cube.gltf");
+        framework.preload_model_asset("test".into(), "models/tiles/vanillaplains/1/tree1_trunk.gltf");
         let model_asset = framework.get_model_asset("test").unwrap();
         let texture_asset = framework.get_texture_asset("default").unwrap();
         let obj = framework.new_model_object("test", model_asset, Some(texture_asset), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
         add_system(Box::new(MainSystem {objects: vec![Box::new(obj)]}), framework);
-        framework.set_camera_position(Vec3::new(0.0, 0.0, -2.0));
+        framework.set_camera_position(Vec3::new(0.0, 0.0, 5.0));
+        framework.input.new_bind("forward", vec![InputEventType::Key(KeyCode::KeyW)]);
+        framework.input.new_bind("backward", vec![InputEventType::Key(KeyCode::KeyS)]);
+        framework.input.new_bind("left", vec![InputEventType::Key(KeyCode::KeyA)]);
+        framework.input.new_bind("right", vec![InputEventType::Key(KeyCode::KeyD)]);
+        framework.input.new_bind("cam_left", vec![InputEventType::Key(KeyCode::ArrowLeft)]);
+        framework.input.new_bind("cam_right", vec![InputEventType::Key(KeyCode::ArrowRight)]);
     }
 
     //add_system(Box::new(PlayerManager::new()), framework);
@@ -68,6 +72,35 @@ pub fn update(framework: &mut Framework) {
             }
         }
     }
+    let mut camera_pos = framework.get_camera_position().unwrap();
+    let mut camera_rot = framework.get_camera_rotation().unwrap();
+
+    if framework.input.is_bind_pressed("forward") {
+        camera_pos.z -= 1.0;
+    }
+
+    if framework.input.is_bind_pressed("backward") {
+        camera_pos.z += 1.0;
+    }
+
+    if framework.input.is_bind_pressed("left") {
+        camera_pos.x -= 1.0;
+    }
+
+    if framework.input.is_bind_pressed("right") {
+        camera_pos.x += 1.0;
+    }
+
+    if framework.input.is_bind_pressed("cam_left") {
+        camera_rot.y -= 15.0;
+    }
+
+    if framework.input.is_bind_pressed("cam_right") {
+        camera_rot.y += 15.0;
+    }
+
+    framework.set_camera_position(camera_pos);
+    framework.set_camera_rotation(camera_rot);
 }
 
 //pub fn render() {}

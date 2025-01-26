@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Surface};
+use glium::{draw_parameters, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Surface};
 
 use crate::managers::render::RenderLayer;
 
@@ -36,6 +36,20 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
     let view_matrix = camera.get_view_matrix().to_cols_array_2d();
     let proj_matrix = camera.get_projection_matrix().to_cols_array_2d();
 
+    draw_objects(
+        layer_1, layer_2, close_shadow_texture, far_shadow_texture,
+        &distance_objects, assets, display, view_matrix, proj_matrix, false
+    );
+
+    draw_objects(
+        layer_1, layer_2, close_shadow_texture, far_shadow_texture,
+        &transparent_distance_objects, assets, display, view_matrix, proj_matrix, true
+    );
+}
+
+fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, 
+    close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, distance_objects: &Vec<(f32, &RenderObjectData)>,
+    assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], transparent: bool) {
     for (_,render_object) in distance_objects {
         // Render it!
         let shader = match &render_object.shader {
@@ -70,22 +84,24 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
             proj: proj_matrix,
             model: render_object.transform.to_cols_array_2d(),
             model_object: render_object.model_object_transform.to_cols_array_2d(),
-            texture: Sampler(&texture_asset.texture, texture_sampler_behavior),
-            joints: &joints,
+            tex: Sampler(&texture_asset.texture, texture_sampler_behavior),
+            joint_matrices: &joints,
             inverse_bind_matrices: &inverse_bind_matrices,
         };
 
-        let draw_parameters = DrawParameters {
+        let mut draw_parameters = DrawParameters {
             depth: glium::Depth {
                 test: glium::draw_parameters::DepthTest::IfLess,
-                //write: true,
                 ..Default::default()
             },
-            //blend: glium::draw_parameters::Blend::alpha_blending(),
             backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
             polygon_mode: glium::draw_parameters::PolygonMode::Fill,
             ..Default::default()
         };
+
+        if transparent == true {
+            draw_parameters.blend = draw_parameters::Blend::alpha_blending();
+        }
 
         let vbo = &render_object.vbo;
         let ibo = &render_object.ibo;
@@ -95,9 +111,7 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
             RenderLayer::Layer2 => layer_2.draw(vbo, ibo, shader, &uniforms, &draw_parameters)
                 .expect("Failed to render the object to the layer 2"),
         }
-        //render_object.vbo
     }
-    // and do the same for transparent objects
 }
 
 // Sorting
