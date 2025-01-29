@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use egui_glium::EguiGlium;
 use glam::{Mat4, Vec3};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 
@@ -92,7 +93,7 @@ impl RenderManager {
         }
     }
 
-    pub fn render_scene(&mut self, assets: &AssetManager) {
+    pub fn render_scene(&mut self, assets: &AssetManager, egui_glium: &mut EguiGlium) {
         // 1. Clean everything (frame, FBs etc.)
         // 2. Render shadow map (to do later)
         // 3. Render objects
@@ -127,6 +128,9 @@ impl RenderManager {
         );
 
         self.render_framebuffer_plane(&mut frame);
+
+        egui_glium
+            .paint(display, &mut frame);
 
         frame.finish().expect("Frame finish failed! - RenderManager(render_scene)");
 

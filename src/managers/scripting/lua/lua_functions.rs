@@ -297,7 +297,6 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             });
         add_function!("new_model_object", new_model_object, lua, &system_id);
 
-        /*
         let system_id_for_functions = system_id.clone();
         let new_master_instanced_model_object = lua.create_function_mut(
             move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, is_transparent, layer):
@@ -415,7 +414,7 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                 }
                 Ok(())
             });
-        add_function!("new_instanced_model_transform_holder", new_instanced_model_transform_holder, lua, system_id);*/
+        add_function!("new_instanced_model_transform_holder", new_instanced_model_transform_holder, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let new_navigation_ground = lua.create_function_mut(move |lua, (name, size_x, size_z): (String, f32, f32)| {

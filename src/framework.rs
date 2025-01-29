@@ -168,11 +168,9 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                                 {
                                     let render = framework.render.as_mut().unwrap();
-                                    render.render_scene(&framework.assets);
+                                    render.render_scene(&framework.assets, &mut egui_glium);
 
                                     //render.debug_draw();
-                                    //egui_glium
-                                        //.paint(&render.display, render.target.as_mut().unwrap());
                                     //render.finish_render();
                                 }
 
