@@ -4,7 +4,7 @@ use crate::{
     managers::{
         self, assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
     },
-    objects::{character_controller::CharacterController, empty_object::EmptyObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, Args,
+    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use ez_al::{EzAl, SoundSourceType};
@@ -905,24 +905,12 @@ impl Framework {
         EmptyObject::new(name)
     }
 
-    /*
     pub fn new_instanced_model_object(
         &mut self,
         name: &str,
         instance: &str,
     ) -> InstancedModelObject {
-        todo!()
-        //InstancedModelObject::new(name, instance)
-    }
-
-    pub fn new_instanced_model_transform_holder(
-        &mut self,
-        name: &str,
-        instance: &str,
-        transforms: Vec<Transform>
-    ) -> InstancedModelTransformHolder {
-        todo!();
-        //InstancedModelTransformHolder::new(name, instance, transforms)
+        InstancedModelObject::new(name, instance.into())
     }
 
     pub fn new_master_instanced_model_object(
@@ -932,11 +920,19 @@ impl Framework {
         texture_asset_id: Option<TextureAssetId>,
         shader_asset: ShaderAsset,
         is_transparent: bool,
-        layer: RenderLayers,
+        layer: RenderLayer,
     ) -> MasterInstancedModelObject {
-        todo!();
-        //MasterInstancedModelObject::new(name, self, model_asset_id, texture_asset_id, shader_asset, is_transparent, layer)
-    }*/
+        MasterInstancedModelObject::new(name, model_asset_id, texture_asset_id, shader_asset, layer, is_transparent)
+    }
+
+    pub fn new_instanced_model_transform_holder(
+        &mut self,
+        name: &str,
+        instance: &str,
+        transforms: Vec<Transform>
+    ) -> InstancedModelTransformHolder {
+        InstancedModelTransformHolder::new(name, instance.into(), transforms)
+    }
 
     pub fn new_model_object(
         &mut self,

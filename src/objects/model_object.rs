@@ -3,13 +3,13 @@ use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
 
 #[derive(Debug)]
 pub struct CurrentAnimationData {
-    animation_name: String,
-    animation_timer: Instant,
-    looping: bool,
+    pub animation_name: String,
+    pub animation_timer: Instant,
+    pub looping: bool,
 }
 
 #[derive(Debug)]
@@ -171,7 +171,7 @@ impl Object for ModelObject {
 impl ModelObject {
     fn model_object_transform(&self) -> Mat4 {
         let global_transform = self.global_transform();
-        let global_rotation = global_transform.rotation;
+        let global_rotation = deg_vec_to_rad(global_transform.rotation);
         let global_rotation =
             Quat::from_euler(glam::EulerRot::XYZ, global_rotation.x, global_rotation.y, global_rotation.z);
 
@@ -239,6 +239,7 @@ impl ModelObject {
                 vbo,
                 ibo,
                 model_object_transform,
+                instanced_master_name: None,
                 // gotta do 'em after setting all transforms
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 512],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 512],

@@ -186,7 +186,7 @@ fn read_gltf_object(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, render: Optio
                             vertices[idx].weights = weight;
                         }
                     },
-                    None => debugger::warn("ModelAsset: can't read weights of a mesh! (read_gltf_object)"),
+                    None => (),//debugger::warn("ModelAsset: can't read weights of a mesh! (read_gltf_object)"),
                 }
 
                 match reader.read_joints(0) {
@@ -196,7 +196,7 @@ fn read_gltf_object(node: &gltf::Node, buffer_data: &Vec<Vec<u8>>, render: Optio
                             vertices[idx].joints = f32_joints;
                         }
                     },
-                    None => debugger::warn("ModelAsset: can't read joints of a mesh! (read_gltf_object)"),
+                    None => (),//debugger::warn("ModelAsset: can't read joints of a mesh! (read_gltf_object)"),
                 }
 
                 match reader.read_indices() {
@@ -389,7 +389,6 @@ fn load_buffers(
                             let bin_path = &Path::new(asset_path)
                                 .with_extension("bin")
                                 .into_os_string();
-                            dbg!(bin_path);
                             match std::fs::read(bin_path) {
                                 Ok(bin) => buffer_data.push(bin),
                                 Err(err) => {

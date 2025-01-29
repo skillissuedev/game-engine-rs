@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{IndexBufferAny, NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
+use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 
 use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
 
@@ -16,8 +16,13 @@ pub struct Vertex {
     pub weights: [f32; 4],
     pub material: u32,
 }
-
 implement_vertex!(Vertex, position, normal, tex_coords, joints, weights, material);
+
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) struct Instance {
+    pub(crate) model: [[f32; 4]; 4],
+}
+implement_vertex!(Instance, model);
 
 pub(crate) struct RenderManager {
     pub(crate) objects: HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>,
@@ -28,6 +33,7 @@ pub(crate) struct RenderManager {
     pub(crate) display: Display<WindowSurface>,
     pub(crate) framebuffer_vbo: VertexBuffer<Vertex>,
     pub(crate) framebuffer_program: Program,
+    pub(crate) instanced_positions: HashMap<String, Vec<Mat4>>,
 }
 
 impl RenderManager {
@@ -82,6 +88,7 @@ impl RenderManager {
             display,
             framebuffer_vbo,
             framebuffer_program,
+            instanced_positions: HashMap::new(),
         }
     }
 
@@ -110,6 +117,7 @@ impl RenderManager {
         object_render::render_objects(
             &mut layer1_framebuffer,
             &mut layer2_framebuffer,
+            &mut self.instanced_positions,
             &self.textures.close_shadow_texture,
             &self.textures.far_shadow_texture,
             &self.objects,
@@ -121,6 +129,8 @@ impl RenderManager {
         self.render_framebuffer_plane(&mut frame);
 
         frame.finish().expect("Frame finish failed! - RenderManager(render_scene)");
+
+        self.instanced_positions.clear();
     }
 
     pub fn render_framebuffer_plane(&self, frame: &mut Frame) {
@@ -320,6 +330,7 @@ pub(crate) struct RenderObjectData {
     pub(crate) ibo: IndexBuffer<u32>,
     pub(crate) joint_matrices: [[[f32; 4]; 4]; 512],
     pub(crate) joint_inverse_bind_matrices: [[[f32; 4]; 4]; 512],
+    pub(crate) instanced_master_name: Option<String>,
 }
 
 impl RenderObjectData {

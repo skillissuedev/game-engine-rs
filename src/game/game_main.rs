@@ -2,7 +2,7 @@ use glam::Vec3;
 use glium::winit::keyboard::KeyCode;
 
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, framework::{DebugMode, Framework}, managers::{assets::ModelAssetId, input::InputEventType, networking, render::{RenderLayer, RenderObjectData, RenderShader}, scripting::lua::LuaSystem, systems::{add_system, SystemValue}}, systems::main_system::MainSystem, Args//, systems::player_manager::PlayerManager, Args,
+    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, framework::{DebugMode, Framework}, managers::{assets::ModelAssetId, input::InputEventType, networking, render::{RenderLayer, RenderObjectData, RenderShader}, scripting::lua::LuaSystem, systems::{add_system, SystemValue}}, objects::Transform, systems::main_system::MainSystem, Args//, systems::player_manager::PlayerManager, Args,
     //systems::player_manager::PlayerManager,
 };
 
@@ -38,9 +38,18 @@ pub fn start(args: Args, framework: &mut Framework) {
         let model_asset = framework.get_model_asset("test").unwrap();
         let model_asset1 = framework.get_model_asset("test1").unwrap();
         let texture_asset = framework.get_texture_asset("default").unwrap();
-        let obj = framework.new_model_object("test", model_asset, Some(texture_asset.clone()), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
+        let obj = framework.new_master_instanced_model_object("test", model_asset, Some(texture_asset.clone()), ShaderAsset::load_default_instanced_shader().unwrap(), false, RenderLayer::Layer1);
+        let obj0 = framework.new_instanced_model_object("test0", "test");
+        let obj00 = framework.new_instanced_model_object("test00", "test");
         let obj1 = framework.new_model_object("test1", model_asset1, Some(texture_asset), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
-        add_system(Box::new(MainSystem {objects: vec![Box::new(obj), Box::new(obj1)]}), framework);
+        let obj2 = framework.new_instanced_model_transform_holder("test00", "test",
+            vec![
+                Transform {position: Vec3::new(1.0, 0.0, 0.0), ..Default::default()},
+                Transform {position: Vec3::new(20.0, 0.0, 0.0), ..Default::default()},
+                Transform {position: Vec3::new(40.0, 0.0, 0.0), ..Default::default()},
+            ]
+        );
+        add_system(Box::new(MainSystem {objects: vec![Box::new(obj0), Box::new(obj1), Box::new(obj00), Box::new(obj), Box::new(obj2)]}), framework);
         framework.set_camera_position(Vec3::new(0.0, 0.0, 5.0));
         framework.input.new_bind("forward", vec![InputEventType::Key(KeyCode::KeyW)]);
         framework.input.new_bind("backward", vec![InputEventType::Key(KeyCode::KeyS)]);

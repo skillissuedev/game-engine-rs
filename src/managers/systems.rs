@@ -6,9 +6,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    assets::AssetManager,
     debugger, networking,
-    render::RenderManager,
 };
 
 static mut SYSTEMS: Vec<Box<dyn System>> = vec![];
