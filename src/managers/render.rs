@@ -247,7 +247,6 @@ impl RenderCamera {
             y: front_row.y,
             z: front_row.z,
         }.normalize();
-        dbg!(front);
 
         let up = Vec3 {
             x: up_row.x,

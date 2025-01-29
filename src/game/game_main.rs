@@ -33,7 +33,7 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
-        framework.preload_model_asset("test".into(), "models/tiles/vanillaplains/1/tree1_trunk.gltf");
+        framework.preload_model_asset("test".into(), "models/123123.gltf");
         let model_asset = framework.get_model_asset("test").unwrap();
         let texture_asset = framework.get_texture_asset("default").unwrap();
         let obj = framework.new_model_object("test", model_asset, Some(texture_asset), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);

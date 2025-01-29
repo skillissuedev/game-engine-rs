@@ -267,7 +267,9 @@ impl ModelObject {
         if let Some(animation_data) = &self.animation_data {
             if let Some(animation) = animations.get(&animation_data.animation_name) {
                 if let Some(channel) = animation.channels.get(&node_id) {
+                    //dbg!(&channel);
                     let animation_time = animation_data.animation_timer.elapsed().as_secs_f32();
+                    //dbg!(animation_time);
 
                     // OH NO-
                     let translation = Vec3::new(

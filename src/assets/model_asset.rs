@@ -278,51 +278,66 @@ fn read_gltf_animations(gltf: &Gltf, buffer_data: &Vec<Vec<u8>>) -> HashMap<Stri
 
         for channel in animation.channels() {
             let target_node = channel.target().node().index();
-            let mut translation_x: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut translation_y: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut translation_z: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut rotation_x: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut rotation_y: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut rotation_z: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut rotation_w: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut scale_x: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut scale_y: Spline<f32, f32> = Spline::from_vec(vec![]);
-            let mut scale_z: Spline<f32, f32> = Spline::from_vec(vec![]);
+
+            let asset_channel = match channels.get_mut(&target_node) {
+                Some(channel) => channel,
+                None => {
+                    channels.insert(target_node, ModelAssetAnimationChannel {
+                        translation_x: Spline::from_vec(vec![]),
+                        translation_y: Spline::from_vec(vec![]),
+                        translation_z: Spline::from_vec(vec![]),
+                        rotation_x: Spline::from_vec(vec![]),
+                        rotation_y: Spline::from_vec(vec![]),
+                        rotation_z: Spline::from_vec(vec![]),
+                        rotation_w: Spline::from_vec(vec![]),
+                        scale_x: Spline::from_vec(vec![]),
+                        scale_y: Spline::from_vec(vec![]),
+                        scale_z: Spline::from_vec(vec![]),
+                    });
+                    channels.get_mut(&target_node)
+                        .expect("Should not be None, because the element was just inserted - ModelAsset (read_gltf_animations)")
+                },
+            };
 
             let reader = channel.reader(|buffer| Some(&buffer_data[buffer.index()]));
 
-            let frames_timestamps: Vec<f32>;
+            let frame_timestamps: Vec<f32>;
             match reader.read_inputs() {
-                Some(timestamps) => frames_timestamps = timestamps.collect(),
+                Some(timestamps) => frame_timestamps = timestamps.collect(),
                 None => {
                     debugger::warn("ModelAsset: read_inputs' result is None (read_gltf_animations)");
-                    frames_timestamps = Vec::new();
+                    frame_timestamps = Vec::new();
                 },
             };
+            if frame_timestamps.is_empty() {
+                // if there are 0 keyframes, skip the channel
+                // had to add it because some empty would overwrite node transformations
+                continue 
+            }
 
             match reader.read_outputs() {
                 Some(keyframes_iter) => {
                     match keyframes_iter {
                         ReadOutputs::Translations(translations) => {
                             for (idx, translation) in translations.enumerate() {
-                                translation_x.add(Key::new(frames_timestamps[idx], translation[0], Interpolation::Linear));
-                                translation_y.add(Key::new(frames_timestamps[idx], translation[1], Interpolation::Linear));
-                                translation_z.add(Key::new(frames_timestamps[idx], translation[2], Interpolation::Linear));
+                                asset_channel.translation_x.add(Key::new(frame_timestamps[idx], translation[0], Interpolation::Linear));
+                                asset_channel.translation_y.add(Key::new(frame_timestamps[idx], translation[1], Interpolation::Linear));
+                                asset_channel.translation_z.add(Key::new(frame_timestamps[idx], translation[2], Interpolation::Linear));
                             }
                         },
                         ReadOutputs::Rotations(rotations) => {
                             for (idx, rotation) in rotations.into_f32().enumerate() {
-                                rotation_x.add(Key::new(frames_timestamps[idx], rotation[0], Interpolation::Linear));
-                                rotation_y.add(Key::new(frames_timestamps[idx], rotation[1], Interpolation::Linear));
-                                rotation_z.add(Key::new(frames_timestamps[idx], rotation[2], Interpolation::Linear));
-                                rotation_w.add(Key::new(frames_timestamps[idx], rotation[3], Interpolation::Linear));
+                                asset_channel.rotation_x.add(Key::new(frame_timestamps[idx], rotation[0], Interpolation::Linear));
+                                asset_channel.rotation_y.add(Key::new(frame_timestamps[idx], rotation[1], Interpolation::Linear));
+                                asset_channel.rotation_z.add(Key::new(frame_timestamps[idx], rotation[2], Interpolation::Linear));
+                                asset_channel.rotation_w.add(Key::new(frame_timestamps[idx], rotation[3], Interpolation::Linear));
                             }
                         },
                         ReadOutputs::Scales(scales) => {
                             for (idx, scale) in scales.enumerate() {
-                                scale_x.add(Key::new(frames_timestamps[idx], scale[0], Interpolation::Linear));
-                                scale_y.add(Key::new(frames_timestamps[idx], scale[1], Interpolation::Linear));
-                                scale_z.add(Key::new(frames_timestamps[idx], scale[2], Interpolation::Linear));
+                                asset_channel.scale_x.add(Key::new(frame_timestamps[idx], scale[0], Interpolation::Linear));
+                                asset_channel.scale_y.add(Key::new(frame_timestamps[idx], scale[1], Interpolation::Linear));
+                                asset_channel.scale_z.add(Key::new(frame_timestamps[idx], scale[2], Interpolation::Linear));
                             }
                         },
                         ReadOutputs::MorphTargetWeights(_) => (),
@@ -332,11 +347,6 @@ fn read_gltf_animations(gltf: &Gltf, buffer_data: &Vec<Vec<u8>>) -> HashMap<Stri
                     debugger::warn("ModelAsset: read_outputs' result is None (read_gltf_animations)")
                 },
             };
-            channels.insert(target_node, ModelAssetAnimationChannel {
-                translation_x, translation_y, translation_z,
-                rotation_x, rotation_y, rotation_z, rotation_w,
-                scale_x, scale_y, scale_z,
-            });
         }
         animations.insert(animation_name.into(), ModelAssetAnimation { channels });
     }

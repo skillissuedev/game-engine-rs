@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::objects::Object;
+use crate::objects::{model_object::ModelObject, Object};
 
 use super::System;
 

@@ -99,6 +99,8 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
             ..Default::default()
         };
 
+        //dbg!((render_object.transform * render_object.model_object_transform).to_scale_rotation_translation());
+
         if transparent == true {
             draw_parameters.blend = draw_parameters::Blend::alpha_blending();
         }

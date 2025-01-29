@@ -8,7 +8,7 @@ use crate::{
         assets::AssetManager,
         debugger,
         networking::{self, Message, MessageReliability, NetworkError},
-        render::{RenderManager},
+        render::RenderManager,
         systems::{register_object_id_name, register_object_id_system, CallList, SystemValue},
     },
     objects::Object,
