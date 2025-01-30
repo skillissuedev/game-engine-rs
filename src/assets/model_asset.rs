@@ -16,14 +16,14 @@ pub(crate) enum ModelAssetError {
     CannotGetDefaultScene,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ModelAsset {
     pub path: String,
     pub(crate) objects: HashMap<usize, ModelAssetObject>,
     pub(crate) animations: HashMap<String, ModelAssetAnimation>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ModelAssetObject {
     pub(crate) render_data: Vec<ModelAssetObjectRenderData>,
     pub(crate) children: HashMap<usize, ModelAssetObject>,
@@ -31,7 +31,7 @@ pub(crate) struct ModelAssetObject {
     pub(crate) default_transform: Mat4,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ModelAssetObjectRenderData {
     pub(crate) vertices: Vec<Vertex>,
     pub(crate) indices: Vec<u32>,
@@ -40,12 +40,12 @@ pub(crate) struct ModelAssetObjectRenderData {
     pub(crate) inverse_bind_matrices: HashMap<usize, Mat4>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ModelAssetAnimation {
     pub(crate) channels: HashMap<usize, ModelAssetAnimationChannel>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ModelAssetAnimationChannel {
     pub(crate) translation_x: Spline<f32, f32>,
     pub(crate) translation_y: Spline<f32, f32>,

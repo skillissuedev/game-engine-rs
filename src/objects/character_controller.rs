@@ -100,7 +100,6 @@ impl Object for CharacterController {
     fn update(&mut self, framework: &mut Framework) {
         if let Some(movement) = &self.movement {
             let pos = self.global_transform().position;
-            //dbg!(self.local_transform());
             let speed = movement.speed;
             if let Some(next_pos) = self.last_path_point {
                 let direction = self.get_direction(next_pos);
@@ -111,8 +110,6 @@ impl Object for CharacterController {
                 let next_pos = framework
                     .navigation
                     .find_next_path_point(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z));
-                //dbg!(self.local_transform());
-                //dbg!(next_pos);
                 match next_pos {
                     Some(next_pos) => {
                         let full_pos = Vec3::new(next_pos.x, pos.y, next_pos.y);
@@ -220,6 +217,7 @@ impl CharacterController {
                 let global_transform = self.global_transform();
                 let global_position = global_transform.position;
                 let global_rotation = global_transform.rotation;
+                dbg!(direction);
 
                 let direction = math_utils::rotate_vector(direction, global_rotation);
 
@@ -262,14 +260,10 @@ impl CharacterController {
                 );
             }
         }
-
-        //let total_elapsed = timer.elapsed();
-        //dbg!(total_elapsed);
     }
 
     pub fn walk_to(&mut self, target: Vec3, speed: f32) {
         let movement = CharacterControllerMovement { target, speed };
-        //dbg!(&movement);
         self.movement = Some(movement);
     }
 }

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use egui_glium::EguiGlium;
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 
-use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
+use crate::{assets::shader_asset::ShaderAsset, math_utils::{deg_to_rad, deg_vec_to_rad}};
 
 use super::{assets::{AssetManager, TextureAssetId}, debugger, object_render};
 
@@ -244,22 +244,22 @@ pub(crate) struct RenderCamera {
 }
 
 impl RenderCamera {
-    fn camera_transformtations(&self) -> Mat4 {
+    fn camera_transformations(&self) -> Mat4 {
         Mat4::from_rotation_x(self.rotation.x.to_radians())
-            * Mat4::from_rotation_y(self.rotation.y.to_radians())
+            * Mat4::from_rotation_y(-self.rotation.y.to_radians())
             * Mat4::from_rotation_z(self.rotation.z.to_radians())
             * Mat4::from_translation(self.translation)
     }
 
     pub fn get_view_matrix(&self) -> Mat4 {
-        let transformations = self.camera_transformtations();
+        let transformations = self.camera_transformations();
         let up_row = transformations.row(1);
         let front_row = transformations.row(2);
 
         let front = Vec3 {
-            x: front_row.x,
+            x: -front_row.x,
             y: front_row.y,
-            z: front_row.z,
+            z: -front_row.z,
         }.normalize();
 
         let up = Vec3 {
@@ -268,25 +268,22 @@ impl RenderCamera {
             z: up_row.z,
         }.normalize();
 
-        Mat4::look_at_lh(self.translation, self.translation + front, up)
+        Mat4::look_at_rh(self.translation, self.translation + front, up)
     }
 
     pub fn front(&self) -> Vec3 {
-        let transformations = self.camera_transformtations();
+        let transformations = self.camera_transformations();
         let front_row = transformations.row(2);
 
         Vec3 {
-            x: front_row.x,
+            x: -front_row.x,
             y: front_row.y,
-            z: front_row.z,
+            z: -front_row.z,
         }.normalize()
     }
 
     pub fn left(&self) -> Vec3 {
-        let transformations = Mat4::from_rotation_x(self.rotation.x.to_radians())
-            * Mat4::from_rotation_y(self.rotation.y.to_radians())
-            * Mat4::from_rotation_z(self.rotation.z.to_radians())
-            * Mat4::from_translation(self.translation);
+        let transformations = self.camera_transformations();
         let left_row = transformations.row(0);
 
         Vec3 {

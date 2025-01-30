@@ -3,7 +3,7 @@ use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::{deg_to_rad, deg_vec_to_rad}};
 
 #[derive(Debug)]
 pub struct CurrentAnimationData {
@@ -172,10 +172,12 @@ impl ModelObject {
     fn model_object_transform(&self) -> Mat4 {
         let global_transform = self.global_transform();
         let global_rotation = deg_vec_to_rad(global_transform.rotation);
-        let global_rotation =
-            Quat::from_euler(glam::EulerRot::XYZ, global_rotation.x, global_rotation.y, global_rotation.z);
 
-        Mat4::from_scale_rotation_translation(global_transform.scale, global_rotation, global_transform.position)
+        Mat4::from_translation(global_transform.position)
+            * Mat4::from_rotation_z(global_rotation.z)
+            * Mat4::from_rotation_y(global_rotation.y)
+            * Mat4::from_rotation_x(global_rotation.x)
+            * Mat4::from_scale(global_transform.scale)
     }
 
     fn add_all_objects(&mut self, assets: &AssetManager, render: &mut RenderManager, shader: ShaderAsset) {
@@ -268,9 +270,7 @@ impl ModelObject {
         if let Some(animation_data) = &self.animation_data {
             if let Some(animation) = animations.get(&animation_data.animation_name) {
                 if let Some(channel) = animation.channels.get(&node_id) {
-                    //dbg!(&channel);
                     let animation_time = animation_data.animation_timer.elapsed().as_secs_f32();
-                    //dbg!(animation_time);
 
                     // OH NO-
                     let translation = Vec3::new(
@@ -290,7 +290,9 @@ impl ModelObject {
                         channel.scale_z.sample(animation_time).unwrap_or_default(),
                     );
 
-                    let local_transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+                    let local_transform = Mat4::from_translation(translation)
+                        * Mat4::from_quat(rotation)
+                        * Mat4::from_scale(scale);
                     let transform = local_transform * parent_transform;
                     self.objects_global_transforms.insert(node_id, transform);
 

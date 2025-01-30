@@ -13,7 +13,7 @@ use rapier3d::{
         RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodySet,
     },
     geometry::{
-        ActiveCollisionTypes, BroadPhase, ColliderBuilder, ColliderHandle, ColliderSet,
+        ActiveCollisionTypes, ColliderBuilder, ColliderHandle, ColliderSet,
         ColliderShape, InteractionGroups, NarrowPhase, Ray,
     },
     math::{Point, Real},
@@ -276,8 +276,6 @@ impl PhysicsManager {
 
     pub fn set_body_position(&mut self, body_parameters: ObjectBodyParameters, position: Vec3) {
         if let Some(body) = body_parameters.rigid_body_handle {
-            let position = Vec3::new(-position.x, position.y, position.z);
-
             match self.rigid_body_set.get_mut(body) {
                 Some(body) => body.set_translation(position.into(), true),
                 None => debugger::error(&format!(
@@ -312,7 +310,7 @@ impl PhysicsManager {
     }
 
     pub fn set_rigidbody_position(&mut self, body: RigidBodyHandle, position: Vec3) {
-        let position = Vec3::new(-position.x, position.y, position.z);
+        let position = Vec3::new(position.x, position.y, position.z);
 
         match self.rigid_body_set.get_mut(body) {
             Some(body) => body.set_translation(position.into(), true),
@@ -326,7 +324,10 @@ impl PhysicsManager {
     pub fn get_body_position(&mut self, body_parameters: ObjectBodyParameters) -> Option<Vec3> {
         if let Some(body) = body_parameters.rigid_body_handle {
             match self.rigid_body_set.get(body) {
-                Some(body) => Some((*body.translation()).into()),
+                Some(body) => {
+                    dbg!(body.translation());
+                    Some((*body.translation()).into())
+                },
                 None => {
                     debugger::error(&format!(
                         "get_rigidbody_position error\nfailed to get rigid body with handle {:?}",
@@ -607,7 +608,7 @@ pub enum BodyColliderType {
     Capsule(f32, f32),
     /// first is radius, second is height,
     Cylinder(f32, f32),
-    /// first is verts position, second is indices,
+    /// just uses first object it finds
     TriangleMesh(ModelAsset),
 }
 

@@ -1,6 +1,6 @@
 pub mod lua_functions;
 use crate::{
-    framework::{self, DebugMode, Framework}, managers::{
+    assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
@@ -665,9 +665,8 @@ impl UserData for ObjectHandle {
             });
 
 
-        /*
         // body_type = "None"/"Fixed"/""/"Ball"/"Cylinder"
-        // model_path - path to the GLTF model
+        // model_id - id of the ModelAsset
         // render_collider_type = "None"/"Cuboid"/"Capsule"/"Ball"/"Cylinder"
         // collider_size_x, collider_size_y, collider_size_z - works only for render collider, some of them may be ignored
         // mass
@@ -687,7 +686,7 @@ impl UserData for ObjectHandle {
                     Some(system) => match system.find_object_mut(&this.name) {
                         Some(object) => {
                             let model_asset_id = framework.get_model_asset(&model_id);
-                            let model_asset;// 
+                            let model_asset;
                             match model_asset_id {
                                 Some(model_asset_id) => model_asset = framework.assets.get_model_asset(&model_asset_id),
                                 None => {
@@ -698,7 +697,7 @@ impl UserData for ObjectHandle {
 
                             match model_asset {
                                 Some(model_asset) => {
-                                    let body_collider = Some(BodyColliderType::TriangleMesh(ModelAsset::clone_for_collider(model_asset)));
+                                    let body_collider = Some(BodyColliderType::TriangleMesh(model_asset.clone()));
 
                                     let (render_collider_type, body_type, membership, filter) =
                                         lua_body_render_colliders_and_groups_to_rust(this.name.clone(), this.system_id.clone(), 
@@ -724,7 +723,7 @@ impl UserData for ObjectHandle {
                 }
 
                 Ok(())
-            });*/
+            });
 
         methods.add_method(
             "object_id",

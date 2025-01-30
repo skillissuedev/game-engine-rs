@@ -33,7 +33,7 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
-        framework.preload_model_asset("test".into(), "models/123123.gltf");
+        /*framework.preload_model_asset("test".into(), "models/123123.gltf");
         framework.preload_model_asset("test1".into(), "models/tiles/vanillaplains/1/land1.gltf");
         let model_asset = framework.get_model_asset("test").unwrap();
         let model_asset1 = framework.get_model_asset("test1").unwrap();
@@ -58,12 +58,12 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework.input.new_bind("cam_left", vec![InputEventType::Key(KeyCode::ArrowLeft)]);
         framework.input.new_bind("cam_right", vec![InputEventType::Key(KeyCode::ArrowRight)]);
 
-        framework.render.as_mut().unwrap().set_camera_position(Vec3::new(0.0, 2.0, 0.0));
+        framework.render.as_mut().unwrap().set_camera_position(Vec3::new(0.0, 2.0, 0.0));*/
     }
 
     //add_system(Box::new(PlayerManager::new()), framework);
     //add_system(Box::new(WorldGenerator::new()));
-    /*add_system(Box::new(LuaSystem::new("player_menu", "scripts/lua/player_menu.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("player_menu", "scripts/lua/player_menu.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("biomes", "scripts/lua/biomes.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("inventory", "scripts/lua/inventory.lua").unwrap()), framework);
     //add_system(Box::new(LuaSystem::new("world_generator", "scripts/lua/world_generation.lua").unwrap()), framework);
@@ -74,7 +74,7 @@ pub fn start(args: Args, framework: &mut Framework) {
     add_system(Box::new(LuaSystem::new("vanilla_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_items", "scripts/lua/vanilla_items.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("land_unlock", "scripts/lua/land_unlock.lua").unwrap()), framework);
-    add_system(Box::new(LuaSystem::new("land_placement", "scripts/lua/land_placement.lua").unwrap()), framework);*/
+    add_system(Box::new(LuaSystem::new("land_placement", "scripts/lua/land_placement.lua").unwrap()), framework);
 }
 
 pub fn update(framework: &mut Framework) {
@@ -85,7 +85,7 @@ pub fn update(framework: &mut Framework) {
                 framework.set_debug_mode(DebugMode::None);
             }
         }
-    }
+    }/*
     let mut camera_pos = framework.get_camera_position().unwrap();
     let mut camera_rot = framework.get_camera_rotation().unwrap();
 
@@ -114,7 +114,7 @@ pub fn update(framework: &mut Framework) {
     }
 
     framework.set_camera_position(camera_pos);
-    framework.set_camera_rotation(camera_rot);
+    framework.set_camera_rotation(camera_rot);*/
 }
 
 //pub fn render() {}
