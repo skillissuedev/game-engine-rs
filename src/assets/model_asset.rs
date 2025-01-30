@@ -387,10 +387,9 @@ fn load_buffers(
                     Err(err) => match err {
                         data_url::DataUrlError::NotADataUrl => {
                             let bin_path = &Path::new(asset_path)
-                                .with_file_name(uri)
-                                .into_os_string()
-                                .into_string()
-                                .unwrap();
+                                .with_extension("bin")
+                                .into_os_string();
+                            dbg!(bin_path);
                             match std::fs::read(bin_path) {
                                 Ok(bin) => buffer_data.push(bin),
                                 Err(err) => {

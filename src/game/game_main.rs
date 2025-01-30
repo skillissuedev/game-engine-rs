@@ -34,10 +34,13 @@ pub fn start(args: Args, framework: &mut Framework) {
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
         framework.preload_model_asset("test".into(), "models/123123.gltf");
+        framework.preload_model_asset("test1".into(), "models/tiles/vanillaplains/1/land1.gltf");
         let model_asset = framework.get_model_asset("test").unwrap();
+        let model_asset1 = framework.get_model_asset("test1").unwrap();
         let texture_asset = framework.get_texture_asset("default").unwrap();
-        let obj = framework.new_model_object("test", model_asset, Some(texture_asset), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
-        add_system(Box::new(MainSystem {objects: vec![Box::new(obj)]}), framework);
+        let obj = framework.new_model_object("test", model_asset, Some(texture_asset.clone()), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
+        let obj1 = framework.new_model_object("test1", model_asset1, Some(texture_asset), ShaderAsset::load_default_shader().unwrap(), false, RenderLayer::Layer1);
+        add_system(Box::new(MainSystem {objects: vec![Box::new(obj), Box::new(obj1)]}), framework);
         framework.set_camera_position(Vec3::new(0.0, 0.0, 5.0));
         framework.input.new_bind("forward", vec![InputEventType::Key(KeyCode::KeyW)]);
         framework.input.new_bind("backward", vec![InputEventType::Key(KeyCode::KeyS)]);
@@ -45,6 +48,8 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework.input.new_bind("right", vec![InputEventType::Key(KeyCode::KeyD)]);
         framework.input.new_bind("cam_left", vec![InputEventType::Key(KeyCode::ArrowLeft)]);
         framework.input.new_bind("cam_right", vec![InputEventType::Key(KeyCode::ArrowRight)]);
+
+        framework.render.as_mut().unwrap().set_camera_position(Vec3::new(0.0, 2.0, 0.0));
     }
 
     //add_system(Box::new(PlayerManager::new()), framework);

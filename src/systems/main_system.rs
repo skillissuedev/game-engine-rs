@@ -11,6 +11,7 @@ pub struct MainSystem {
 impl System for MainSystem {
     fn client_start(&mut self, framework: &mut crate::framework::Framework) {
         self.objects[0].set_position(framework, Vec3::new(0.0, 0.0, -10.0), true);
+        self.objects[1].set_position(framework, Vec3::new(0.0, -2.0, -50.0), true);
     }
 
     fn server_start(&mut self, framework: &mut crate::framework::Framework) {

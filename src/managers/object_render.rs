@@ -92,6 +92,7 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
         let mut draw_parameters = DrawParameters {
             depth: glium::Depth {
                 test: glium::draw_parameters::DepthTest::IfLess,
+                write: true,
                 ..Default::default()
             },
             backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
