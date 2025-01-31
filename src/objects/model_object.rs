@@ -243,8 +243,8 @@ impl ModelObject {
                 model_object_transform,
                 instanced_master_name: None,
                 // gotta do 'em after setting all transforms
-                joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 512],   
-                joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 512],
+                joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
+                joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
             };
 
             objects_list.get_mut(&node_id).expect("add_objects_to_list err").push(render_object_data);
@@ -368,8 +368,8 @@ impl ModelObject {
         if let Some(render_object) = render_object_list.get_mut(&node_id) {
             for (node_data_idx, node_data) in node.render_data.iter().enumerate() {
                 // list of values to change
-                let mut joints = [[[0.0, 0.0, 0.0, 0.0]; 4]; 512];
-                let mut joint_inverse_bind_matrices = [[[0.0, 0.0, 0.0, 0.0]; 4]; 512];
+                let mut joints = [[[0.0, 0.0, 0.0, 0.0]; 4]; 128];
+                let mut joint_inverse_bind_matrices = [[[0.0, 0.0, 0.0, 0.0]; 4]; 128];
                 // + transform, model_object_tranform
 
                 for (joint_obj_idx, joint_idx) in &node_data.joint_objects_idx {

@@ -217,7 +217,6 @@ impl CharacterController {
                 let global_transform = self.global_transform();
                 let global_position = global_transform.position;
                 let global_rotation = global_transform.rotation;
-                dbg!(direction);
 
                 let direction = math_utils::rotate_vector(direction, global_rotation);
 

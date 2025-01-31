@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use egui_glium::EguiGlium;
-use glam::{Mat4, Quat, Vec3};
+use glam::{Mat4, Vec3, Vec4};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 
-use crate::{assets::shader_asset::ShaderAsset, math_utils::{deg_to_rad, deg_vec_to_rad}};
+use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
 
 use super::{assets::{AssetManager, TextureAssetId}, debugger, object_render};
 
@@ -35,6 +35,9 @@ pub(crate) struct RenderManager {
     pub(crate) framebuffer_vbo: VertexBuffer<Vertex>,
     pub(crate) framebuffer_program: Program,
     pub(crate) instanced_positions: HashMap<String, Vec<Mat4>>,
+    pub(crate) directional_light_dir: Vec3,
+    pub(crate) shadow_map_shader: Program,
+    pub(crate) instanced_shadow_map_shader: Program,
 }
 
 impl RenderManager {
@@ -42,10 +45,10 @@ impl RenderManager {
         let pixelation_amount = 2.0;
         let textures = RenderManagerTextures {
             close_shadow_texture: 
-                DepthTexture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
+                DepthTexture2d::empty(&display, 4096, 4096)
                     .expect("close_shadow_texture creation error!"),
             far_shadow_texture:
-                DepthTexture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
+                DepthTexture2d::empty(&display, 4096, 4096)
                     .expect("far_shadow_texture creation error!"),
             layer_1_texture:
                 Texture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
@@ -80,6 +83,24 @@ impl RenderManager {
             None,
         ).expect("Failed to make the default framebuffer program - RenderManager (new)");
 
+        let shadow_shader_asset = ShaderAsset::load_shadow_shader()
+            .expect("Failed to load the shadow map shader - RenderManager (new)");
+        let shadow_map_shader = Program::from_source(
+            &display,
+            &shadow_shader_asset.vertex_shader_source,
+            &shadow_shader_asset.fragment_shader_source,
+            None,
+        ).expect("Failed to compile the shadow map program - RenderManager (new)");
+
+        let instanced_shadow_shader_asset = ShaderAsset::load_instanced_shadow_shader()
+            .expect("Failed to load the instanced shadow map shader - RenderManager (new)");
+        let instanced_shadow_map_shader = Program::from_source(
+            &display,
+            &instanced_shadow_shader_asset.vertex_shader_source,
+            &instanced_shadow_shader_asset.fragment_shader_source,
+            None,
+        ).expect("Failed to compile the instanced shadow map program - RenderManager (new)");
+
         RenderManager {
             objects: HashMap::new(),
             window_size: (1280, 720),
@@ -90,6 +111,9 @@ impl RenderManager {
             framebuffer_vbo,
             framebuffer_program,
             instanced_positions: HashMap::new(),
+            directional_light_dir: Vec3::new(0.5, 0.0, 0.0),
+            shadow_map_shader,
+            instanced_shadow_map_shader,
         }
     }
 
@@ -113,7 +137,29 @@ impl RenderManager {
         layer1_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
         layer2_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
 
-        // 2. Render shadow map - to do
+        // 2. Render shadow map
+        let shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
+        let mut close_shadow_framebuffer =
+            SimpleFrameBuffer::depth_only(display, &self.textures.close_shadow_texture)
+                .expect("Failed to create a SimpleFrameBuffer for the close shadow (render_scene in render.rs)");
+        let mut far_shadow_framebuffer = 
+            SimpleFrameBuffer::depth_only(display, &self.textures.far_shadow_texture)
+                .expect("Failed to create a SimpleFrameBuffer for the far shadow (render_scene in render.rs)");
+        close_shadow_framebuffer.clear_depth(1.0);
+        far_shadow_framebuffer.clear_depth(1.0);
+
+        object_render::shadow_render_objects(
+            &mut close_shadow_framebuffer,
+            &mut far_shadow_framebuffer,
+            &mut self.instanced_positions,
+            shadow_camera,
+            &self.objects,
+            &self.display,
+            &self.shadow_map_shader,
+            &self.instanced_shadow_map_shader
+        );
+
+
         // 3. Rendering objects
         object_render::render_objects(
             &mut layer1_framebuffer,
@@ -176,10 +222,10 @@ impl RenderManager {
 
         self.textures = RenderManagerTextures {
             close_shadow_texture: 
-                DepthTexture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
+                DepthTexture2d::empty(display, 4096, 4096)
                     .expect("close_shadow_texture creation error!"),
             far_shadow_texture:
-                DepthTexture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
+                DepthTexture2d::empty(display, 4096, 4096)
                     .expect("far_shadow_texture creation error!"),
             layer_1_texture:
                 Texture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
@@ -240,7 +286,7 @@ pub(crate) struct RenderCamera {
     pub rotation: Vec3,
     pub y_fov_deg: f32,
     pub window_size: (u32, u32),
-    pub render_distance: f32
+    pub render_distance: f32,
 }
 
 impl RenderCamera {
@@ -298,6 +344,16 @@ impl RenderCamera {
         Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, 0.001, self.render_distance)
     }
 
+    pub fn get_projection_matrix_with_max_distance(&self, max_distance: f32) -> Mat4 {
+        let aspect_ratio = self.window_size.0 as f32 / self.window_size.1 as f32;
+        Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, 0.001, max_distance)
+    }
+
+    pub fn get_projection_matrix_with_min_distance(&self, min_distance: f32) -> Mat4 {
+        let aspect_ratio = self.window_size.0 as f32 / self.window_size.1 as f32;
+        Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, min_distance, self.render_distance)
+    }
+
     pub fn new(window_size: (u32, u32)) -> RenderCamera {
         RenderCamera {
             translation: Vec3::ZERO,
@@ -329,23 +385,9 @@ pub(crate) struct RenderObjectData {
     pub(crate) layer: RenderLayer,
     pub(crate) vbo: VertexBuffer<Vertex>,
     pub(crate) ibo: IndexBuffer<u32>,
-    pub(crate) joint_matrices: [[[f32; 4]; 4]; 512],
-    pub(crate) joint_inverse_bind_matrices: [[[f32; 4]; 4]; 512],
+    pub(crate) joint_matrices: [[[f32; 4]; 4]; 128],
+    pub(crate) joint_inverse_bind_matrices: [[[f32; 4]; 4]; 128],
     pub(crate) instanced_master_name: Option<String>,
-}
-
-impl RenderObjectData {
-    pub fn set_transform(&mut self, transform_matrix: Mat4) {
-        self.transform = transform_matrix;
-    }
-
-    pub fn add_uniform(&mut self, uniform_name: String, uniform_value: RenderUniformValue) {
-        self.uniforms.insert(uniform_name, uniform_value);
-    }
-
-    pub fn remove_uniform(&mut self, uniform_name: String) {
-        self.uniforms.remove(&uniform_name);
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -364,6 +406,90 @@ pub(crate) enum RenderUniformValue {
 
 #[derive(Debug)]
 pub(crate) enum RenderShader {
-    NotLinked(ShaderAsset),
+    NotLinked,
     Program(Program)
+}
+
+#[derive(Debug)]
+pub(crate) struct RenderShadowCamera {
+    pub(crate) close_shadow_proj: Mat4,
+    pub(crate) close_shadow_view: Mat4,
+    pub(crate) far_shadow_proj: Mat4,
+    pub(crate) far_shadow_view: Mat4,
+}
+
+impl RenderShadowCamera {
+    pub(crate) fn new(camera: &RenderCamera, light_dir: Vec3) -> RenderShadowCamera {
+        let view = camera.get_view_matrix();
+        let close_corners = Self::get_frustum_corners_world_space(
+            camera.get_projection_matrix_with_max_distance(100.0), view);
+        let far_corners = Self::get_frustum_corners_world_space(
+            camera.get_projection_matrix_with_min_distance(100.0), view);
+
+        let close_shadow_proj = Self::shadow_proj(&close_corners);
+        let far_shadow_proj = Self::shadow_proj(&far_corners);
+        let close_shadow_view = Self::shadow_view(light_dir, &close_corners);
+        let far_shadow_view = Self::shadow_view(light_dir, &far_corners);
+
+        RenderShadowCamera {
+            close_shadow_proj,
+            close_shadow_view,
+            far_shadow_proj,
+            far_shadow_view,
+        }
+    }
+
+    // from https://learnopengl.com/Guest-Articles/2021/CSM
+    fn get_frustum_corners_world_space(proj: Mat4, view: Mat4) -> Vec<Vec4> {
+        let inv = (proj * view).inverse();
+
+        let mut corners: Vec<Vec4> = Vec::new();
+        for x in 0..2 {
+            for y in 0..2 {
+                for z in 0..2 {
+                    let pt: Vec4 = inv * Vec4::new(
+                        2.0 * x as f32 - 1.0,
+                        2.0 * y as f32 - 1.0,
+                        2.0 * z as f32 - 1.0,
+                        1.0
+                    );
+                    corners.push(pt / pt.w);
+                }
+            }
+        }
+
+        corners
+    }
+
+    fn shadow_view(light_dir: Vec3, corners: &Vec<Vec4>) -> Mat4 {
+        let mut center = Vec3::ZERO;
+        for corner in corners {
+            center += Vec3::new(corner.x, corner.y, corner.z);
+        }
+        center /= Vec3::new(corners.len() as f32, corners.len() as f32, corners.len() as f32);
+
+        Mat4::look_at_rh(center + Vec3::new(0.0, 40.0, 0.0) + light_dir, center, Vec3::Y)
+    }
+
+    fn shadow_proj(corners: &Vec<Vec4>) -> Mat4 {
+        let mut center = Vec3::ZERO;
+        let mut min_x = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut min_y = f32::MAX;
+        let mut max_y = f32::MIN;
+        let mut min_z = f32::MAX;
+        let mut max_z = f32::MIN;
+        for corner in corners {
+            center += Vec3::new(corner.x, corner.y, corner.z);
+            if corner.x < min_x { min_x = corner.x }
+            else if corner.x > max_x { max_x = corner.x }
+            if corner.y < min_y { min_y = corner.y }
+            else if corner.y > max_y { max_y = corner.y }
+            if corner.z < min_z { min_z = corner.z }
+            else if corner.z > max_z { max_z = corner.z }
+        }
+        center /= Vec3::new(corners.len() as f32, corners.len() as f32, corners.len() as f32);
+
+        Mat4::orthographic_rh_gl(min_x, max_x, min_y - 50.0, max_y + 50.0, min_z, max_z)
+    }
 }
