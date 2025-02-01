@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    framework::{self, Framework},
+    framework::Framework,
     managers::{
         self,
         assets::AssetManager,
@@ -25,6 +25,7 @@ pub mod navmesh;
 pub mod ray;
 pub mod sound_emitter;
 pub mod trigger;
+pub mod point_light;
 
 static mut LAST_OBJECT_ID: u128 = 0;
 

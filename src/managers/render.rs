@@ -35,9 +35,11 @@ pub(crate) struct RenderManager {
     pub(crate) framebuffer_vbo: VertexBuffer<Vertex>,
     pub(crate) framebuffer_program: Program,
     pub(crate) instanced_positions: HashMap<String, Vec<Mat4>>,
-    pub(crate) directional_light_dir: Vec3,
     pub(crate) shadow_map_shader: Program,
     pub(crate) instanced_shadow_map_shader: Program,
+    pub(crate) lights: Vec<RenderPointLight>,
+    pub(crate) directional_light_dir: Vec3,
+    pub(crate) directional_light_strength: f32
 }
 
 impl RenderManager {
@@ -111,9 +113,11 @@ impl RenderManager {
             framebuffer_vbo,
             framebuffer_program,
             instanced_positions: HashMap::new(),
-            directional_light_dir: Vec3::new(0.5, 0.0, 0.0),
             shadow_map_shader,
             instanced_shadow_map_shader,
+            lights: Vec::new(),
+            directional_light_dir: Vec3::new(0.5, -0.5, 0.0),
+            directional_light_strength: 0.8,
         }
     }
 
@@ -170,7 +174,10 @@ impl RenderManager {
             &self.objects,
             &self.camera,
             assets,
-            &self.display
+            &self.display,
+            &self.lights,
+            self.directional_light_dir,
+            self.directional_light_strength
         );
 
         self.render_framebuffer_plane(&mut frame);
@@ -181,6 +188,7 @@ impl RenderManager {
         frame.finish().expect("Frame finish failed! - RenderManager(render_scene)");
 
         self.instanced_positions.clear();
+        self.lights.clear();
     }
 
     pub fn render_framebuffer_plane(&self, frame: &mut Frame) {
@@ -278,6 +286,15 @@ impl RenderManager {
 
     pub fn camera_left(&self) -> Vec3 {
         self.camera.left()
+    }
+
+    pub fn add_light(&mut self, light: RenderPointLight) {
+        self.lights.push(light);
+    }
+
+    pub fn set_light(&mut self, direction: Vec3, strength: f32) {
+        self.directional_light_strength = strength;
+        self.directional_light_dir = direction;
     }
 }
 
@@ -409,6 +426,10 @@ pub(crate) enum RenderShader {
     NotLinked,
     Program(Program)
 }
+
+/// 0 is position, 1 is color
+#[derive(Debug)]
+pub(crate) struct RenderPointLight(pub Vec3, pub Vec3);
 
 #[derive(Debug)]
 pub(crate) struct RenderShadowCamera {

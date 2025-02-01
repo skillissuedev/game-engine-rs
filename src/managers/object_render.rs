@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 
-use glam::Mat4;
+use glam::{Mat4, Vec3};
 use glium::{draw_parameters, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Program, Surface};
 
 use crate::managers::render::RenderLayer;
 
-use super::{assets::AssetManager, render::{Instance, RenderCamera, RenderObjectData, RenderShadowCamera}};
+use super::{assets::AssetManager, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera}};
 
-pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
-        shadow_camera: RenderShadowCamera, objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>, display: &Display<WindowSurface>,
-        program: &Program, instanced_program: &Program) {
+pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer,
+        instanced_positions: &HashMap<String, Vec<Mat4>>, shadow_camera: RenderShadowCamera,
+        objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>, display: &Display<WindowSurface>, program: &Program,
+        instanced_program: &Program) {
 
     for (_, render_objects_list) in objects_list {
         for (_, render_node) in render_objects_list {
@@ -115,7 +116,7 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
 
 pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
     close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>,
-    camera: &RenderCamera, assets: &AssetManager, display: &Display<WindowSurface>) {
+    camera: &RenderCamera, assets: &AssetManager, display: &Display<WindowSurface>, lights: &Vec<RenderPointLight>, light_direction: Vec3, light_strength: f32) {
     // we'll let the model object set the transformations of every node of the asset
 
     let mut distance_objects: Vec<(f32, &RenderObjectData)> = Vec::new();
@@ -135,6 +136,20 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
         }
     }
 
+    let mut point_lights = [[0.0, 0.0, 0.0]; 64];
+    let mut point_lights_strenghts = [[0.0, 0.0, 0.0]; 64];
+
+    let mut point_lights_idx: usize = 0;
+    for light in lights {
+        point_lights[point_lights_idx] = light.0.to_array();
+        point_lights_strenghts[point_lights_idx] = light.1.to_array();
+        point_lights_idx += 1;
+    }
+    let point_lights = UniformBuffer::new(display, point_lights)
+        .expect("UniformBuffer::new() failed (point_lights) - object_render.rs");
+    let point_lights_strenghts = UniformBuffer::new(display, point_lights_strenghts)
+        .expect("UniformBuffer::new() failed (point_lights_strenghts) - object_render.rs");
+
     // Sort objects by distance
     quicksort(&mut distance_objects);
     quicksort(&mut transparent_distance_objects);
@@ -145,18 +160,21 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
-        &distance_objects, assets, display, view_matrix, proj_matrix, false
+        &distance_objects, assets, display, view_matrix, proj_matrix, false, &point_lights,
+        &point_lights_strenghts, light_direction, light_strength
     );
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
-        &transparent_distance_objects, assets, display, view_matrix, proj_matrix, true
+        &transparent_distance_objects, assets, display, view_matrix, proj_matrix, true, &point_lights,
+        &point_lights_strenghts, light_direction, light_strength
     );
 }
 
 fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
     close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, distance_objects: &Vec<(f32, &RenderObjectData)>,
-    assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], transparent: bool) {
+    assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], transparent: bool,
+    point_lights: &UniformBuffer<[[f32; 3]; 64]>, point_lights_colors: &UniformBuffer<[[f32; 3]; 64]>, light_direction: Vec3, light_strength: f32) {
     for (_, render_object) in distance_objects {
         // Render it!
         let shader = match &render_object.shader {
@@ -207,13 +225,16 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
         let uniforms = uniform! {
             view: view_matrix,
             proj: proj_matrix,
-            //model: render_object.transform.to_cols_array_2d(),
             model_object: render_object.model_object_transform.to_cols_array_2d(),
             tex: Sampler(&texture_asset.texture, texture_sampler_behavior),
             joint_matrices: &joints,
             inverse_bind_matrices: &inverse_bind_matrices,
             close_shadow_tex: Sampler(close_shadow_texture, texture_sampler_behavior),
             far_shadow_tex: Sampler(far_shadow_texture, texture_sampler_behavior),
+            point_lights: point_lights,
+            point_lights_colors: point_lights_colors,
+            light_direction: light_direction.to_array(),
+            light_strength: light_strength,
         };
 
 
