@@ -1,6 +1,6 @@
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
-use crate::objects::{model_object::ModelObject, Object};
+use crate::objects::{point_light::PointLight, Object};
 
 use super::System;
 
@@ -10,9 +10,15 @@ pub struct MainSystem {
 
 impl System for MainSystem {
     fn client_start(&mut self, framework: &mut crate::framework::Framework) {
-        self.objects[0].set_position(framework, Vec3::new(0.0, 0.0, -10.0), true);
-        self.objects[1].set_position(framework, Vec3::new(0.0, 0.0, -50.0), true);
-        self.objects[2].set_position(framework, Vec3::new(4.0, 0.0, -20.0), true);
+        let mut object = PointLight::new("light", Vec3::new(1.0, 0.0, 0.0), Vec2::new(0.01, 0.002));
+        object.set_position(framework, Vec3::new(-2.0, 15.0, 0.0), false);
+        self.add_object(Box::new(object));
+        let mut object = PointLight::new("light1", Vec3::new(0.0, 1.0, 1.0), Vec2::new(0.01, 0.002));
+        object.set_position(framework, Vec3::new(-60.0, 7.0, 0.0), false);
+        self.add_object(Box::new(object));
+        let mut object = PointLight::new("light2", Vec3::new(0.9, 0.9, 0.9), Vec2::new(0.01, 0.002));
+        object.set_position(framework, Vec3::new(-30.0, 7.0, 0.0), false);
+        self.add_object(Box::new(object));
     }
 
     fn server_start(&mut self, framework: &mut crate::framework::Framework) {

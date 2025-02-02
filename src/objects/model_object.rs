@@ -3,13 +3,14 @@ use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::{deg_to_rad, deg_vec_to_rad}};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
 
 #[derive(Debug)]
 pub struct CurrentAnimationData {
     pub animation_name: String,
     pub animation_timer: Instant,
     pub looping: bool,
+    pub current_animation_frame: f32
 }
 
 #[derive(Debug)]
@@ -242,7 +243,7 @@ impl ModelObject {
                 ibo,
                 model_object_transform,
                 instanced_master_name: None,
-                // gotta do 'em after setting all transforms
+                // gotta set 'em after setting all transforms
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
             };
@@ -270,11 +271,15 @@ impl ModelObject {
         if let Some(animation_data) = &self.animation_data {
             if let Some(animation) = animations.get(&animation_data.animation_name) {
                 if let Some(channel) = animation.channels.get(&node_id) {
-                    let animation_time = animation_data.animation_timer.elapsed().as_secs_f32();
+                    let animation_time = animation_data.current_animation_frame;
 
+                    dbg!(animation_time);
                     // OH NO-
                     let translation = Vec3::new(
-                        channel.translation_x.sample(animation_time).unwrap_or_default(),
+                        channel.translation_x.sample(animation_time).unwrap_or_else(|| {
+                            println!("default!!!");
+                            Default::default()
+                        }),
                         channel.translation_y.sample(animation_time).unwrap_or_default(),
                         channel.translation_z.sample(animation_time).unwrap_or_default(),
                     );
@@ -307,6 +312,7 @@ impl ModelObject {
 
         let transform = node.default_transform * parent_transform;
         self.objects_global_transforms.insert(node_id, transform);
+        dbg!(transform);
 
         for (child_id, child) in &node.children {
             self.update_children_transforms(animations, *child_id, child, Some(transform));
@@ -324,11 +330,13 @@ impl ModelObject {
                         if let Some(last_key) = channel.translation_x.keys().last() {
                             if last_key.t > animation_len {
                                 animation_len = last_key.t;
+                                dbg!(animation_len);
                             }
                         }
                     }
 
                     let timer = animation_data.animation_timer.elapsed().as_secs_f32();
+                    animation_data.current_animation_frame = timer;
                     if timer > animation_len {
                         if animation_data.looping == false {
                             should_stop = true;
@@ -402,6 +410,7 @@ impl ModelObject {
             animation_name,
             animation_timer: Instant::now(),
             looping,
+            current_animation_frame: 0.0
         });
     }
 

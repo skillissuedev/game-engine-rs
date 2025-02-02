@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use egui_glium::EguiGlium;
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec2, Vec3, Vec4};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 
 use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
@@ -117,7 +117,7 @@ impl RenderManager {
             instanced_shadow_map_shader,
             lights: Vec::new(),
             directional_light_dir: Vec3::new(0.5, -0.5, 0.0),
-            directional_light_strength: 0.8,
+            directional_light_strength: 0.7,
         }
     }
 
@@ -325,13 +325,7 @@ impl RenderCamera {
             z: -front_row.z,
         }.normalize();
 
-        let up = Vec3 {
-            x: up_row.x,
-            y: up_row.y,
-            z: up_row.z,
-        }.normalize();
-
-        Mat4::look_at_rh(self.translation, self.translation + front, up)
+        Mat4::look_at_rh(self.translation, self.translation + front, Vec3::Y)
     }
 
     pub fn front(&self) -> Vec3 {
@@ -427,9 +421,9 @@ pub(crate) enum RenderShader {
     Program(Program)
 }
 
-/// 0 is position, 1 is color
-#[derive(Debug)]
-pub(crate) struct RenderPointLight(pub Vec3, pub Vec3);
+/// 0 is position, 1 is color, 2 is attenuation
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct RenderPointLight(pub Vec3, pub Vec3, pub Vec2);
 
 #[derive(Debug)]
 pub(crate) struct RenderShadowCamera {

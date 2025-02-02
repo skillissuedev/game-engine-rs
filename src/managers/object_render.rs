@@ -136,19 +136,22 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
         }
     }
 
-    let mut point_lights = [[0.0, 0.0, 0.0]; 64];
-    let mut point_lights_strenghts = [[0.0, 0.0, 0.0]; 64];
+    let mut point_lights = [(0.0, 0.0, 0.0, 0.0); 128];
+    let mut point_lights_colors = [(0.0, 0.0, 0.0, 0.0); 128];
+    let mut point_lights_attenuation = [(0.0, 0.0); 128];
 
-    let mut point_lights_idx: usize = 0;
-    for light in lights {
-        point_lights[point_lights_idx] = light.0.to_array();
-        point_lights_strenghts[point_lights_idx] = light.1.to_array();
-        point_lights_idx += 1;
+    for (light_idx, light) in lights.iter().enumerate() {
+        point_lights[light_idx] = (light.0.x, light.0.y, light.0.z, 1.0);
+        point_lights_colors[light_idx] = (light.1.x, light.1.y, light.1.z, 1.0);
+        point_lights_attenuation[light_idx] = light.2.into();
     }
+
     let point_lights = UniformBuffer::new(display, point_lights)
         .expect("UniformBuffer::new() failed (point_lights) - object_render.rs");
-    let point_lights_strenghts = UniformBuffer::new(display, point_lights_strenghts)
-        .expect("UniformBuffer::new() failed (point_lights_strenghts) - object_render.rs");
+    let point_lights_colors = UniformBuffer::new(display, point_lights_colors)
+        .expect("UniformBuffer::new() failed (point_lights_colors) - object_render.rs");
+    let point_lights_attenuation = UniformBuffer::new(display, point_lights_attenuation)
+        .expect("UniformBuffer::new() failed (point_lights_attenuation) - object_render.rs");
 
     // Sort objects by distance
     quicksort(&mut distance_objects);
@@ -161,20 +164,21 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
         &distance_objects, assets, display, view_matrix, proj_matrix, false, &point_lights,
-        &point_lights_strenghts, light_direction, light_strength
+        &point_lights_colors, &point_lights_attenuation, light_direction, light_strength
     );
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
         &transparent_distance_objects, assets, display, view_matrix, proj_matrix, true, &point_lights,
-        &point_lights_strenghts, light_direction, light_strength
+        &point_lights_colors, &point_lights_attenuation, light_direction, light_strength
     );
 }
 
 fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
-    close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, distance_objects: &Vec<(f32, &RenderObjectData)>,
-    assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], transparent: bool,
-    point_lights: &UniformBuffer<[[f32; 3]; 64]>, point_lights_colors: &UniformBuffer<[[f32; 3]; 64]>, light_direction: Vec3, light_strength: f32) {
+        close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, distance_objects: &Vec<(f32, &RenderObjectData)>,
+        assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], transparent: bool,
+        point_lights: &UniformBuffer<[(f32, f32, f32, f32); 128]>, point_lights_colors: &UniformBuffer<[(f32, f32, f32, f32); 128]>,
+        point_lights_attenuation: &UniformBuffer<[(f32, f32); 128]>, light_direction: Vec3, light_strength: f32) {
     for (_, render_object) in distance_objects {
         // Render it!
         let shader = match &render_object.shader {
@@ -233,6 +237,7 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
             far_shadow_tex: Sampler(far_shadow_texture, texture_sampler_behavior),
             point_lights: point_lights,
             point_lights_colors: point_lights_colors,
+            point_lights_attenuation: point_lights_attenuation,
             light_direction: light_direction.to_array(),
             light_strength: light_strength,
         };

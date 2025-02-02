@@ -262,7 +262,7 @@ impl MasterInstancedModelObject {
             if let Some(animation) = animations.get(&animation_data.animation_name) {
                 if let Some(channel) = animation.channels.get(&node_id) {
                     //dbg!(&channel);
-                    let animation_time = animation_data.animation_timer.elapsed().as_secs_f32();
+                    let animation_time = animation_data.current_animation_frame;
                     //dbg!(animation_time);
 
                     // OH NO-
@@ -320,6 +320,7 @@ impl MasterInstancedModelObject {
                     }
 
                     let timer = animation_data.animation_timer.elapsed().as_secs_f32();
+                    animation_data.current_animation_frame = timer;
                     if timer > animation_len {
                         if animation_data.looping == false {
                             should_stop = true;
@@ -393,6 +394,7 @@ impl MasterInstancedModelObject {
             animation_name,
             animation_timer: Instant::now(),
             looping,
+            current_animation_frame: 0.0,
         });
     }
 

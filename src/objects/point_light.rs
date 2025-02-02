@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use egui_glium::egui_winit::egui;
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{framework::Framework, managers::{physics::ObjectBodyParameters, render::RenderPointLight}};
 
@@ -15,10 +15,11 @@ pub struct PointLight {
     groups: Vec<ObjectGroup>,
     object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>,
     color: Vec3,
+    attenuation: Vec2,
 }
 
 impl PointLight {
-    pub fn new(name: &str, color: Vec3) -> Self {
+    pub fn new(name: &str, color: Vec3, attenuation: Vec2) -> Self {
         PointLight {
             transform: Transform::default(),
             children: vec![],
@@ -29,6 +30,7 @@ impl PointLight {
             groups: vec![],
             object_properties: HashMap::new(),
             color,
+            attenuation,
         }
     }
 }
@@ -36,9 +38,15 @@ impl PointLight {
 impl Object for PointLight {
     fn start(&mut self) {}
 
-    fn update(&mut self, framework: &mut Framework) {
+    fn update(&mut self, _: &mut Framework) {}
+
+    fn render(&mut self, framework: &mut Framework) {
         if let Some(render) = framework.render.as_mut() {
-            render.add_light(RenderPointLight(self.global_transform().position, self.color));
+            println!("{}", self.name());
+            let light = RenderPointLight(
+                self.global_transform().position, self.color, self.attenuation
+            );
+            render.lights.push(light);
         }
     }
 
@@ -119,5 +127,13 @@ impl PointLight {
 
     pub fn color(&mut self) -> Vec3 {
         self.color
+    }
+
+    pub fn set_attenuation(&mut self, attenuation: Vec2) {
+        self.attenuation = attenuation
+    }
+
+    pub fn attenuation(&mut self) -> Vec2 {
+        self.attenuation
     }
 }
