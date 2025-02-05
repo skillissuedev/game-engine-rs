@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{draw_parameters, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Program, Surface};
+use glium::{draw_parameters::{self, PolygonOffset}, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Program, Surface};
 
 use crate::managers::render::RenderLayer;
 
-use super::{assets::AssetManager, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera}};
+use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera}};
 
 pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer,
-        instanced_positions: &HashMap<String, Vec<Mat4>>, shadow_camera: RenderShadowCamera,
+        instanced_positions: &HashMap<String, Vec<Mat4>>, shadow_camera: &RenderShadowCamera,
         objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>, display: &Display<WindowSurface>, program: &Program,
         instanced_program: &Program) {
 
@@ -39,8 +39,15 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
             write: true,
             ..Default::default()
         },
-        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
         polygon_mode: glium::draw_parameters::PolygonMode::Fill,
+        /*polygon_offset: PolygonOffset {
+            factor: 1.0,
+            units: 0.4,
+            point: true,
+            line: true,
+            fill: true,
+        },*/
         ..Default::default()
     };
 
@@ -116,7 +123,8 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
 
 pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
     close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>,
-    camera: &RenderCamera, assets: &AssetManager, display: &Display<WindowSurface>, lights: &Vec<RenderPointLight>, light_direction: Vec3, light_strength: f32) {
+    camera: &RenderCamera, shadow_camera: &RenderShadowCamera, assets: &AssetManager, display: &Display<WindowSurface>, lights: &Vec<RenderPointLight>,
+    light_direction: Vec3, light_strength: f32) {
     // we'll let the model object set the transformations of every node of the asset
 
     let mut distance_objects: Vec<(f32, &RenderObjectData)> = Vec::new();
@@ -136,11 +144,15 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
         }
     }
 
-    let mut point_lights = [(0.0, 0.0, 0.0, 0.0); 128];
-    let mut point_lights_colors = [(0.0, 0.0, 0.0, 0.0); 128];
-    let mut point_lights_attenuation = [(0.0, 0.0); 128];
+    let mut point_lights = [(0.0, 0.0, 0.0, 0.0); 64];
+    let mut point_lights_colors = [(0.0, 0.0, 0.0, 0.0); 64];
+    let mut point_lights_attenuation = [(0.0, 0.0); 64];
 
     for (light_idx, light) in lights.iter().enumerate() {
+        if light_idx > 63 {
+            debugger::warn("object_render: max amounth of point lights is 64");
+            break
+        }
         point_lights[light_idx] = (light.0.x, light.0.y, light.0.z, 1.0);
         point_lights_colors[light_idx] = (light.1.x, light.1.y, light.1.z, 1.0);
         point_lights_attenuation[light_idx] = light.2.into();
@@ -160,25 +172,35 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
 
     let view_matrix = camera.get_view_matrix().to_cols_array_2d();
     let proj_matrix = camera.get_projection_matrix().to_cols_array_2d();
+    let camera_position = camera.translation.to_array();
+
+    let close_shadow_viewproj =
+        (shadow_camera.close_shadow_proj * shadow_camera.close_shadow_view).to_cols_array_2d();
+    let far_shadow_viewproj =
+        (shadow_camera.far_shadow_proj * shadow_camera.far_shadow_view).to_cols_array_2d();
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
-        &distance_objects, assets, display, view_matrix, proj_matrix, false, &point_lights,
+        &distance_objects, assets, display, view_matrix, proj_matrix, camera_position,
+        false, close_shadow_viewproj, far_shadow_viewproj, &point_lights,
         &point_lights_colors, &point_lights_attenuation, light_direction, light_strength
     );
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
-        &transparent_distance_objects, assets, display, view_matrix, proj_matrix, true, &point_lights,
+        &transparent_distance_objects, assets, display, view_matrix, proj_matrix, camera_position,
+        true, close_shadow_viewproj, far_shadow_viewproj, &point_lights,
         &point_lights_colors, &point_lights_attenuation, light_direction, light_strength
     );
 }
 
+// that's a lot of arguments...
 fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
         close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, distance_objects: &Vec<(f32, &RenderObjectData)>,
-        assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], transparent: bool,
-        point_lights: &UniformBuffer<[(f32, f32, f32, f32); 128]>, point_lights_colors: &UniformBuffer<[(f32, f32, f32, f32); 128]>,
-        point_lights_attenuation: &UniformBuffer<[(f32, f32); 128]>, light_direction: Vec3, light_strength: f32) {
+        assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], camera_position: [f32; 3],
+        transparent: bool, close_shadow_viewproj: [[f32; 4]; 4], far_shadow_viewproj: [[f32; 4]; 4],
+        point_lights: &UniformBuffer<[(f32, f32, f32, f32); 64]>, point_lights_colors: &UniformBuffer<[(f32, f32, f32, f32); 64]>,
+        point_lights_attenuation: &UniformBuffer<[(f32, f32); 64]>, light_direction: Vec3, light_strength: f32) {
     for (_, render_object) in distance_objects {
         // Render it!
         let shader = match &render_object.shader {
@@ -233,15 +255,17 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
             tex: Sampler(&texture_asset.texture, texture_sampler_behavior),
             joint_matrices: &joints,
             inverse_bind_matrices: &inverse_bind_matrices,
-            close_shadow_tex: Sampler(close_shadow_texture, texture_sampler_behavior),
-            far_shadow_tex: Sampler(far_shadow_texture, texture_sampler_behavior),
+            close_shadow_tex: close_shadow_texture,
+            far_shadow_tex: far_shadow_texture,
             point_lights: point_lights,
             point_lights_colors: point_lights_colors,
             point_lights_attenuation: point_lights_attenuation,
             light_direction: light_direction.to_array(),
             light_strength: light_strength,
+            close_shadow_viewproj: close_shadow_viewproj,
+            far_shadow_viewproj: far_shadow_viewproj,
+            camera_position: camera_position,
         };
-
 
         match &render_object.instanced_master_name {
             Some(master_name) => {

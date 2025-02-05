@@ -273,7 +273,6 @@ impl ModelObject {
                 if let Some(channel) = animation.channels.get(&node_id) {
                     let animation_time = animation_data.current_animation_frame;
 
-                    dbg!(animation_time);
                     // OH NO-
                     let translation = Vec3::new(
                         channel.translation_x.sample(animation_time).unwrap_or_else(|| {
@@ -312,7 +311,6 @@ impl ModelObject {
 
         let transform = node.default_transform * parent_transform;
         self.objects_global_transforms.insert(node_id, transform);
-        dbg!(transform);
 
         for (child_id, child) in &node.children {
             self.update_children_transforms(animations, *child_id, child, Some(transform));
@@ -330,7 +328,6 @@ impl ModelObject {
                         if let Some(last_key) = channel.translation_x.keys().last() {
                             if last_key.t > animation_len {
                                 animation_len = last_key.t;
-                                dbg!(animation_len);
                             }
                         }
                     }
