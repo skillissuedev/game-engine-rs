@@ -8,6 +8,7 @@ use crate::objects::Object;
 use glam::{Vec2, Vec3};
 use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
+use splines::{Key, Spline};
 use std::{collections::HashMap, fs};
 
 static mut SYSTEMS_LUA_VMS: Lazy<HashMap<String, Lua>> = Lazy::new(|| HashMap::new()); // String is system's id and Lua is it's vm
@@ -2142,6 +2143,40 @@ impl<'lua> FromLuaMulti<'lua> for Framework {
                 })
             },
         }
+    }
+}
+
+pub(crate) struct LuaSpline(pub Spline<f32, f32>);
+/*
+impl<'lua> IntoLua<'lua> for LuaSpline {
+    fn into_lua(self, lua: &'lua Lua) -> mlua::Result<mlua::Value<'lua>> {
+        let table = lua.create_table()?;
+        for key in self.0.keys() {
+            let key_table = lua.create_table()?;
+            key_table.set(1, key.value)?;
+            let interpolation = serde_bare::to_vec(&key.interpolation);
+            match interpolation {
+                Ok(interpolation) => key_table.set(2, interpolation)?,
+                Err(err) => debugger::error(
+                    &format!("LuaSpline into_lua error! Failed to serialize interpolation! Err: {}", err)
+                ),
+            }
+            table.set(key.t, key.value)?;
+        }
+
+        Ok(mlua::Value::Table(table))
+    }
+}*/
+impl UserData for LuaSpline {
+    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {}
+
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("get_value", |_, spline, t: f32| -> Result<Option<f32>, Error> {
+            Ok(match spline.0.sample(t) {
+                Some(v) => Some(v),
+                None => None,
+            })
+        });
     }
 }
 

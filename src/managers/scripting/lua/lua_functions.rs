@@ -6,13 +6,15 @@ use crate::{
         self,
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
-        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::get_framework_pointer, systems::{self, SystemValue}
+        self, debugger::{self, error}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::{get_framework_pointer, LuaSpline}, systems::{self, SystemValue}
     }, math_utils, objects::{
         Object, Transform
     }, systems::System
 };
+use egui_glium::egui_winit::egui::TextBuffer;
 use glam::Vec3;
 use mlua::Lua;
+use splines::Spline;
 
 macro_rules! add_function {
     ($name:literal, $function:expr, $lua:expr, $system_id:expr) => {
@@ -39,12 +41,73 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         let _ = lua.globals().set("current_parent", None::<String>);
 
         // creating some functions
+        // splines
+        let system_id_for_functions = system_id.clone();
+        let new_spline = lua.create_function(move |_,
+                (t, v, interpolation_types, interpolation_values): (Vec<f32>, Vec<f32>, Option<Vec<String>>, Option<Vec<f32>>)| {
+            let mut keys: Vec<splines::Key<f32, f32>> = Vec::new();
+            for (idx, t) in t.iter().enumerate() {
+                let v = v.get(idx);
+                match v {
+                    Some(v) => {
+                        let interpolation = match &interpolation_types {
+                            Some(interpolation) => match interpolation.get(idx) {
+                                Some(interpolation) => match interpolation.to_lowercase().as_str() {
+                                    "linear" => splines::Interpolation::Linear,
+                                    "cosine" => splines::Interpolation::Cosine,
+                                    "catmullrom" => splines::Interpolation::CatmullRom,
+                                    "bezier" => {
+                                        let interpolation_value = match &interpolation_values {
+                                            Some(interpolation_values) => match interpolation_values.get(idx) {
+                                                Some(interpolation_value) => *interpolation_value,
+                                                None => {
+                                                    debugger::warn("new_spline warning! Check the fourth argument (interpolation_values)");
+                                                    println!("lua system id of the spline error above = {}", system_id_for_functions);
+                                                    1.0
+                                                },
+                                            }
+                                            None => {
+                                                debugger::warn("new_spline warning! Check the fourth argument (interpolation_values)");
+                                                println!("lua system id of the spline error above = {}", system_id_for_functions);
+                                                1.0
+                                            },
+                                        };
+                                        splines::Interpolation::Bezier(interpolation_value)
+                                    },
+                                    _ => {
+                                        debugger::warn("new_spline warning! Check the third argument (interpolation_types)");
+                                        println!("lua system id of the spline error above = {}", system_id_for_functions);
+                                        splines::Interpolation::Linear
+                                    },
+                                },
+                                None => {
+                                    debugger::warn("new_spline warning! Check the third argument (interpolation_types)");
+                                    println!("lua system id of the spline error above = {}", system_id_for_functions);
+                                    splines::Interpolation::Linear
+                                },
+                            },
+                            None => splines::Interpolation::Linear,
+                        };
+                        keys.push(splines::Key::new(*t, *v, interpolation))
+                    },
+                    None => {
+                        debugger::error("new_spline failed! Check the second argument (values)");
+                        println!("lua system id of the spline error above = {}", system_id_for_functions);
+                        return Ok(None)
+                    },
+                }
+            };
+            Ok(Some(LuaSpline(Spline::from_vec(keys))))
+        });
+        add_function!("new_spline", new_spline, lua, &system_id);
+
         // setting/crearing current parent
         let system_id_for_functions = system_id.clone();
         let set_current_parent = lua.create_function(move |lua, name: String| {
             if let Err(err) = lua.globals().set("current_parent", Some(name)) {
                 debugger::error(&format!(
-                        "lua error: failed to set current_parent! system: {}\nerr: {:?}",
+                        "lua error: failed to set current_parent! 
+                        system: {}\nerr: {:?}",
                         system_id_for_functions, err
                 ));
             }

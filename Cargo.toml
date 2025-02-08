@@ -8,7 +8,7 @@ colored = "2.0.0"
 image = "0.24.6"
 gltf = { version = "=1.4.1", features = ["extras", "names"] }
 data-url = "0.1.1"
-splines = "4.2.0"
+splines = { version = "4.2.0", features = ["serde"] }
 glam = { version = "0.28", features = ["serde"] }
 serde_bare = "0.5.0"
 serde = { version = "1.0.188", features = ["derive"] }
