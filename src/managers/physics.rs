@@ -599,6 +599,7 @@ pub enum BodyType {
     PositionKinematic(Option<BodyColliderType>),
 }
 
+#[derive(Debug)]
 pub enum BodyColliderType {
     /// f32 is radius,
     Ball(f32),

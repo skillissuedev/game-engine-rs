@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{framework::Framework, managers::physics::ObjectBodyParameters, math_utils::deg_vec_to_rad};
+use crate::{framework::{self, Framework}, managers::physics::ObjectBodyParameters, math_utils::deg_vec_to_rad};
 
 #[derive(Debug)]
 pub struct InstancedModelObject {
@@ -127,5 +127,15 @@ impl Object for InstancedModelObject {
 
     fn object_properties(&self) -> &HashMap<String, Vec<crate::managers::systems::SystemValue>> {
         &self.object_properties
+    }
+}
+
+impl Drop for InstancedModelObject {
+    fn drop(&mut self) {
+        let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
+        let framework = unsafe { &mut *framework_ptr };
+        if let Some(render) = &mut framework.render {
+            render.remove_object(self.object_id());
+        }
     }
 }

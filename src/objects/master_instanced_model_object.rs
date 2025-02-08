@@ -77,7 +77,7 @@ impl Object for MasterInstancedModelObject {
                 self.started = true;
             }
 
-            self.stop_animation_if_needed(asset);
+            self.loop_animation_if_needed(asset);
             self.update_all_object_transforms(asset);
             self.update_all_render_objects(render, asset);
         } else {
@@ -261,29 +261,79 @@ impl MasterInstancedModelObject {
         if let Some(animation_data) = &self.animation_data {
             if let Some(animation) = animations.get(&animation_data.animation_name) {
                 if let Some(channel) = animation.channels.get(&node_id) {
-                    //dbg!(&channel);
                     let animation_time = animation_data.current_animation_frame;
-                    //dbg!(animation_time);
 
                     // OH NO-
                     let translation = Vec3::new(
-                        channel.translation_x.sample(animation_time).unwrap_or_default(),
-                        channel.translation_y.sample(animation_time).unwrap_or_default(),
-                        channel.translation_z.sample(animation_time).unwrap_or_default(),
+                        channel.translation_x.sample(animation_time).unwrap_or_else(|| {
+                            match channel.translation_x.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.translation_y.sample(animation_time).unwrap_or_else(|| {
+                            match channel.translation_y.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.translation_z.sample(animation_time).unwrap_or_else(|| {
+                            match channel.translation_z.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
                     );
                     let rotation = Quat::from_xyzw(
-                        channel.rotation_x.sample(animation_time).unwrap_or_default(),
-                        channel.rotation_y.sample(animation_time).unwrap_or_default(),
-                        channel.rotation_z.sample(animation_time).unwrap_or_default(),
-                        channel.rotation_w.sample(animation_time).unwrap_or_default(),
+                        channel.rotation_x.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_x.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.rotation_y.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_y.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.rotation_z.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_z.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.rotation_w.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_w.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
                     );
                     let scale = Vec3::new(
-                        channel.scale_x.sample(animation_time).unwrap_or_default(),
-                        channel.scale_y.sample(animation_time).unwrap_or_default(),
-                        channel.scale_z.sample(animation_time).unwrap_or_default(),
+                        channel.scale_x.sample(animation_time).unwrap_or_else(|| {
+                            match channel.scale_x.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.scale_y.sample(animation_time).unwrap_or_else(|| {
+                            match channel.scale_y.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.scale_z.sample(animation_time).unwrap_or_else(|| {
+                            match channel.scale_z.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
                     );
 
-                    let local_transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+                    let local_transform = Mat4::from_translation(translation)
+                        * Mat4::from_quat(rotation)
+                        * Mat4::from_scale(scale);
                     let transform = local_transform * parent_transform;
                     self.objects_global_transforms.insert(node_id, transform);
 
@@ -304,9 +354,9 @@ impl MasterInstancedModelObject {
         }
     }
 
-    fn stop_animation_if_needed(&mut self, asset: &ModelAsset) {
-        let mut should_stop = false;
+    fn loop_animation_if_needed(&mut self, asset: &ModelAsset) {
         let mut animation_len = 0.0;
+        let mut should_stop = false;
         if let Some(animation_data) = &mut self.animation_data {
             let animation_name = &animation_data.animation_name;
             match asset.animations.get(animation_name) {
@@ -322,10 +372,10 @@ impl MasterInstancedModelObject {
                     let timer = animation_data.animation_timer.elapsed().as_secs_f32();
                     animation_data.current_animation_frame = timer;
                     if timer > animation_len {
-                        if animation_data.looping == false {
-                            should_stop = true;
-                        } else {
+                        if animation_data.looping {
                             animation_data.animation_timer = Instant::now();
+                        } else {
+                            animation_data.animation_ended = true;
                         }
                     }
                 },
@@ -334,13 +384,12 @@ impl MasterInstancedModelObject {
                     debugger::error(
                         &format!("{}{}",
                             format!("Animation with name '{}' not found in model asset '{}'!", animation_name, asset.path),
-                            "Setting current animation data to None - MasterInstancedModelObject (stop_animation_if_needed)"
+                            "Setting current animation data to None - ModelObject (stop_animation_if_needed)"
                         )
                     )
                 },
             }
         }
-
         if should_stop {
             self.animation_data = None;
         }
@@ -395,6 +444,7 @@ impl MasterInstancedModelObject {
             animation_timer: Instant::now(),
             looping,
             current_animation_frame: 0.0,
+            animation_ended: false,
         });
     }
 
@@ -417,7 +467,13 @@ impl MasterInstancedModelObject {
 
     pub fn current_animation(&self) -> Option<String> {
         match &self.animation_data {
-            Some(animation_data) => Some(animation_data.animation_name.clone()),
+            Some(animation_data) => {
+                if animation_data.animation_ended {
+                    None
+                } else {
+                    Some(animation_data.animation_name.clone())
+                }
+            },
             None => None,
         }
     }

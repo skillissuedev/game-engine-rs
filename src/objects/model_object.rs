@@ -3,14 +3,15 @@ use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::{self, Framework}, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
 
 #[derive(Debug)]
 pub struct CurrentAnimationData {
     pub animation_name: String,
     pub animation_timer: Instant,
     pub looping: bool,
-    pub current_animation_frame: f32
+    pub current_animation_frame: f32,
+    pub animation_ended: bool,
 }
 
 #[derive(Debug)]
@@ -85,7 +86,7 @@ impl Object for ModelObject {
                 self.started = true;
             }
 
-            self.stop_animation_if_needed(asset);
+            self.loop_animation_if_needed(asset);
             self.update_all_object_transforms(asset);
             self.update_all_render_objects(render, asset);
         } else {
@@ -276,22 +277,69 @@ impl ModelObject {
                     // OH NO-
                     let translation = Vec3::new(
                         channel.translation_x.sample(animation_time).unwrap_or_else(|| {
-                            println!("default!!!");
-                            Default::default()
+                            match channel.translation_x.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
                         }),
-                        channel.translation_y.sample(animation_time).unwrap_or_default(),
-                        channel.translation_z.sample(animation_time).unwrap_or_default(),
+                        channel.translation_y.sample(animation_time).unwrap_or_else(|| {
+                            match channel.translation_y.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.translation_z.sample(animation_time).unwrap_or_else(|| {
+                            match channel.translation_z.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
                     );
                     let rotation = Quat::from_xyzw(
-                        channel.rotation_x.sample(animation_time).unwrap_or_default(),
-                        channel.rotation_y.sample(animation_time).unwrap_or_default(),
-                        channel.rotation_z.sample(animation_time).unwrap_or_default(),
-                        channel.rotation_w.sample(animation_time).unwrap_or_default(),
+                        channel.rotation_x.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_x.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.rotation_y.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_y.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.rotation_z.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_z.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.rotation_w.sample(animation_time).unwrap_or_else(|| {
+                            match channel.rotation_w.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
                     );
                     let scale = Vec3::new(
-                        channel.scale_x.sample(animation_time).unwrap_or_default(),
-                        channel.scale_y.sample(animation_time).unwrap_or_default(),
-                        channel.scale_z.sample(animation_time).unwrap_or_default(),
+                        channel.scale_x.sample(animation_time).unwrap_or_else(|| {
+                            match channel.scale_x.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.scale_y.sample(animation_time).unwrap_or_else(|| {
+                            match channel.scale_y.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
+                        channel.scale_z.sample(animation_time).unwrap_or_else(|| {
+                            match channel.scale_z.into_iter().last() {
+                                Some(last) => last.value,
+                                None => f32::default(),
+                            }
+                        }),
                     );
 
                     let local_transform = Mat4::from_translation(translation)
@@ -317,9 +365,9 @@ impl ModelObject {
         }
     }
 
-    fn stop_animation_if_needed(&mut self, asset: &ModelAsset) {
-        let mut should_stop = false;
+    fn loop_animation_if_needed(&mut self, asset: &ModelAsset) {
         let mut animation_len = 0.0;
+        let mut should_stop = false;
         if let Some(animation_data) = &mut self.animation_data {
             let animation_name = &animation_data.animation_name;
             match asset.animations.get(animation_name) {
@@ -335,10 +383,10 @@ impl ModelObject {
                     let timer = animation_data.animation_timer.elapsed().as_secs_f32();
                     animation_data.current_animation_frame = timer;
                     if timer > animation_len {
-                        if animation_data.looping == false {
-                            should_stop = true;
-                        } else {
+                        if animation_data.looping {
                             animation_data.animation_timer = Instant::now();
+                        } else {
+                            animation_data.animation_ended = true;
                         }
                     }
                 },
@@ -353,7 +401,6 @@ impl ModelObject {
                 },
             }
         }
-
         if should_stop {
             self.animation_data = None;
         }
@@ -407,7 +454,8 @@ impl ModelObject {
             animation_name,
             animation_timer: Instant::now(),
             looping,
-            current_animation_frame: 0.0
+            current_animation_frame: 0.0,
+            animation_ended: false,
         });
     }
 
@@ -430,8 +478,24 @@ impl ModelObject {
 
     pub fn current_animation(&self) -> Option<String> {
         match &self.animation_data {
-            Some(animation_data) => Some(animation_data.animation_name.clone()),
+            Some(animation_data) => {
+                if animation_data.animation_ended {
+                    None
+                } else {
+                    Some(animation_data.animation_name.clone())
+                }
+            },
             None => None,
+        }
+    }
+}
+
+impl Drop for ModelObject {
+    fn drop(&mut self) {
+        let framework_ptr: *mut Framework = unsafe { framework::FRAMEWORK_POINTER } as *mut Framework;
+        let framework = unsafe { &mut *framework_ptr };
+        if let Some(render) = &mut framework.render {
+            render.remove_object(self.object_id());
         }
     }
 }

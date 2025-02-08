@@ -47,7 +47,7 @@ pub(crate) struct RenderManager {
 
 impl RenderManager {
     pub fn new(display: Display<WindowSurface>) -> RenderManager {
-        let pixelation_amount = 2.0;
+        let pixelation_amount = 1.2;
         let textures = RenderManagerTextures {
             close_shadow_texture: 
                 DepthTexture2d::empty(&display, 8192, 8192)
@@ -70,7 +70,7 @@ impl RenderManager {
         };
         let camera = RenderCamera::new((1280, 720));
 
-        let directional_light_dir = Vec3::new(0.5, -0.5, 0.0);
+        let directional_light_dir = Vec3::new(0.3, -0.8, 0.0);
         let shadow_camera = RenderShadowCamera::new(&camera, directional_light_dir);
 
         let framebuffer_vbo = VertexBuffer::new(&display, &[
@@ -123,7 +123,7 @@ impl RenderManager {
             instanced_shadow_map_shader,
             lights: Vec::new(),
             directional_light_dir,
-            directional_light_strength: 0.7,
+            directional_light_strength: 0.6,
             update_shadowmap_timer: Instant::now(),
             shadow_camera,
         }
@@ -145,7 +145,7 @@ impl RenderManager {
                 .expect("Failed to create a SimpleFrameBuffer for the 2nd layer (render_scene in render.rs)");
         
         // 1. Cleaning
-        frame.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
+        frame.clear_color_and_depth((0.7, 0.7, 1.0, 1.0), 1.0);
         layer1_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
         layer2_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
 

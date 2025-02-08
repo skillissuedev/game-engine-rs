@@ -203,8 +203,8 @@ pub trait Object: std::fmt::Debug + Downcast {
         transform.position = position;
         self.set_local_transform(transform);
 
-        if let Some(parameters) = self.body_parameters() {
-            if set_rigid_body_position == true {
+        if set_rigid_body_position == true {
+            if let Some(parameters) = self.body_parameters() {
                 framework.physics.set_body_position(parameters, position);
             }
         }
