@@ -1,4 +1,5 @@
 use glam::{Mat4, Vec3};
+use noise::{NoiseFn, Perlin};
 use std::f32::consts::PI;
 
 pub fn rad_to_deg(rad: f32) -> f32 {
@@ -31,4 +32,25 @@ pub fn rotate_vector(direction: Vec3, rotation: Vec3) -> Vec3 {
     let direction = rotation_mat.transform_vector3(direction);
 
     direction
+}
+
+pub struct PerlinNoise {
+    noise: Perlin,
+}
+
+impl PerlinNoise {
+    pub fn new(seed: u32) -> PerlinNoise {
+        let noise = Perlin::new(seed);
+        PerlinNoise {
+            noise
+        }
+    }
+
+    pub fn get_x(&self, coordinate: f32) -> f32 {
+        self.noise.get([coordinate as f64, 1.0]) as f32
+    }
+
+    pub fn get_y(&self, coordinate: f32) -> f32 {
+        self.noise.get([coordinate as f64, 2.0]) as f32
+    }
 }

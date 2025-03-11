@@ -2,7 +2,7 @@ pub mod lua_functions;
 use crate::{
     assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
-    }, math_utils, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
+    }, math_utils::{self, PerlinNoise}, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use glam::{Vec2, Vec3};
@@ -2176,6 +2176,20 @@ impl UserData for LuaSpline {
                 Some(v) => Some(v),
                 None => None,
             })
+        });
+    }
+}
+
+impl UserData for PerlinNoise {
+    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {}
+
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("get_x", |_, noise, coordinate: f32| -> Result<f32, Error> {
+            Ok(noise.get_x(coordinate))
+        });
+
+        methods.add_method("get_y", |_, noise, coordinate: f32| -> Result<f32, Error> {
+            Ok(noise.get_y(coordinate))
         });
     }
 }

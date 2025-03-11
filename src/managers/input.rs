@@ -22,7 +22,7 @@ impl InputManager {
     pub fn new_bind(&mut self, name: &str, input_events: Vec<InputEventType>) {
         match self.binds.get_mut(name) {
             Some(bind_evs) => {
-                debugger::warn("Binds '{}' already exist, adding new key in list");
+                debugger::warn(&format!("Bind '{}' already exist, adding new key in list", name));
                 input_events.iter().for_each(|ev| bind_evs.push(*ev));
             }
             None => {

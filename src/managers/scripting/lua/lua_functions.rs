@@ -7,7 +7,7 @@ use crate::{
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
         self, debugger::{self, error}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::{get_framework_pointer, LuaSpline}, systems::{self, SystemValue}
-    }, math_utils, objects::{
+    }, math_utils::{self, PerlinNoise}, objects::{
         Object, Transform
     }, systems::System
 };
@@ -100,6 +100,13 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             Ok(Some(LuaSpline(Spline::from_vec(keys))))
         });
         add_function!("new_spline", new_spline, lua, &system_id);
+
+        // PerlinNoise
+        let new_perlin_noise = lua.create_function(move |_, seed: u32| {
+            Ok(Some(PerlinNoise::new(seed)))
+        });
+        add_function!("new_perlin_noise", new_perlin_noise, lua, &system_id);
+
 
         // setting/crearing current parent
         let system_id_for_functions = system_id.clone();

@@ -76,8 +76,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         render: Some(RenderManager::new(display)),
         ui: Some(UiManager::default())
     };
-    let display = &framework.render.as_ref().unwrap().display;
-
     framework.set_debug_mode(debug_mode);
 
     framework.navigation.update();
@@ -97,11 +95,11 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
             };
 
             match ev {
+                Event::AboutToWait => window.request_redraw(),
                 Event::DeviceEvent {
                     device_id: _,
                     event,
                 } => framework.input.reg_device_event(&event),
-                Event::AboutToWait => window.request_redraw(),
                 Event::WindowEvent {
                     window_id: _,
                     event,
@@ -142,7 +140,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 });
 
                                 systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
-                                
+
                                 {
                                     let render = framework.render.as_mut().unwrap();
 
@@ -152,36 +150,21 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                         render.camera.front(),
                                     );
 
-                                    //render.prepare_for_shadow_render();
-                                }
-
-                                /*systems::shadow_render(
-                                    framework.render.as_mut().unwrap(),
-                                    &framework.assets,
-                                    &CurrentCascade::Closest,
-                                );
-                                systems::shadow_render(
-                                    framework.render.as_mut().unwrap(),
-                                    &framework.assets,
-                                    &CurrentCascade::Furthest,
-                                );*/
-
-                                {
-                                    let render = framework.render.as_mut().unwrap();
                                     render.render_scene(&framework.assets, &mut egui_glium);
-
-                                    //render.debug_draw();
-                                    //render.finish_render();
                                 }
 
                                 frames_count += 1;
-                            }
+                                framework.input.update();
+                            },
                             WindowEvent::CloseRequested => {
                                 window_target.exit();
                                 networking::disconnect();
                                 return;
                             },
                             WindowEvent::Resized(size) => {
+                                framework.render.as_mut()
+                                    .expect("Failed to resize the Display\nFailed to get the render manager")
+                                    .display.resize(size.into());
                                 framework.resolution =
                                     Vec2::new(size.width as f32, size.height as f32);
                                 framework.render.as_mut().expect("No RenderManager! - Framework (WindowEvent::Resized)")
@@ -206,7 +189,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                 }
                 _ => (),
             }
-
             if let Some(new_fps) = get_fps(&now, &frames_count) {
                 fps = new_fps;
                 window.set_title(&format!("projectbaldej: {fps} fps"));
@@ -262,21 +244,12 @@ pub fn start_game_without_render(args: Args) {
 
 fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.delta_time = delta_time;
-
-    /*if let Some(render) = &mut framework.render {
-        render.update();
-    }*/
     framework.physics.update();
     networking::update(delta_time);
     framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
     framework.navigation.create_grids();
-    /*if let Some(render) = &mut framework.render {
-        render.finish_render();
-    }*/
-
-    framework.input.update();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -319,7 +292,7 @@ pub struct Framework {
     pub physics: PhysicsManager,
     pub saves: SavesManager,
     pub assets: AssetManager,
-    pub render: Option<RenderManager>,
+    pub(crate) render: Option<RenderManager>,
     pub ui: Option<UiManager>,
 }
 
