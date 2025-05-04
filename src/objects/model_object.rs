@@ -3,7 +3,7 @@ use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
-use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::{self, Framework}, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::{self, Framework}, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader, RenderUniformValue}}, math_utils::deg_vec_to_rad};
 
 #[derive(Debug)]
 pub struct CurrentAnimationData {
@@ -33,6 +33,8 @@ pub struct ModelObject {
     error: bool,
     objects_global_transforms: HashMap<usize, Mat4>,
     animation_data: Option<CurrentAnimationData>,
+    uniforms_queue: HashMap<String, RenderUniformValue>,
+    cast_shadows: bool,
 }
 
 impl ModelObject {
@@ -58,6 +60,8 @@ impl ModelObject {
             error: false,
             objects_global_transforms: HashMap::new(),
             animation_data: None,
+            uniforms_queue: HashMap::new(),
+            cast_shadows: true,
         }
     }
 }
@@ -84,6 +88,11 @@ impl Object for ModelObject {
                 let shader_asset = self.shader.clone();
                 self.add_all_objects(assets, render, shader_asset);
                 self.started = true;
+
+                for (uniform_name, uniform) in self.uniforms_queue.clone() {
+                    self.add_uniform_render(render, uniform_name, uniform);
+                }
+                self.uniforms_queue.clear();
             }
 
             self.loop_animation_if_needed(asset);
@@ -247,6 +256,7 @@ impl ModelObject {
                 // gotta set 'em after setting all transforms
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
+                cast_shadows: self.cast_shadows,
             };
 
             objects_list.get_mut(&node_id).expect("add_objects_to_list err").push(render_object_data);
@@ -411,12 +421,12 @@ impl ModelObject {
 
         if let Some(render_object_list) = render.get_object(self.id) {
             for (node_id, node) in &asset.objects {
-                self.update_children_render_objects(render_object_list, *node_id, node, model_object_transform)
+                self.update_children_render_objects(render_object_list, *node_id, node, model_object_transform, self.cast_shadows)
             }
         }
     }
 
-    fn update_children_render_objects(&self, render_object_list: &mut HashMap<usize, Vec<RenderObjectData>>, node_id: usize, node: &ModelAssetObject, model_object_transform: Mat4) {
+    fn update_children_render_objects(&self, render_object_list: &mut HashMap<usize, Vec<RenderObjectData>>, node_id: usize, node: &ModelAssetObject, model_object_transform: Mat4, cast_shadows: bool) {
         if let Some(render_object) = render_object_list.get_mut(&node_id) {
             for (node_data_idx, node_data) in node.render_data.iter().enumerate() {
                 // list of values to change
@@ -437,10 +447,12 @@ impl ModelObject {
                     = self.objects_global_transforms[&node_id];
                 render_object[node_data_idx].model_object_transform
                     = model_object_transform;
+                render_object[node_data_idx].cast_shadows
+                    = cast_shadows;
             }
         }
         for (child_id, child) in &node.children {
-            self.update_children_render_objects(render_object_list, *child_id, child, model_object_transform);
+            self.update_children_render_objects(render_object_list, *child_id, child, model_object_transform, cast_shadows);
         }
     }
 
@@ -462,6 +474,11 @@ impl ModelObject {
     pub fn stop_animation(&mut self) {
         self.animation_data = None;
     }
+
+    pub fn cast_shadows(&mut self, cast: bool) {
+        self.cast_shadows = cast;
+    }
+
 
     pub fn set_looping(&mut self, looping: bool) {
         if let Some(animation_data) = &mut self.animation_data {
@@ -486,6 +503,33 @@ impl ModelObject {
                 }
             },
             None => None,
+        }
+    }
+
+    fn add_uniform_render(&mut self, render: &mut RenderManager, name: String, value: RenderUniformValue) {
+        if let Some(object) = render.get_object(self.id) {
+            for (_, object) in object {
+                for object_data in object {
+                    object_data.uniforms.insert(name.clone(), value.clone());
+                }
+            }
+        }
+    }
+
+    pub(crate) fn add_uniform(&mut self, framework: &mut Framework, name: String, value: RenderUniformValue) {
+        if !self.started {
+            self.uniforms_queue.insert(name, value);
+            return
+        }
+
+        if let Some(render) = &mut framework.render {
+            if let Some(object) = render.get_object(self.id) {
+                for (_, object) in object {
+                    for object_data in object {
+                        object_data.uniforms.insert(name.clone(), value.clone());
+                    }
+                }
+            }
         }
     }
 }

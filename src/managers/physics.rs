@@ -1,12 +1,12 @@
 use super::debugger;
 use crate::{
     assets::model_asset::ModelAsset,
-    math_utils::{deg_to_rad, rad_vec_to_deg},
+    math_utils::{deg_to_rad, deg_vec_to_rad, rad_vec_to_deg},
     objects::Transform,
 };
 use bitmask_enum::bitmask;
 use glam::{Quat, Vec3};
-use nalgebra::Vector3;
+use nalgebra::{Quaternion, Vector3};
 use rapier3d::{
     dynamics::{
         CCDSolver, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointSet,
@@ -148,7 +148,7 @@ impl PhysicsManager {
                 rigid_body = rigid_body_builder
                     .additional_mass(mass)
                     .translation(transform.position.into())
-                    .rotation(transform.rotation.into())
+                    .rotation(deg_vec_to_rad(transform.rotation).into())
                     .user_data(id)
                     .build();
             }
@@ -325,7 +325,6 @@ impl PhysicsManager {
         if let Some(body) = body_parameters.rigid_body_handle {
             match self.rigid_body_set.get(body) {
                 Some(body) => {
-                    dbg!(body.translation());
                     Some((*body.translation()).into())
                 },
                 None => {
@@ -657,7 +656,6 @@ pub fn collider_type_to_collider_builder(
                     break
                 }
             }
-            //dbg!(&positions_nalgebra, &indices);
             collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
         }
     }

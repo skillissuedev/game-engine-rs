@@ -39,11 +39,9 @@ impl TextureAsset {
         let image = image.into_raw();
 
         let image = glium::texture::RawImage2d::from_raw_rgba(image, dimensions);
-        let texture = glium::texture::texture2d::Texture2d::with_format(
+        let texture = glium::texture::texture2d::Texture2d::new(
             &render.display,
             image,
-            UncompressedFloatFormat::F32F32F32,
-            MipmapsOption::NoMipmap,
         )
         .unwrap();
 

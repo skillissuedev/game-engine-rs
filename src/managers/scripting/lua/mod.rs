@@ -1,14 +1,14 @@
 pub mod lua_functions;
 use crate::{
-    assets::model_asset::ModelAsset, framework::{self, DebugMode, Framework}, managers::{
-        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
+    framework::{self, DebugMode, Framework}, managers::{
+        assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, render::RenderUniformValue, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
     }, math_utils::{self, PerlinNoise}, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use glam::{Vec2, Vec3};
 use mlua::{Error, FromLua, FromLuaMulti, Function, IntoLua, Lua, LuaOptions, StdLib, UserData};
 use once_cell::sync::Lazy;
-use splines::{Key, Spline};
+use splines::Spline;
 use std::{collections::HashMap, fs};
 
 static mut SYSTEMS_LUA_VMS: Lazy<HashMap<String, Lua>> = Lazy::new(|| HashMap::new()); // String is system's id and Lua is it's vm
@@ -857,8 +857,36 @@ impl UserData for ObjectHandle {
 
 
         // object-specific methods:
+        methods.add_method("cast_shadows", |_, this, cast: bool| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<ModelObject>() {
+                            Some(object) => {
+                                object.cast_shadows(cast);
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): cast_shadows failed in object: {}. this object is not ModelObject!", 
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: cast_shadows failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: cast_shadows failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
         methods.add_method("play_animation", |_, this, anim_name: String| {
-            let framework = &mut *get_framework_pointer();
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
                     Some(object) => {
@@ -1214,6 +1242,37 @@ impl UserData for ObjectHandle {
             Ok(None)
         });
 
+        methods.add_method("add_uniform", |_, this, (name, value): (String, RenderUniformValue)| {
+            let framework = &mut *get_framework_pointer();
+
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<ModelObject>() {
+                            Some(object) => {
+                                object.add_uniform(framework, name, value);
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): add_uniform failed in object: {}. this object is not ModelObject!",
+                                    this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: add_uniform failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: add_uniform failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
         methods.add_method("play_sound", |_, this, _: ()| {
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
@@ -1562,6 +1621,78 @@ impl<'lua> FromLua<'lua> for SystemValue {
     }
 }
 
+impl<'lua> FromLua<'lua> for RenderUniformValue {
+    fn from_lua(value: mlua::Value<'lua>, lua: &'lua Lua) -> mlua::Result<Self> {
+        match value {
+            mlua::Value::Integer(int) => Ok(RenderUniformValue::Float(int as f32)),
+            mlua::Value::Number(float) => Ok(RenderUniformValue::Float(float as f32)),
+            mlua::Value::Table(table) => {
+                if table.raw_len() == 3 {
+                    let mut vector = [0.0, 0.0, 0.0];
+                    let x: Result<f32, mlua::Error> = table.get(1);
+                    let y: Result<f32, mlua::Error> = table.get(2);
+                    let z: Result<f32, mlua::Error> = table.get(3);
+                    match x {
+                        Ok(x) => vector[0] = x,
+                        Err(_) => {
+                            debugger::error(&("Failed to convert lua table to a RenderUniformValue Vec3!"
+                                    .to_string() + "\nTable's element is NOT a float"));
+                        }
+                    }
+                    match y {
+                        Ok(y) => vector[1] = y,
+                        Err(_) => {
+                            debugger::error(&("Failed to convert lua table to a RenderUniformValue Vec3!"
+                                    .to_string() + "\nTable's element is NOT a float"));
+                        }
+                    }
+                    match z {
+                        Ok(z) => vector[2] = z,
+                        Err(_) => {
+                            debugger::error(&("Failed to convert lua table to a RenderUniformValue Vec3!"
+                                    .to_string() + "\nTable's element is NOT a float"));
+                        }
+                    }
+
+                    Ok(RenderUniformValue::Vec3(vector.into()))
+                } else {
+                    debugger::error(&("Failed to convert lua value to a RenderUniformValue!".to_string()
+                            + "\nTable len should be 3 to convert it to a Vec3"));
+                    Err(mlua::Error::FromLuaConversionError {
+                        from: "Table",
+                        to: "RenderUniformValue",
+                        message: Some(String::from("Avaliable Lua types: int, number and string (texture id), table (Vec3)"))
+                    })
+                }
+            },
+            mlua::Value::String(id) => {
+                let framework = &mut *get_framework_pointer();
+                if let Some(id) = framework.assets.get_texture_asset_id(id.to_str()?) {
+                    Ok(RenderUniformValue::Texture(id))
+                } else {
+                    debugger::error(&("Failed to convert lua value to a RenderUniformValue!".to_string()
+                            + &format!("\nFailed to get a texture with id {}", id.to_str()?)));
+
+                    Err(mlua::Error::FromLuaConversionError {
+                        from: "String",
+                        to: "RenderUniformValue",
+                        message: Some(String::from("Can't find a texture with required ID."))
+                    })
+                }
+            },
+            _ => {
+                debugger::error(&("Failed to convert lua value to a RenderUniformValue!".to_string()
+                        + "\nAvaliable Lua types: int, number and string (texture id), table (Vec3)"));
+                Err(mlua::Error::FromLuaConversionError {
+                    from: "-",
+                    to: "RenderUniformValue",
+                    message: Some(String::from("Avaliable Lua types: int, number and string (texture id)"))
+                })
+            }
+        }
+        
+    }
+}
 impl<'lua> IntoLua<'lua> for SystemValue {
     fn into_lua(self, lua: &'lua mlua::prelude::Lua) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'lua>> {
         match self {

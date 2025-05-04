@@ -86,10 +86,12 @@ pub trait Object: std::fmt::Debug + Downcast {
     fn global_transform(&self) -> Transform {
         let base_transformations = self.local_transform();
         match self.parent_transform() {
-            Some(transform) => Transform {
-                position: base_transformations.position + transform.position,
-                rotation: base_transformations.rotation + transform.rotation,
-                scale: base_transformations.scale + transform.scale,
+            Some(transform) => {
+                Transform {
+                    position: base_transformations.position + transform.position,
+                    rotation: base_transformations.rotation + transform.rotation,
+                    scale: base_transformations.scale + transform.scale,
+                }
             },
             None => base_transformations,
         }

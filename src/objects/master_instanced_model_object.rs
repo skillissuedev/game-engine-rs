@@ -236,6 +236,7 @@ impl MasterInstancedModelObject {
                 // gotta do 'em after setting all transforms
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
+                cast_shadows: true,
             };
 
             objects_list.get_mut(&node_id).expect("add_objects_to_list err").push(render_object_data);

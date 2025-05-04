@@ -363,12 +363,12 @@ impl RenderCamera {
 
     pub fn get_projection_matrix(&self) -> Mat4 {
         let aspect_ratio = self.window_size.0 as f32 / self.window_size.1 as f32;
-        Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, 0.001, self.render_distance)
+        Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, 0.1, self.render_distance)
     }
 
     pub fn get_projection_matrix_with_max_distance(&self, max_distance: f32) -> Mat4 {
         let aspect_ratio = self.window_size.0 as f32 / self.window_size.1 as f32;
-        Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, 0.001, max_distance)
+        Mat4::perspective_rh_gl(deg_to_rad(self.y_fov_deg), aspect_ratio, 0.1, max_distance)
     }
 
     pub fn get_projection_matrix_with_min_distance(&self, min_distance: f32) -> Mat4 {
@@ -410,6 +410,7 @@ pub(crate) struct RenderObjectData {
     pub(crate) joint_matrices: [[[f32; 4]; 4]; 128],
     pub(crate) joint_inverse_bind_matrices: [[[f32; 4]; 4]; 128],
     pub(crate) instanced_master_name: Option<String>,
+    pub(crate) cast_shadows: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -418,7 +419,7 @@ pub enum RenderLayer {
     Layer2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum RenderUniformValue {
     Mat4(Mat4),
     Vec3(Vec3),

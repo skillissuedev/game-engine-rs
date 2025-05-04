@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{draw_parameters::{self, PolygonOffset}, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Program, Surface};
+use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Program, Surface, Texture2d};
 
 use crate::managers::render::RenderLayer;
 
-use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera}};
+use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera, RenderUniformValue}};
 
 pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer,
         instanced_positions: &HashMap<String, Vec<Mat4>>, shadow_camera: &RenderShadowCamera,
@@ -15,7 +15,7 @@ pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, f
     for (_, render_objects_list) in objects_list {
         for (_, render_node) in render_objects_list {
             for render_object in render_node {
-                if !render_object.transparent {
+                if !render_object.transparent && render_object.cast_shadows {
                     shadow_draw_objects(close_framebuffer, far_framebuffer, instanced_positions, &shadow_camera, render_object, display, program, instanced_program);
                 } 
             }
@@ -224,9 +224,10 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
             ..Default::default()
         };
 
-        let joints = UniformBuffer::new(display, render_object.joint_matrices)
+        let joints_buffer = 
+            UniformBuffer::new(display, render_object.joint_matrices)
             .expect("UniformBuffer::new() failed (joints) - object_render.rs");
-        let inverse_bind_matrices =
+        let inverse_bind_matrices_buffer =
             UniformBuffer::new(display, render_object.joint_inverse_bind_matrices)
             .expect("UniformBuffer::new() failed (inverse_bind_matrices) - object_render.rs");
 
@@ -247,25 +248,85 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
 
         let vbo = &render_object.vbo;
         let ibo = &render_object.ibo;
+        let model_object_transform = render_object.model_object_transform.to_cols_array_2d();
+        let texture = Sampler(&texture_asset.texture, texture_sampler_behavior);
+        let light_direction = light_direction.to_array();
 
-        let uniforms = uniform! {
-            view: view_matrix,
-            proj: proj_matrix,
-            model_object: render_object.model_object_transform.to_cols_array_2d(),
-            tex: Sampler(&texture_asset.texture, texture_sampler_behavior),
-            joint_matrices: &joints,
-            inverse_bind_matrices: &inverse_bind_matrices,
+        let joints_buffer = &joints_buffer;
+        let inverse_bind_matrices_buffer = &inverse_bind_matrices_buffer;
+
+        let mut uniforms = dynamic_uniform! {
+            view: &view_matrix,
+            proj: &proj_matrix,
+            model_object: &model_object_transform,
+            tex: &texture,
             close_shadow_tex: close_shadow_texture,
             far_shadow_tex: far_shadow_texture,
-            point_lights: point_lights,
-            point_lights_colors: point_lights_colors,
-            point_lights_attenuation: point_lights_attenuation,
-            light_direction: light_direction.to_array(),
-            light_strength: light_strength,
-            close_shadow_viewproj: close_shadow_viewproj,
-            far_shadow_viewproj: far_shadow_viewproj,
-            camera_position: camera_position,
+            point_lights: &point_lights,
+            point_lights_colors: &point_lights_colors,
+            point_lights_attenuation: &point_lights_attenuation,
+            light_direction: &light_direction,
+            light_strength: &light_strength,
+            joint_matrices: &joints_buffer,
+            inverse_bind_matrices: &inverse_bind_matrices_buffer,
+            close_shadow_viewproj: &close_shadow_viewproj,
+            far_shadow_viewproj: &far_shadow_viewproj,
+            camera_position: &camera_position,
         };
+
+        // uniforms!
+        let mut uniform_matrices: Vec<(String, [[f32; 4]; 4])> = Vec::new();
+        let mut uniform_floats: Vec<(String, f32)> = Vec::new();
+        let mut uniform_vectors: Vec<(String, [f32; 3])> = Vec::new();
+        let mut uniform_textures: Vec<(String, Sampler<Texture2d>)> = Vec::new();
+
+        for (name, object_uniform) in &render_object.uniforms {
+            let name = name.to_string();
+            match object_uniform {
+                RenderUniformValue::Mat4(mat4) =>
+                    uniform_matrices.push((name, mat4.to_cols_array_2d())),
+                RenderUniformValue::Vec3(vec3) => 
+                    uniform_vectors.push((name, vec3.to_array())),
+                RenderUniformValue::Float(float) =>
+                    uniform_floats.push((name, *float)),
+                RenderUniformValue::Texture(texture_asset_id) => {
+                    match &assets.get_texture_asset(texture_asset_id) {
+                        Some(texture) =>
+                            uniform_textures.push(
+                                (
+                                    name,
+                                    Sampler(&texture.texture, texture_sampler_behavior)
+                                )
+                            ),
+                        None =>
+                            debugger::warn(
+                                &format!(
+                                    "Failed to set a uniform value '{}'! Texture asset wan't found",
+                                    texture_asset_id.get_id()
+                                )
+                            ),
+                    }
+                }
+            }
+        }
+
+        for (name, uniform_value) in uniform_matrices.leak() {
+            uniforms.add(name, uniform_value);
+        }
+
+        for (name, uniform_value) in uniform_floats.leak() {
+            uniforms.add(name, uniform_value);
+        }
+
+        for (name, uniform_value) in uniform_textures.leak() {
+            uniforms.add(name, uniform_value);
+        }
+
+        for (name, uniform_value) in uniform_vectors.leak() {
+            uniforms.add(name, uniform_value);
+        }
+
+        // uniforms end here
 
         match &render_object.instanced_master_name {
             Some(master_name) => {
@@ -293,7 +354,8 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
                 }
             },
             None => {
-                let uniforms = uniforms.add("model", render_object.transform.to_cols_array_2d());
+                let model = render_object.transform.to_cols_array_2d();
+                uniforms.add("model", &model);
 
                 match render_object.layer {
                     RenderLayer::Layer1 => layer_1.draw(vbo, ibo, shader, &uniforms, &draw_parameters)
