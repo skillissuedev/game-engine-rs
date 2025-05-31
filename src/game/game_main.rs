@@ -49,6 +49,7 @@ pub fn start(args: Args, framework: &mut Framework) {
     add_system(Box::new(LuaSystem::new("land_placement", "scripts/lua/land_placement.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("interactable_objects", "scripts/lua/interactable_objects.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_item_unlockers", "scripts/lua/vanilla_item_unlockers.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("vanilla_enemies", "scripts/lua/vanilla_enemies.lua").unwrap()), framework);
 }
 
 pub fn update(framework: &mut Framework) {

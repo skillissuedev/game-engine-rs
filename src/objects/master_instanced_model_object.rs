@@ -22,8 +22,9 @@ pub struct MasterInstancedModelObject {
     transparent: bool,
     started: bool,
     error: bool,
-    objects_global_transforms: HashMap<usize, Mat4>,
+    objects_global_transforms: HashMap<String, Mat4>,
     animation_data: Option<CurrentAnimationData>,
+    bone_offsets: HashMap<String, Mat4>,
 }
 
 impl MasterInstancedModelObject {
@@ -49,6 +50,7 @@ impl MasterInstancedModelObject {
             error: false,
             objects_global_transforms: HashMap::new(),
             animation_data: None,
+            bone_offsets: HashMap::new(),
         }
     }
 }
@@ -172,18 +174,16 @@ impl MasterInstancedModelObject {
     }
 
     fn add_all_objects(&mut self, assets: &AssetManager, render: &mut RenderManager, shader: ShaderAsset) {
-        let mut objects_list: HashMap<usize, Vec<RenderObjectData>> = HashMap::new();
+        let mut objects_list: HashMap<String, Vec<RenderObjectData>> = HashMap::new();
         let asset = assets.get_model_asset(&self.model_asset_id);
         if let Some(asset) = asset {
-            for (node_id, node) in &asset.objects {
-                self.add_objects_to_list(&shader, render, *node_id, node, &mut objects_list, None);
-            }
+            self.add_objects_to_list(&shader, render, asset.root.object_name.clone().unwrap_or(String::new()), &asset.root, &mut objects_list, None);
         }
 
         render.add_object(self.id, objects_list);
     }
 
-    fn add_objects_to_list(&mut self, shader_asset: &ShaderAsset, render: &RenderManager, node_id: usize, node: &ModelAssetObject, objects_list: &mut HashMap<usize, Vec<RenderObjectData>>, parent_transform: Option<Mat4>) {
+    fn add_objects_to_list(&mut self, shader_asset: &ShaderAsset, render: &RenderManager, node_id: String, node: &ModelAssetObject, objects_list: &mut HashMap<String, Vec<RenderObjectData>>, parent_transform: Option<Mat4>) {
         let transparent = self.transparent;
         let layer = &self.layer;
 
@@ -192,9 +192,9 @@ impl MasterInstancedModelObject {
             None => Mat4::IDENTITY,
         };
         let transform = parent_transform * node.default_transform;
-        self.objects_global_transforms.insert(node_id, transform);
+        self.objects_global_transforms.insert(node_id.clone(), transform);
         
-        objects_list.insert(node_id, Vec::new());
+        objects_list.insert(node_id.clone(), Vec::new());
         for render_data in &node.render_data {
             let program = Program::from_source(
                 &render.display,
@@ -239,21 +239,23 @@ impl MasterInstancedModelObject {
                 cast_shadows: true,
             };
 
+            for (bone_name, offset) in render_data.bone_offsets.clone() {
+                self.bone_offsets.insert(bone_name, offset);
+            }
+
             objects_list.get_mut(&node_id).expect("add_objects_to_list err").push(render_object_data);
         }
 
         for (child_idx, child) in &node.children {
-            self.add_objects_to_list(shader_asset, render, *child_idx, child, objects_list, Some(transform));
+            self.add_objects_to_list(shader_asset, render, child_idx.to_owned(), child, objects_list, Some(transform));
         }
     }
 
     fn update_all_object_transforms(&mut self, asset: &ModelAsset) {
-        for (node_id, node) in &asset.objects {
-            self.update_children_transforms(&asset.animations, *node_id, node, None)
-        }
+        self.update_children_transforms(&asset.animations, asset.root.object_name.clone().unwrap_or(String::new()), &asset.root, None)
     }
 
-    fn update_children_transforms(&mut self, animations: &HashMap<String, ModelAssetAnimation>, node_id: usize, node: &ModelAssetObject, parent_transform: Option<Mat4>) {
+    fn update_children_transforms(&mut self, animations: &HashMap<String, ModelAssetAnimation>, node_id: String, node: &ModelAssetObject, parent_transform: Option<Mat4>) {
         let parent_transform = match parent_transform {
             Some(parent_transform) => parent_transform,
             None => Mat4::IDENTITY,
@@ -339,7 +341,7 @@ impl MasterInstancedModelObject {
                     self.objects_global_transforms.insert(node_id, transform);
 
                     for (child_id, child) in &node.children {
-                        self.update_children_transforms(animations, *child_id, child, Some(transform));
+                        self.update_children_transforms(animations, child_id.to_owned(), child, Some(transform));
                     }
 
                     return
@@ -351,7 +353,7 @@ impl MasterInstancedModelObject {
         self.objects_global_transforms.insert(node_id, transform);
 
         for (child_id, child) in &node.children {
-            self.update_children_transforms(animations, *child_id, child, Some(transform));
+            self.update_children_transforms(animations, child_id.to_owned(), child, Some(transform));
         }
     }
 
@@ -400,24 +402,23 @@ impl MasterInstancedModelObject {
         let model_object_transform = self.model_object_transform();
 
         if let Some(render_object_list) = render.get_object(self.id) {
-            for (node_id, node) in &asset.objects {
-                self.update_children_render_objects(render_object_list, *node_id, node, model_object_transform)
-            }
+            self.update_children_render_objects(render_object_list, asset.root.object_name.clone().unwrap_or(String::new()), &asset.root, model_object_transform)
         }
     }
 
-    fn update_children_render_objects(&self, render_object_list: &mut HashMap<usize, Vec<RenderObjectData>>, node_id: usize, node: &ModelAssetObject, model_object_transform: Mat4) {
+    fn update_children_render_objects(&self, render_object_list: &mut HashMap<String, Vec<RenderObjectData>>, node_id: String, node: &ModelAssetObject, model_object_transform: Mat4) {
         if let Some(render_object) = render_object_list.get_mut(&node_id) {
             for (node_data_idx, node_data) in node.render_data.iter().enumerate() {
                 // list of values to change
                 let mut joints = [[[0.0, 0.0, 0.0, 0.0]; 4]; 128];
-                let mut joint_inverse_bind_matrices = [[[0.0, 0.0, 0.0, 0.0]; 4]; 128];
-                // + transform, model_object_tranform
+                let joint_inverse_bind_matrices = [[[0.0, 0.0, 0.0, 0.0]; 4]; 128]; // idk if i
+                                                                                    // need to use
+                                                                                    // it anymore..
 
-                for (joint_obj_idx, joint_idx) in &node_data.joint_objects_idx {
-                    let inv_bind_matrix = &node_data.inverse_bind_matrices[joint_obj_idx];
-                    joint_inverse_bind_matrices[*joint_idx] = inv_bind_matrix.to_cols_array_2d();
-                    joints[*joint_idx] = self.objects_global_transforms[joint_obj_idx].to_cols_array_2d();
+                for (joint_idx, node_name) in &node_data.bone_names {
+                    /*let inv_bind_matrix = &node_data.inverse_bind_matrices[joint_obj_idx];
+                    joint_inverse_bind_matrices[*joint_idx] = inv_bind_matrix.to_cols_array_2d();*/
+                    joints[*joint_idx] = (self.objects_global_transforms[node_name] * self.bone_offsets[node_name]).to_cols_array_2d();
                 }
 
                 render_object[node_data_idx].joint_matrices = joints;
@@ -430,7 +431,7 @@ impl MasterInstancedModelObject {
             }
         }
         for (child_id, child) in &node.children {
-            self.update_children_render_objects(render_object_list, *child_id, child, model_object_transform);
+            self.update_children_render_objects(render_object_list, child_id.to_owned(), child, model_object_transform);
         }
     }
 

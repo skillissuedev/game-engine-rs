@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 colored = "2.0.0"
 image = "0.24.6"
-gltf = { version = "=1.4.1", features = ["extras", "names"] }
 data-url = "0.1.1"
 splines = { version = "4.2.0", features = ["serde"] }
 glam = { version = "0.28", features = ["serde"] }
@@ -36,6 +35,7 @@ egui_glium = { git = "https://github.com/skillissuedev/egui_glium", features = [
 glium = { version = "0.35.0", features = ["glutin-winit", "winit"] }
 winit = { version = "0.30.5", features = ["serde"] }
 noise = "0.9.0"
+russimp = { version = "3.2.1", features = ["prebuilt"] }
 
 [profile.dev.package.rapier3d]
 opt-level = 3

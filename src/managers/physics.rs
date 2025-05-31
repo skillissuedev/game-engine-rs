@@ -617,7 +617,7 @@ pub fn collider_type_to_collider_builder(
     membership_groups: CollisionGroups,
     filter_groups: CollisionGroups,
 ) -> ColliderBuilder {
-    let mut collider_builder: ColliderBuilder;
+    let mut collider_builder: ColliderBuilder = ColliderBuilder::cuboid(0.1, 0.1, 0.1);
 
     match collider {
         BodyColliderType::Ball(radius) => collider_builder = ColliderBuilder::ball(radius),
@@ -632,8 +632,9 @@ pub fn collider_type_to_collider_builder(
             let mut indices: Vec<[u32; 3]> = Vec::new();
             let mut temp_indices: Vec<u32> = Vec::new();
             let mut positions_nalgebra: Vec<Point<Real>> = Vec::new();
-            for (_,object) in &asset.objects {
-                for primitive in &object.render_data {
+            // checking if the root has the mesh first, otherwise search it in the children
+            if asset.root.render_data.len() >= 1 {
+                for primitive in &asset.root.render_data {
                     primitive.vertices.iter().for_each(|vert| {
                         positions_nalgebra.push(
                             Vec3::new(
@@ -653,10 +654,37 @@ pub fn collider_type_to_collider_builder(
                             temp_indices.push(*ind as u32);
                         }
                     });
+                    collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
+
                     break
                 }
+            } else {
+                for (_,object) in &asset.root.children {
+                    for primitive in &object.render_data {
+                        primitive.vertices.iter().for_each(|vert| {
+                            positions_nalgebra.push(
+                                Vec3::new(
+                                    vert.position[0],// * 2.0,
+                                    vert.position[1],// * 2.0,
+                                    vert.position[2],// * 2.0,
+                                )
+                                .into(),
+                            )
+                        });
+                        primitive.indices.iter().for_each(|ind| {
+                            if temp_indices.len() < 3 {
+                                temp_indices.push(*ind as u32);
+                            } else {
+                                indices.push([temp_indices[0], temp_indices[1], temp_indices[2]]);
+                                temp_indices.clear();
+                                temp_indices.push(*ind as u32);
+                            }
+                        });
+                        break
+                    }
+                }
+                collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
             }
-            collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
         }
     }
 

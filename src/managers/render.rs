@@ -26,7 +26,7 @@ pub(crate) struct Instance {
 implement_vertex!(Instance, model);
 
 pub(crate) struct RenderManager {
-    pub(crate) objects: HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>,
+    pub(crate) objects: HashMap<u128, HashMap<String, Vec<RenderObjectData>>>,
     pub(crate) window_size: (u32, u32),
     pub(crate) textures: RenderManagerTextures,
     pub(crate) camera: RenderCamera,
@@ -262,13 +262,13 @@ impl RenderManager {
         };
     }
 
-    pub fn add_object(&mut self, object_id: u128, object_data: HashMap<usize, Vec<RenderObjectData>>) {
+    pub fn add_object(&mut self, object_id: u128, object_data: HashMap<String, Vec<RenderObjectData>>) {
         if self.objects.insert(object_id, object_data).is_some() {
             debugger::warn("Engine error! add_object() in render.rs, object is already inserted");
         }
     }
 
-    pub fn get_object(&mut self, object_id: u128) -> Option<&mut HashMap<usize, Vec<RenderObjectData>>> {
+    pub fn get_object(&mut self, object_id: u128) -> Option<&mut HashMap<String, Vec<RenderObjectData>>> {
         self.objects.get_mut(&object_id)
     }
 

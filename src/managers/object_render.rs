@@ -9,7 +9,7 @@ use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, Ren
 
 pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer,
         instanced_positions: &HashMap<String, Vec<Mat4>>, shadow_camera: &RenderShadowCamera,
-        objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>, display: &Display<WindowSurface>, program: &Program,
+        objects_list: &HashMap<u128, HashMap<String, Vec<RenderObjectData>>>, display: &Display<WindowSurface>, program: &Program,
         instanced_program: &Program) {
 
     for (_, render_objects_list) in objects_list {
@@ -122,7 +122,7 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
 }
 
 pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
-    close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, objects_list: &HashMap<u128, HashMap<usize, Vec<RenderObjectData>>>,
+    close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, objects_list: &HashMap<u128, HashMap<String, Vec<RenderObjectData>>>,
     camera: &RenderCamera, shadow_camera: &RenderShadowCamera, assets: &AssetManager, display: &Display<WindowSurface>, lights: &Vec<RenderPointLight>,
     light_direction: Vec3, light_strength: f32) {
     // we'll let the model object set the transformations of every node of the asset
