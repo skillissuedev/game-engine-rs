@@ -7,7 +7,7 @@ use crate::{
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
         self, debugger::{self, error}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::{get_framework_pointer, LuaSpline}, systems::{self, SystemValue}
-    }, math_utils::{self, PerlinNoise}, objects::{
+    }, math_utils::{self, look_at_rotation, PerlinNoise}, objects::{
         Object, Transform
     }, systems::System
 };
@@ -245,6 +245,23 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             }
         );
         add_function!("new_character_controller", new_character_controller, lua, &system_id);
+
+        let vec3_distance =
+            lua.create_function_mut(move |_, (x1, y1, z1, x2, y2, z2):
+            (f32, f32, f32, f32, f32, f32)| {
+                Ok(Vec3::new(x1, y1, z1).distance(Vec3::new(x2, y2, z2)))
+            }
+        );
+        add_function!("vec3_distance", vec3_distance, lua, &system_id);
+
+        let look_at_rotation =
+            lua.create_function_mut(move |_, (x1, y1, z1, x2, y2, z2):
+            (f32, f32, f32, f32, f32, f32)| {
+                let rotation = look_at_rotation(Vec3::new(x1, y1, z1), Vec3::new(x2, y2, z2));
+                Ok(vec![rotation.x, rotation.y, rotation.z])
+            }
+        );
+        add_function!("look_at_rotation", look_at_rotation, lua, &system_id);
 
         let system_id_for_functions = system_id.clone();
         let new_empty_object = 

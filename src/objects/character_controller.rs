@@ -26,7 +26,6 @@ pub struct CharacterController {
     controller: KinematicCharacterController,
     collider: ColliderHandle,
     movement: Option<CharacterControllerMovement>,
-    last_path_point: Option<Vec3>,
     object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>
 }
 
@@ -34,6 +33,8 @@ pub struct CharacterController {
 pub struct CharacterControllerMovement {
     pub target: Vec3,
     pub speed: f32,
+    pub path: Option<Vec<Vec2>>,
+    pub path_point_index: usize,
 }
 
 impl CharacterController {
@@ -88,7 +89,6 @@ impl CharacterController {
             collider: collider_handle,
             id,
             movement: None,
-            last_path_point: None,
             object_properties: HashMap::new()
         }
     }
@@ -98,32 +98,38 @@ impl Object for CharacterController {
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {
-        if let Some(movement) = &self.movement {
-            let pos = self.global_transform().position;
-            let speed = movement.speed;
-            if let Some(next_pos) = self.last_path_point {
-                let direction = self.get_direction(next_pos);
-                self.move_controller(framework, direction * speed);
-                self.last_path_point = None;
-            } else {
-                let target = movement.target;
-                let next_pos = framework
-                    .navigation
-                    .find_next_path_point(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z));
-                match next_pos {
-                    Some(next_pos) => {
-                        let full_pos = Vec3::new(next_pos.x, pos.y, next_pos.y);
-                        let direction = self.get_direction(full_pos);
-                        self.move_controller(framework, direction * speed);
-                        self.last_path_point = Some(full_pos);
-                    }
-                    None => {
-                        //println!("done walking");
-                        self.last_path_point = None;
-                        self.movement = None;
-                    }
+        let mut reset_movement = false;
+        let pos = self.global_transform().position;
+        if let Some(movement) = &mut self.movement {
+            let target = movement.target;
+
+            if let None = movement.path {
+                match framework.navigation.find_path(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z)) {
+                    Some(path) => movement.path = Some(path),
+                    None => reset_movement = true,
                 }
             }
+            if let Some(path) = &movement.path {
+                let speed = movement.speed;
+
+                if path[movement.path_point_index].distance(Vec2::new(pos.x, pos.z)) <= 1.0 {
+                    movement.path_point_index += 1;
+                }
+
+                match path.get(movement.path_point_index) {
+                    Some(point) => {
+                        let pos = Vec3::new(pos.x, 0.0, pos.z);
+                        let direction = Self::get_direction(pos, Vec3::new(point.x, 0.0, point.y));
+                        self.move_controller(framework, direction * speed);
+                    },
+                    None => reset_movement = true,
+                }
+            }
+        }
+
+
+        if reset_movement {
+            self.movement = None;
         }
     }
 
@@ -199,10 +205,8 @@ impl Object for CharacterController {
 }
 
 impl CharacterController {
-    fn get_direction(&self, next_pos: Vec3) -> Vec3 {
-        let global_pos = self.global_transform().position;
-
-        let direction = global_pos - next_pos;
+    fn get_direction(global_position: Vec3, next_pos: Vec3) -> Vec3 {
+        let direction = -(global_position - next_pos);
         let direction = direction.normalize();
 
         direction
@@ -262,8 +266,29 @@ impl CharacterController {
     }
 
     pub fn walk_to(&mut self, target: Vec3, speed: f32) {
-        let movement = CharacterControllerMovement { target, speed };
+        let movement = CharacterControllerMovement { target, speed, path: None, path_point_index: 1 };
         self.movement = Some(movement);
+    }
+
+    pub fn stop_walking(&mut self) {
+        self.movement = None;
+    }
+
+    pub fn next_path_position(&self) -> Option<Vec3> {
+        match &self.movement {
+            Some(movement) => {
+                match &movement.path {
+                    Some(path) => {
+                        match path.get(movement.path_point_index) {
+                            Some(point) => Some(Vec3::new(point.x, 0.0, point.y)),
+                            None => None,
+                        }
+                    },
+                    None => None,
+                }
+            },
+            None => None,
+        }
     }
 }
 

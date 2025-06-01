@@ -1417,6 +1417,65 @@ impl UserData for ObjectHandle {
             Ok(())
         });
 
+        methods.add_method("stop_walking", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<CharacterController>() {
+                            Some(object) => object.stop_walking(),
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): stop_walking failed in object: {}. this object is not CharacterController!",
+                                    this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: stop_walking failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: stop_walking failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("next_path_position", |_, this, _: ()| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<CharacterController>() {
+                            Some(object) => {
+                                return Ok(match object.next_path_position() {
+                                    Some(point) => Some(vec![point.x, point.y, point.z]),
+                                    None => None,
+                                })
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): next_path_position failed in object: {}. this object is not CharacterController!",
+                                    this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: next_path_position failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(&format!(
+                        "lua error: next_path_position failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                )),
+            }
+
+            Ok(None)
+        });
+
         methods.add_method("set_object_properties", |_, this, properties: HashMap<String, Vec<SystemValue>>| {
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {

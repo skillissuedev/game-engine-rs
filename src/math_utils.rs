@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec3};
+use glam::{Mat3, Mat4, Quat, Vec3};
 use noise::{NoiseFn, Perlin};
 use std::f32::consts::PI;
 
@@ -25,6 +25,7 @@ pub fn rad_vec_to_deg(rad_vec: Vec3) -> Vec3 {
 
     Vec3::new(x, y, z)
 }
+
 pub fn rotate_vector(direction: Vec3, rotation: Vec3) -> Vec3 {
     let global_rotation = deg_vec_to_rad(rotation);
     let rotation_mat = Mat4::from_euler(glam::EulerRot::XYZ, global_rotation.x, global_rotation.y, global_rotation.z);
@@ -32,6 +33,17 @@ pub fn rotate_vector(direction: Vec3, rotation: Vec3) -> Vec3 {
     let direction = rotation_mat.transform_vector3(direction);
 
     direction
+}
+
+//https://www.opengl-tutorial.org/intermediate-tutorials/tutorial-17-quaternions/
+pub fn look_at_rotation(from: Vec3, to: Vec3) -> Vec3 {
+    let matrix = Mat4::look_at_rh(from, to, Vec3::Y).inverse();
+
+    let euler = matrix.to_scale_rotation_translation().1
+        .to_euler(glam::EulerRot::XYZ);
+
+    let degrees = rad_vec_to_deg(Vec3::new(euler.0, euler.1, euler.2));
+    degrees
 }
 
 pub struct PerlinNoise {

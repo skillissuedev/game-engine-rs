@@ -95,7 +95,6 @@ impl NavigationManager {
                         self.navmesh_obstacles.insert(*navmesh_id, vec![transform]);
                     }
                 }
-                //dbg!(&NAVMESH_OBSTACLES.get(navmesh_id));
 
                 break;
             }
@@ -104,7 +103,7 @@ impl NavigationManager {
 
     pub fn update(&mut self) {
         self.create_grids();
-        self.navmesh_obstacles.clear()
+        self.navmesh_obstacles.clear();
     }
 
     pub fn create_grids(&mut self) {
@@ -146,19 +145,18 @@ impl NavigationManager {
                 let rect = Rect::new(rect_x, rect_y, rect_width, rect_height);
                 grid.set_rectangle(&rect, true);
             }
-            //println!("{}", &grid);
+
             grid.generate_components();
             self.navmesh_grids.insert(*navmesh_id, grid);
         }
     }
 
-    pub fn find_next_path_point(&self, start_world: Vec2, finish_world: Vec2) -> Option<Vec2> {
+    pub fn find_path(&self, start_world: Vec2, finish_world: Vec2) -> Option<Vec<Vec2>> {
         let start_x = start_world.x.round() as i32;
         let start_z = start_world.y.round() as i32;
 
         let finish_x = finish_world.x.round() as i32;
         let finish_z = finish_world.y.round() as i32;
-        //dbg!(start_x, start_z, finish_x, finish_z);
 
         for (navmesh_id, dim) in self.navmesh_dimensions.iter() {
             let navmesh_position_x = dim.position[0];
@@ -170,7 +168,6 @@ impl NavigationManager {
             let navmesh_x2 = navmesh_position_x + area_size_x as i32 / 2;
             let navmesh_z1 = navmesh_position_z - area_size_z as i32 / 2;
             let navmesh_z2 = navmesh_position_z + area_size_z as i32 / 2;
-            //dbg!(navmesh_x1, navmesh_x2, navmesh_z1, navmesh_z2);
 
             if (start_x >= navmesh_x1 && start_x <= navmesh_x2)
                 && (start_z >= navmesh_z1 && start_z <= navmesh_z2)
@@ -186,16 +183,17 @@ impl NavigationManager {
 
                         let grid_start = Point::new(grid_start_x as i32, grid_start_z as i32);
                         let grid_finish = Point::new(grid_finish_x as i32, grid_finish_z as i32);
-                        match grid.get_path_single_goal(grid_start, grid_finish, false) {
-                            Some(path) => match path.get(1) {
-                                Some(point) => {
-                                    let point_x = (navmesh_x1 + point.x) as f32;
-                                    let point_z = (navmesh_z1 + point.y) as f32;
-                                    return Some(Vec2::new(point_x, point_z));
-                                }
-                                None => {
-                                    return None;
-                                }
+
+                        match grid.get_path_single_goal(grid_start, grid_finish, true) {
+                            Some(path) => {
+                                let mut converted_path = path.iter().map(|point| {
+                                    let point_x = point.x as f32 - navmesh_x2 as f32;
+                                    let point_z = point.y as f32 - navmesh_z2 as f32;
+                                    Vec2::new(point_x, point_z)
+                                }).collect::<Vec<Vec2>>();
+                                converted_path.push(finish_world);
+
+                                return Some(converted_path);
                             },
                             None => {
                                 return None;
