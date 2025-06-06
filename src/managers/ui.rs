@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, scroll_area::{self, ScrollBarVisibility}, Button, Checkbox, ColorImage, ComboBox, Context, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
+use egui_glium::egui_winit::egui::{self, scroll_area::ScrollBarVisibility, Button, Checkbox, Color32, ColorImage, ComboBox, Context, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -34,7 +34,7 @@ pub enum WidgetData {
     Checkbox(bool, String),
     FloatSlider(f32, f32, f32),
     IntSlider(i32, i32, i32),
-    ProgressBar(f32),
+    ProgressBar(f32, String, f32),
     Image(String),
 }
 
@@ -263,7 +263,11 @@ impl UiManager {
             WidgetData::Checkbox(value, text) => Some(ui.add_sized(size, Checkbox::new(value, text.as_str()))),
             WidgetData::FloatSlider(value, min, max) => Some(ui.add_sized(size, Slider::new(value, *min..=*max))),
             WidgetData::IntSlider(value, min, max) => Some(ui.add_sized(size, Slider::new(value, *min..=*max))),
-            WidgetData::ProgressBar(value) => Some(ui.add_sized(size, ProgressBar::new(*value))),
+            WidgetData::ProgressBar(value, text, text_size) =>
+                Some(ui.add_sized(size, ProgressBar::new(*value).fill(Color32::from_rgb(80, 80, 80))
+                    .text(RichText::new(text.clone()).size(*text_size).color(Color32::from_rgb(180, 180, 180)))
+                    .desired_height(size.y).rounding(0.0))
+                ),
             WidgetData::Image(image_path) => {
                 let texture = textures.get(image_path);
                 match texture {
@@ -708,6 +712,7 @@ impl UiManager {
                             WidgetData::SinglelineTextEdit(contents) => Some(contents),
                             WidgetData::MultilineTextEdit(contents) => Some(contents),
                             WidgetData::Checkbox(_, label) => Some(label),
+                            WidgetData::ProgressBar(_, label, _) => Some(label),
                             _ => {
                                 debugger::error(
                                     &format!(
@@ -746,7 +751,7 @@ impl UiManager {
                         return match widget.widget_data.clone() {
                             WidgetData::IntSlider(value, _, _) => Some(value as f32),
                             WidgetData::FloatSlider(value, _, _) => Some(value),
-                            WidgetData::ProgressBar(value) => Some(value),
+                            WidgetData::ProgressBar(value, _, _) => Some(value),
                             _ => {
                                 debugger::error(
                                     &format!(
@@ -1056,11 +1061,11 @@ impl UiManager {
         self.add_widget("add_int_slider", window_id, widget_id, widget, parent)
     }
 
-    pub fn add_progress_bar(&mut self, window_id: &str, widget_id: &str, current_value: f32, size: Vec2, parent: Option<&str>) {
+    pub fn add_progress_bar(&mut self, window_id: &str, widget_id: &str, current_value: f32, text: String, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
             size,
-            widget_data: WidgetData::ProgressBar(current_value),
+            widget_data: WidgetData::ProgressBar(current_value, text, text_size.unwrap_or(14.0)),
             children: Vec::new(),
             ..Default::default()
         };

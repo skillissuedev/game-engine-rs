@@ -156,7 +156,6 @@ fn read_object(node: &Rc<Node>, meshes: &Vec<Mesh>) -> ModelAssetObject {
         let mut bone_offsets: HashMap<String, Mat4> = HashMap::new();
         for (bone_idx, bone) in mesh.bones.iter().enumerate() {
             for vertex_weights in &bone.weights {
-                dbg!(vertex_weights);
                 let vertex = &mut vertices[vertex_weights.vertex_id as usize];
                 for (weight_idx, weight) in vertex.weights.iter().enumerate() {
                     if *weight <= 0.0 {
@@ -186,7 +185,6 @@ fn read_object(node: &Rc<Node>, meshes: &Vec<Mesh>) -> ModelAssetObject {
     let mut children = HashMap::new();
     for child in node.children.take() {
         children.insert(child.name.clone(), read_object(&child, meshes));
-        dbg!(child.name.clone());
     }
 
 

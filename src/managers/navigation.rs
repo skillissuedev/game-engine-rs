@@ -90,7 +90,10 @@ impl NavigationManager {
                 && (obstacle_z1 >= navmesh_z1 && obstacle_z2 <= navmesh_z2)
             {
                 match self.navmesh_obstacles.get_mut(navmesh_id) {
-                    Some(obstacles) => obstacles.push(transform),
+                    Some(obstacles) => {
+                        obstacles.push(transform);
+                        //dbg!(obstacles);
+                    },
                     None => {
                         self.navmesh_obstacles.insert(*navmesh_id, vec![transform]);
                     }
@@ -130,22 +133,25 @@ impl NavigationManager {
                 let obstacle_z1 = obstacle.position_z - obstacle_size_z / 2;
                 let obstacle_x2 = obstacle.position_x + obstacle_size_x / 2;
                 let obstacle_z2 = obstacle.position_z + obstacle_size_z / 2;
+                //dbg!(obstacle_x1, obstacle_x2);
 
                 let distance_to_obstacle_x1 = navmesh_x1.abs_diff(obstacle_x1) as i32;
                 let distance_to_obstacle_x2 = navmesh_x1.abs_diff(obstacle_x2) as i32;
                 let distance_to_obstacle_z1 = navmesh_z1.abs_diff(obstacle_z1) as i32;
                 let distance_to_obstacle_z2 = navmesh_z1.abs_diff(obstacle_z2) as i32;
 
-                let rect_x = distance_to_obstacle_x1;
-                let rect_y = distance_to_obstacle_z1;
+                let rect_x = (distance_to_obstacle_x1 + distance_to_obstacle_x2) / 2;
+                let rect_y = (distance_to_obstacle_z1 + distance_to_obstacle_z2) / 2;
 
-                let rect_width = distance_to_obstacle_x1.abs_diff(distance_to_obstacle_x2) as i32;
-                let rect_height = distance_to_obstacle_z1.abs_diff(distance_to_obstacle_z2) as i32;
+                let rect_w = distance_to_obstacle_x1.abs_diff(distance_to_obstacle_x2) as i32;
+                let rect_h = distance_to_obstacle_z1.abs_diff(distance_to_obstacle_z2) as i32;
 
-                let rect = Rect::new(rect_x, rect_y, rect_width, rect_height);
+                let rect = Rect::new(rect_x, rect_y, rect_w, rect_h);
                 grid.set_rectangle(&rect, true);
             }
 
+            grid.allow_diagonal_move = true;
+            grid.heuristic_factor = 1.3;
             grid.generate_components();
             self.navmesh_grids.insert(*navmesh_id, grid);
         }
@@ -176,6 +182,17 @@ impl NavigationManager {
             {
                 match self.navmesh_grids.get(navmesh_id) {
                     Some(grid) => {
+                        let mut count = 0;
+                        for x in 0..grid.width() {
+                            for y in 0..grid.height() {
+                                let val = grid.get(x, y);
+                                if val == true {
+                                    count += 1;
+                                }
+                            }
+                        }
+                        //dbg!(count);
+
                         let grid_start_x = navmesh_x1.abs_diff(start_x);
                         let grid_start_z = navmesh_z1.abs_diff(start_z);
                         let grid_finish_x = navmesh_x1.abs_diff(finish_x);
@@ -184,7 +201,7 @@ impl NavigationManager {
                         let grid_start = Point::new(grid_start_x as i32, grid_start_z as i32);
                         let grid_finish = Point::new(grid_finish_x as i32, grid_finish_z as i32);
 
-                        match grid.get_path_single_goal(grid_start, grid_finish, true) {
+                        match grid.get_path_single_goal(grid_start, grid_finish, false) {
                             Some(path) => {
                                 let mut converted_path = path.iter().map(|point| {
                                     let point_x = point.x as f32 - navmesh_x2 as f32;
@@ -207,3 +224,4 @@ impl NavigationManager {
         None
     }
 }
+

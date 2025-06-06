@@ -2000,8 +2000,8 @@ impl UserData for Framework {
         );
 
         methods.add_method_mut("add_progress_bar",
-            |_, framework, (window_id, widget_id, contents, size, parent): (String, String, f32, [f32; 2], Option<String>)| {
-                Ok(framework.add_progress_bar(&window_id, &widget_id, contents, size.into(), parent.as_deref()))
+            |_, framework, (window_id, widget_id, contents, text, text_size, size, parent): (String, String, f32, String, Option<f32>, [f32; 2], Option<String>)| {
+                Ok(framework.add_progress_bar(&window_id, &widget_id, contents, text, text_size, size.into(), parent.as_deref()))
             }
         );
 

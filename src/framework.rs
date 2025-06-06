@@ -249,7 +249,6 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
-    framework.navigation.create_grids();
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -610,9 +609,9 @@ impl Framework {
         }
     }
 
-    pub fn add_progress_bar(&mut self, window_id: &str, widget_id: &str, contents: f32, size: Vec2, parent: Option<&str>) {
+    pub fn add_progress_bar(&mut self, window_id: &str, widget_id: &str, contents: f32, text: String, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
         match &mut self.ui {
-            Some(ui) => ui.add_progress_bar(window_id, widget_id, contents, size, parent),
+            Some(ui) => ui.add_progress_bar(window_id, widget_id, contents, text, text_size, size, parent),
             None => {
                 debugger::error("Framework error!\nCan't use UI (add_progress_bar) while running server");
             },
