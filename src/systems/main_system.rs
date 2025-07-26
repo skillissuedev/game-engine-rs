@@ -1,6 +1,6 @@
 use glam::{Vec2, Vec3};
 
-use crate::objects::{point_light::PointLight, Object};
+use crate::{managers::assets::ModelAssetId, objects::{point_light::PointLight, Object, Transform}};
 
 use super::System;
 
@@ -22,29 +22,24 @@ impl System for MainSystem {
     }
 
     fn server_start(&mut self, framework: &mut crate::framework::Framework) {
-        todo!()
     }
 
     fn client_update(&mut self, framework: &mut crate::framework::Framework) {
     }
 
     fn server_update(&mut self, framework: &mut crate::framework::Framework) {
-        todo!()
     }
 
     fn server_render(&mut self) {
-        todo!()
     }
 
     fn client_render(&mut self, framework: &mut crate::framework::Framework) {
     }
 
     fn call(&self, call_id: &str) {
-        todo!()
     }
 
     fn call_mut(&mut self, call_id: &str) {
-        todo!()
     }
 
     fn objects_list(&self) -> &Vec<Box<dyn crate::objects::Object>> {

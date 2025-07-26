@@ -33,8 +33,6 @@ pub struct CharacterController {
 pub struct CharacterControllerMovement {
     pub target: Vec3,
     pub speed: f32,
-    pub path: Option<Vec<Vec2>>,
-    pub path_point_index: usize,
 }
 
 impl CharacterController {
@@ -46,7 +44,8 @@ impl CharacterController {
         mask: Option<CollisionGroups>,
     ) -> Self {
         let mut controller = KinematicCharacterController::default();
-        controller.max_slope_climb_angle = deg_to_rad(65.0);
+        controller.max_slope_climb_angle = deg_to_rad(80.0);
+        controller.snap_to_ground = Some(CharacterLength::Absolute(0.3));
         controller.up = nalgebra::Vector::y_axis();
         controller.offset = CharacterLength::Absolute(0.2);
 
@@ -98,38 +97,21 @@ impl Object for CharacterController {
     fn start(&mut self) {}
 
     fn update(&mut self, framework: &mut Framework) {
-        let mut reset_movement = false;
-        let pos = self.global_transform().position;
+        let object_id = *self.object_id();
+
         if let Some(movement) = &mut self.movement {
             let target = movement.target;
 
-            if let None = movement.path {
-                match framework.navigation.find_path(Vec2::new(pos.x, pos.z), Vec2::new(target.x, target.z)) {
-                    Some(path) => movement.path = Some(path),
-                    None => reset_movement = true,
-                }
+            match framework.navigation.get_agent_velocity(object_id) {
+                Some(velocity) => {
+                    self.move_controller_ignoring_rotation(framework, velocity);
+                    framework.navigation.set_agent_position(object_id, self.transform.position);
+                    framework.navigation.set_agent_target(object_id, Some(target));
+                },
+                None => {
+                    framework.navigation.add_agent(object_id, movement.speed, self.transform.position, 1.0);
+                },
             }
-            if let Some(path) = &movement.path {
-                let speed = movement.speed;
-
-                if path[movement.path_point_index].distance(Vec2::new(pos.x, pos.z)) <= 1.0 {
-                    movement.path_point_index += 1;
-                }
-
-                match path.get(movement.path_point_index) {
-                    Some(point) => {
-                        let pos = Vec3::new(pos.x, 0.0, pos.z);
-                        let direction = Self::get_direction(pos, Vec3::new(point.x, 0.0, point.y));
-                        self.move_controller(framework, direction * speed);
-                    },
-                    None => reset_movement = true,
-                }
-            }
-        }
-
-
-        if reset_movement {
-            self.movement = None;
         }
     }
 
@@ -212,6 +194,68 @@ impl CharacterController {
         direction
     }
 
+    pub fn move_controller_ignoring_rotation(&mut self, framework: &mut Framework, direction: Vec3) {
+        let mut new_position = None;
+        {
+            let collider = framework.physics.collider_set.get(self.collider);
+            if let Some(collider) = collider {
+                let shape = collider.shape();
+                let global_transform = self.global_transform();
+                let global_position = global_transform.position;
+
+                let movement = self.controller.move_shape(
+                    framework.delta_time().as_secs_f32(),
+                    &framework.physics.rigid_body_set,
+                    &framework.physics.collider_set,
+                    &framework.physics.query_pipeline,
+                    shape,
+                    &global_position.into(),
+                    direction.into(),
+                    QueryFilter::new().exclude_sensors(),
+                    |_| {},
+                );
+
+                let translation: Vec3;
+
+                if direction.x == 0.0 && direction.y < 0.0 && direction.z == 0.0 {
+                    translation = Vec3::new(
+                        0.0,
+                        movement.translation.y,
+                        0.0,
+                    );
+                } else {
+                    translation = Vec3::new(
+                        movement.translation.x,
+                        movement.translation.y,
+                        movement.translation.z,
+                    );
+                }
+
+                let object_position = self.local_transform().position
+                    + translation;
+                self.set_position(framework, object_position, false);
+                new_position = Some(object_position);
+            } else {
+                debugger::error(
+                    "CharacterController's move_controller error!\nfailed to get collider",
+                );
+            }
+        }
+
+        {
+            if let Some(new_position) = new_position {
+                let collider = framework.physics.collider_set.get_mut(self.collider);
+                if let Some(collider) = collider {
+                    collider.set_position(new_position.into());
+                }
+            } else {
+                debugger::error(
+                    "CharacterController's move_controller error!\nfailed to get collider",
+                );
+            }
+        }
+    }
+
     pub fn move_controller(&mut self, framework: &mut Framework, direction: Vec3) {
         let mut new_position = None;
         {
@@ -236,12 +280,24 @@ impl CharacterController {
                     |_| {},
                 );
 
-                let object_position = self.local_transform().position
-                    + Vec3::new(
+                let translation: Vec3;
+
+                if direction.x == 0.0 && direction.y < 0.0 && direction.z == 0.0 {
+                    translation = Vec3::new(
+                        0.0,
+                        movement.translation.y,
+                        0.0,
+                    );
+                } else {
+                    translation = Vec3::new(
                         movement.translation.x,
                         movement.translation.y,
                         movement.translation.z,
                     );
+                }
+
+                let object_position = self.local_transform().position
+                    + translation;
                 self.set_position(framework, object_position, false);
                 new_position = Some(object_position);
             } else {
@@ -266,7 +322,7 @@ impl CharacterController {
     }
 
     pub fn walk_to(&mut self, target: Vec3, speed: f32) {
-        let movement = CharacterControllerMovement { target, speed, path: None, path_point_index: 1 };
+        let movement = CharacterControllerMovement { target, speed };
         self.movement = Some(movement);
     }
 
@@ -275,20 +331,7 @@ impl CharacterController {
     }
 
     pub fn next_path_position(&self) -> Option<Vec3> {
-        match &self.movement {
-            Some(movement) => {
-                match &movement.path {
-                    Some(path) => {
-                        match path.get(movement.path_point_index) {
-                            Some(point) => Some(Vec3::new(point.x, 0.0, point.y)),
-                            None => None,
-                        }
-                    },
-                    None => None,
-                }
-            },
-            None => None,
-        }
+        None
     }
 }
 

@@ -4,7 +4,7 @@ use crate::{
     managers::{
         self, assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
     },
-    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
+    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use ez_al::{EzAl, SoundSourceType};
@@ -26,6 +26,10 @@ use glium::winit::{
 
 pub static mut FRAMEWORK_POINTER: usize = 0;
 static FONT: Lazy<Vec<u8>> =
+    Lazy::new(|| fs::read(get_full_asset_path("fonts/Oswald-VariableFont_wght.ttf")).unwrap());
+static BOLD_FONT: Lazy<Vec<u8>> =
+    Lazy::new(|| fs::read(get_full_asset_path("fonts/Oswald-Bold.ttf")).unwrap());
+static MONOSPACE_FONT: Lazy<Vec<u8>> =
     Lazy::new(|| fs::read(get_full_asset_path("fonts/JetBrainsMono-Regular.ttf")).unwrap());
 
 pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
@@ -42,17 +46,29 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     let mut fonts = FontDefinitions::default();
     fonts
         .font_data
-        .insert("JetBrains Mono".into(), FontData::from_static(&FONT));
+        .insert("Oswald".into(), FontData::from_static(&FONT));
+    fonts
+        .font_data
+        .insert("JetBrains Mono".into(), FontData::from_static(&MONOSPACE_FONT));
+    fonts
+        .font_data
+        .insert("Oswald Bold".into(), FontData::from_static(&BOLD_FONT));
+
     fonts
         .families
         .get_mut(&FontFamily::Proportional)
         .unwrap()
-        .insert(0, "JetBrains Mono".into());
+        .insert(0, "Oswald".into());
+    fonts
+        .families
+        .insert(FontFamily::Name("Oswald Bold".into()), vec!["Oswald Bold".into()]);
+
     fonts
         .families
         .get_mut(&FontFamily::Monospace)
         .unwrap()
         .insert(0, "JetBrains Mono".into());
+
     egui_glium.egui_ctx().set_fonts(fonts);
     let mut ui_state = managers::ui::UiState::default();
 
@@ -69,7 +85,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
         al,
         input: InputManager::default(),
-        navigation: NavigationManager::default(),
+        navigation: NavigationManager::new(),
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
@@ -78,7 +94,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     };
     framework.set_debug_mode(debug_mode);
 
-    framework.navigation.update();
     unsafe {
         let ptr = &mut framework as *mut Framework;
         FRAMEWORK_POINTER = ptr as usize;
@@ -210,7 +225,7 @@ pub fn start_game_without_render(args: Args) {
 
         al: None,
         input: InputManager::default(),
-        navigation: NavigationManager::default(),
+        navigation: NavigationManager::new(),
         physics: PhysicsManager::default(),
         saves: SavesManager::default(),
         assets: AssetManager::default(),
@@ -246,9 +261,9 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.delta_time = delta_time;
     framework.physics.update();
     networking::update(delta_time);
-    framework.navigation.update();
     game_main::update(framework);
     systems::update(framework);
+    framework.navigation.update(delta_time.as_secs_f32());
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -699,6 +714,15 @@ impl Framework {
         }
     }
 
+    pub fn add_text_button(&mut self, window_id: &str, widget_id: &str, contents: &str, font_size: f32, bold: bool, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_text_button(window_id, widget_id, contents, font_size, bold, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_text_button) while running server");
+            },
+        }
+    }
+
     pub fn add_image(&mut self, window_id: &str, widget_id: &str, image_path: &str, size: Vec2, parent: Option<&str>) {
         match &mut self.ui {
             Some(ui) => ui.add_image(window_id, widget_id, image_path, size, parent),
@@ -713,6 +737,15 @@ impl Framework {
             Some(ui) => ui.add_label(window_id, widget_id, contents, text_size, size, parent),
             None => {
                 debugger::error("Framework error!\nCan't use UI (add_label) while running server");
+            },
+        }
+    }
+
+    pub fn add_bold_label(&mut self, window_id: &str, widget_id: &str, contents: &str, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_bold_label(window_id, widget_id, contents, text_size, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_bold_label) while running server");
             },
         }
     }
@@ -922,6 +955,14 @@ impl Framework {
 
     pub fn new_navigation_ground(&mut self, name: &str, size: Vec3) -> NavigationGround {
         NavigationGround::new(name, Vec2::new(size.x, size.z))
+    }
+
+    pub fn new_dynamic_nav_object(&mut self, name: &str, radius: f32) -> NavObject {
+        NavObject::new(name, NavObjectData::DynamicCapsule(radius))
+    }
+
+    pub fn new_static_nav_object(&mut self, name: &str, model_asset_id: ModelAssetId) -> NavObject {
+        NavObject::new(name, NavObjectData::StaticMesh(model_asset_id))
     }
 
     pub fn new_ray(&mut self, name: &str, direction: Vec3, mask: Option<CollisionGroups>) -> Ray {

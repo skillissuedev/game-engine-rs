@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use egui_glium::egui_winit::egui::{self, scroll_area::ScrollBarVisibility, Button, Checkbox, Color32, ColorImage, ComboBox, Context, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
+use egui_alignments::center_vertical;
+use egui_glium::egui_winit::egui::{self, scroll_area::ScrollBarVisibility, Button, Checkbox, Color32, ColorImage, ComboBox, Context, FontFamily, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
 use crate::framework::{DebugMode, Framework};
@@ -23,7 +24,9 @@ pub struct UiManager {
 #[derive(Clone, Debug)]
 pub enum WidgetData {
     Button(String),
+    TextButton(String, f32, bool),
     Label(String, f32),
+    BoldLabel(String, f32),
     Horizontal,
     HorizontalScroll,
     Vertical,
@@ -217,8 +220,26 @@ impl UiManager {
 
         let egui_widget: Option<Response> = match &mut widget.widget_data {
             WidgetData::Button(contents) => Some(ui.add_sized(size, Button::new(contents.as_str()).sense(Sense::click_and_drag()))),
+            WidgetData::TextButton(contents, font_size, bold) => {
+                match bold {
+                    true => {
+                        Some(ui.add_sized(size, Button::new(RichText::new(contents.clone())
+                                .font(egui::FontId::new(*font_size, FontFamily::Name("Oswald Bold".into()))))
+                                .sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap)
+                            )
+                        )
+                    },
+                    false => {
+                        Some(ui.add_sized(size, Button::new(RichText::new(contents.clone()).size(*font_size)).sense(Sense::click_and_drag())))
+                    },
+                }
+            }
             WidgetData::Label(contents, text_size) => 
-                Some(ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag()))),
+                Some(ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap))),
+            WidgetData::BoldLabel(contents, text_size) => 
+                Some(ui.add_sized(size, Label::new(RichText::new(contents.clone()).font(egui::FontId::new(*text_size, FontFamily::Name("Oswald Bold".into()))))
+                        .sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap))
+                    ),
             WidgetData::Horizontal => {
                 Some(ui.horizontal(|ui| {
                     for widget in &mut widget.children {
@@ -236,14 +257,14 @@ impl UiManager {
                 None
             },
             WidgetData::Vertical => {
-                Some(ui.vertical(|ui| {
+                Some(ui.vertical_centered(|ui| {
                     for widget in &mut widget.children {
                         Self::render_widget(textures, ctx, ui, widget, themes);
                     }
                 }).response)
             },
             WidgetData::VerticalScroll => {
-                ScrollArea::vertical().show(ui, |ui| {
+                ScrollArea::vertical().scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
                     for widget in &mut widget.children {
                         Self::render_widget(textures, ctx, ui, widget, themes);
                     }
@@ -348,6 +369,7 @@ impl UiManager {
 
         false
     }
+    //
     // exists to write less in functions like add_button, add_label, ...
     fn add_widget(&mut self, function_name: &str, window_id: &str, widget_id: &str, widget: Widget, parent: Option<&str>) {
         match self.windows.get_mut(window_id) {
@@ -709,6 +731,7 @@ impl UiManager {
                         return match widget.widget_data.clone() {
                             WidgetData::Button(contents) => Some(contents),
                             WidgetData::Label(contents, _) => Some(contents),
+                            WidgetData::BoldLabel(contents, _) => Some(contents),
                             WidgetData::SinglelineTextEdit(contents) => Some(contents),
                             WidgetData::MultilineTextEdit(contents) => Some(contents),
                             WidgetData::Checkbox(_, label) => Some(label),
@@ -929,11 +952,35 @@ impl UiManager {
         self.add_widget("add_button", window_id, widget_id, widget, parent)
     }
 
+    pub fn add_text_button(&mut self, window_id: &str, widget_id: &str, contents: &str, font_size: f32, bold: bool, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::TextButton(contents.into(), font_size, bold),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_text_button", window_id, widget_id, widget, parent)
+    }
+
     pub fn add_label(&mut self, window_id: &str, widget_id: &str, contents: &str, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
             size,
             widget_data: WidgetData::Label(contents.into(), text_size.unwrap_or(14.0)),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_label", window_id, widget_id, widget, parent)
+    }
+
+    pub fn add_bold_label(&mut self, window_id: &str, widget_id: &str, contents: &str, text_size: Option<f32>, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::BoldLabel(contents.into(), text_size.unwrap_or(14.0)),
             children: Vec::new(),
             ..Default::default()
         };

@@ -521,6 +521,51 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         add_function!("new_navigation_ground", new_navigation_ground, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
+        let new_static_nav_object = lua.create_function_mut(move |lua, (name, model_asset_id): (String, String)| {
+            let framework_ptr = get_framework_pointer();
+            let framework = &mut *framework_ptr;
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let model_asset = framework.get_model_asset(&model_asset_id);
+                    match model_asset {
+                        Some(model_asset_id) => {
+                            let object = framework.new_static_nav_object(&name, model_asset_id);
+                            add_to_system_or_parent(lua, system, Box::new(object));
+                        },
+                        None => debugger::error(
+                            &format!(
+                                "Failed to call new_static_nav_object, failed to get the model asset with id `{}`",
+                                model_asset_id
+                            )
+                        ),
+                    }
+                },
+                None => debugger::error("failed to call new_static_nav_object, system not found"),
+            }
+
+            Ok(())
+        });
+        add_function!("new_static_nav_object", new_static_nav_object, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
+        let new_dynamic_nav_object = lua.create_function_mut(move |lua, (name, radius): (String, f32)| {
+            let framework_ptr = get_framework_pointer();
+            let framework = &mut *framework_ptr;
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let object = framework.new_dynamic_nav_object(&name, radius);
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_dynamic_nav_object, system not found"),
+            }
+
+            Ok(())
+        });
+        add_function!("new_dynamic_nav_object", new_dynamic_nav_object, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
         let new_ray = lua.create_function_mut(
             move |lua, (name, direction_x, direction_y, direction_z, mask_bits): (String, f32, f32, f32, Option<u32>)| {
                 let framework_ptr = get_framework_pointer();

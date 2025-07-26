@@ -16,7 +16,7 @@ mlua = { version = "0.9.9", features = ["lua54", "vendored"] }
 once_cell = "1.18.0"
 renet = "0.0.13"
 machineid-rs = "1.2.4"
-rapier3d = "0.22.0"
+rapier3d = "0.26.1"
 nalgebra = { version = "0.33.0", features = ["convert-glam028"] }
 chron = "0.1.3"
 bitmask-enum = "2.2.3"
@@ -28,14 +28,17 @@ toml = "0.8.13"
 serde_json = "1.0.117"
 clap = { version = "4.5.6", features = ["derive"] }
 glutin = { version = "0.31.0" }
-#glutin-winit = "0.5.0"
 raw-window-handle = "0.6.2"
-#egui_glium = "0.26.3"
 egui_glium = { git = "https://github.com/skillissuedev/egui_glium", features = ["clipboard", "serde"] }
 glium = { version = "0.35.0", features = ["glutin-winit", "winit"] }
 winit = { version = "0.30.5", features = ["serde"] }
 noise = "0.9.0"
 russimp = { version = "3.2.1", features = ["prebuilt"] }
+recast_navigation = "0.1.0"
+landmass = "0.8.0"
+parry3d = "=0.17.0"
+egui_commonmark = "0.21.1"
+egui_alignments = "=0.2.5"
 
 [profile.dev.package.rapier3d]
 opt-level = 3

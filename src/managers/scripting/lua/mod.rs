@@ -2059,6 +2059,12 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("add_text_button",
+            |_, framework, (window_id, widget_id, contents, font_size, bold, size, parent): (String, String, String, f32, bool, [f32; 2], Option<String>)| {
+                Ok(framework.add_text_button(&window_id, &widget_id, &contents, font_size, bold, size.into(), parent.as_deref()))
+            }
+        );
+
         methods.add_method_mut("add_image",
             |_, framework, (window_id, widget_id, image_path, size, parent): (String, String, String, [f32; 2], Option<String>)| {
                 Ok(framework.add_image(&window_id, &widget_id, &image_path, size.into(), parent.as_deref()))
@@ -2070,6 +2076,13 @@ impl UserData for Framework {
                 Ok(framework.add_label(&window_id, &widget_id, &contents, text_size, size.into(), parent.as_deref()))
             }
         );
+
+        methods.add_method_mut("add_bold_label",
+            |_, framework, (window_id, widget_id, contents, text_size, size, parent): (String, String, String, Option<f32>, [f32; 2], Option<String>)| {
+                Ok(framework.add_bold_label(&window_id, &widget_id, &contents, text_size, size.into(), parent.as_deref()))
+            }
+        );
+
         methods.add_method_mut("set_widget_spacing",
             |_, framework, (window_id, widget_id, spacing): (String, String, f32)| {
                 Ok(framework.set_widget_spacing(&window_id, &widget_id, spacing))

@@ -1,16 +1,344 @@
-use glam::Vec2;
-use grid_pathfinding::PathingGrid;
-use grid_util::{Grid, Point, Rect};
 use std::collections::HashMap;
 
-#[derive(Default)]
+use glam::{Vec2, Vec3};
+use grid_pathfinding::PathingGrid;
+use landmass::{Agent, AgentId, AgentOptions, Archipelago, Character, CharacterId, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, SampledPoint, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
+
+use crate::{managers::debugger, objects::{nav_object::NavObjectData, Transform}};
+
+use super::assets::AssetManager;
+
 pub struct NavigationManager {
+    objects: HashMap<u128, IslandId>,
+    archipelago: Archipelago<XYZ>,
+    characters: HashMap<u128, CharacterId>,
+    agents: HashMap<u128, AgentId>,
+
+    //old:
     // u128 is object's id
     navmesh_dimensions: HashMap<u128, NavMeshDimensions>,
     // u128 is navmesh's id
     navmesh_obstacles: HashMap<u128, Vec<NavMeshObstacleTransform>>,
     navmesh_grids: HashMap<u128, PathingGrid>,
 }
+
+impl NavigationManager {
+    pub fn new() -> NavigationManager {
+        let archipelago = Archipelago::new(AgentOptions::from_agent_radius(1.0));
+
+        Self {
+            objects: HashMap::new(),
+            archipelago,
+            navmesh_dimensions: HashMap::new(),
+            navmesh_obstacles: HashMap::new(),
+            navmesh_grids: HashMap::new(),
+            characters: HashMap::new(),
+            agents: HashMap::new(),
+        }
+    }
+
+    pub fn add_object(&mut self, assets: &AssetManager, id: u128, data: NavObjectData, transform: Transform) {
+        match &data {
+            NavObjectData::StaticMesh(model_asset_id) => {
+                let pos = transform.position;
+                let rot = transform.rotation;
+                let transform: landmass::Transform<XYZ> = landmass::Transform {
+                    translation: landmass::Vec3::new(pos.x, pos.z, pos.y),
+                    rotation: rot.y.to_radians(), //???
+                };
+                let mut vertices = vec![];
+                let mut polygons = Vec::new();
+                let mut polygon_type_indices = Vec::new();
+
+                match assets.get_model_asset(model_asset_id) {
+                    Some(asset) => {
+                        for data in &asset.root.render_data {
+                            for vertex in &data.vertices {
+                                let pos = vertex.position;
+                                vertices.push(landmass::Vec3::new(pos[0], pos[2], pos[1]));
+                            }
+
+                            for index in data.indices.chunks_exact(3) {
+                                polygons.push(vec![index[0] as usize, index[1] as usize, index[2] as usize]);
+                                polygon_type_indices.push(0);
+                            }
+
+                            break
+                        }
+                    },
+                    None => {
+                        debugger::error("Failed to create a navmesh! Failed to get the required model asset.");
+                        return
+                    },
+                };
+
+                let navmesh = NavigationMesh {
+                    vertices,
+                    polygons,
+                    polygon_type_indices,
+                };
+                match validate_navmesh(navmesh, None) {
+                    Some(navmesh) => {
+                        if let Ok(navmesh) = navmesh {
+                            let island_id = self.archipelago.add_island(
+                                Island::new(transform, navmesh.into(), HashMap::new())
+                            );
+                            self.objects.insert(id, island_id);
+                        }
+                    },
+                    None => (),
+                }
+            },
+            NavObjectData::DynamicCapsule(radius) => {
+                let pos = transform.position;
+                let character_id = self.archipelago.add_character(Character {
+                    position: landmass::Vec3::new(pos.x, pos.z, pos.y),
+                    velocity: landmass::Vec3::ZERO,
+                    radius: *radius,
+                });
+                self.characters.insert(id, character_id);
+            },
+        }
+    }
+
+    pub fn update(&mut self, delta_time: f32) {
+        self.archipelago.update(delta_time);
+        for agent_id in self.archipelago.get_agent_ids().collect::<Vec<_>>() {
+            let agent = self.archipelago.get_agent_mut(agent_id)
+                .expect("No agent for some reason?");
+            agent.velocity = *agent.get_desired_velocity();
+        }
+    }
+
+    pub fn set_island_transform(&mut self, idx: u128, transform: Transform) {
+        match self.objects.get(&idx) {
+            Some(island) => {
+                match self.archipelago.get_island_mut(*island) {
+                    Some(mut island) => {
+                        let pos = transform.position;
+                        let transform: landmass::Transform<XYZ> = landmass::Transform {
+                            translation: landmass::Vec3::new(pos.x, pos.z, pos.y),
+                            rotation: transform.rotation.y.to_radians(),
+                        };
+
+                        island.set_transform(transform);
+                    },
+                    None => debugger::error("Failed to update the island transform! Failed to get the island."),
+                }
+            },
+            None => debugger::error("Failed to update the island transform! Failed to get the island id."),
+        }
+    }
+
+    pub fn set_character_position(&mut self, idx: u128, position: Vec3) {
+        match self.characters.get(&idx) {
+            Some(character) => {
+                match self.archipelago.get_character_mut(*character) {
+                    Some(character) => {
+                        let position = landmass::Vec3::new(position.x, position.z, position.y);
+
+                        character.position = position;
+                    },
+                    None => debugger::error("Failed to update the character position! Failed to get the character."),
+                }
+            },
+            None => debugger::error("Failed to update the character position! Failed to get the character id."),
+        }
+    }
+
+    pub fn add_agent(&mut self, idx: u128, speed: f32, position: Vec3, radius: f32) {
+        let mut position = landmass::Vec3::from_array(position.to_array());
+        let y = position.y;
+        position.y = position.z;
+        position.z = y;
+
+        let sample_point = self.archipelago.sample_point(position, &PointSampleDistance3d {
+            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+        match sample_point {
+            Ok(position) => {
+                let position = position.point();
+
+                let mut agent = Agent::create(/*position*/landmass::Vec3::ZERO, landmass::Vec3::ZERO, radius, speed, speed);
+                agent.target_reached_condition = TargetReachedCondition::StraightPathDistance(Some(0.5));
+                self.agents.insert(idx, self.archipelago.add_agent(agent));
+            },
+            Err(err) => {
+                dbg!(err);
+            },
+        }
+    }
+
+    pub fn set_agent_position(&mut self, idx: u128, position: Vec3) {
+        match self.agents.get(&idx) {
+            Some(agent) => {
+                let mut position = landmass::Vec3::from_array(position.to_array());
+                let y = position.y;
+                position.y = position.z;
+                position.z = y;
+
+                let sampled_position = self.archipelago.sample_point(position, &PointSampleDistance3d {
+                    horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+                let position: landmass::Vec3;
+
+                match sampled_position {
+                    Ok(sampled_position) => {
+                        position = sampled_position.point();
+                        dbg!(position);
+                    },
+                    Err(err) => {
+                        debugger::error(&format!("set_agent_position failed! Failed to sample the point! Error: {}", err));
+                        return;
+                    },
+                }
+
+                match self.archipelago.get_agent_mut(*agent) {
+                    Some(agent) => {
+                        agent.position = position;
+                    },
+                    None => debugger::error("set_agent_position failed! Failed to get the agent!"),
+                }
+            }
+            None => debugger::error("set_agent_position failed! Failed to get the agent id!"),
+        }
+    }
+
+    pub fn get_agent_velocity(&self, idx: u128) -> Option<Vec3> {
+        match self.agents.get(&idx) {
+            Some(agent) => {
+                match self.archipelago.get_agent(*agent) {
+                    Some(agent) => {
+                        let mut velocity = Vec3::from_array(agent.velocity.to_array());
+                        let y = velocity.y;
+                        velocity.y = velocity.z;
+                        velocity.z = y;
+                        dbg!(velocity);
+                        Some(velocity)
+                    },
+                    None => {
+                        debugger::error("get_agent_velocity failed! Failed to get the agent!");
+                        None
+                    },
+                }
+            }
+            None => {
+                debugger::error("get_agent_velocity failed! Failed to get the agent id!");
+                None
+            },
+        }
+    }
+
+    pub fn set_agent_target(&mut self, idx: u128, target: Option<Vec3>) {
+        match self.agents.get(&idx) {
+            Some(agent) => {
+                match target {
+                    Some(target) => {
+                        let mut target = landmass::Vec3::from_array(target.to_array());
+                        let y = target.y;
+                        target.y = target.z;
+                        target.z = y;
+
+                        let sampled_target = self.archipelago.sample_point(target, &PointSampleDistance3d {
+                            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+                        let target: landmass::Vec3;
+
+                        match sampled_target {
+                            Ok(sampled_target) => {
+                                target = sampled_target.point();
+                                dbg!(target);
+                            },
+                            Err(err) => {
+                                debugger::error(&format!("set_agent_target failed! Failed to sample the point! Error: {}", err));
+                                return;
+                            },
+                        }
+
+                        match self.archipelago.get_agent_mut(*agent) {
+                            Some(agent) => {
+                                agent.current_target = Some(target);
+                            },
+                            None => debugger::error("set_agent_target failed! Failed to get the agent!"),
+                        }
+                    },
+                    None => {
+                        match self.archipelago.get_agent_mut(*agent) {
+                            Some(agent) => {
+                                agent.current_target = None;
+                            },
+                            None => debugger::error("set_agent_target failed! Failed to get the agent!"),
+                        }
+                    },
+                }
+            }
+            None => debugger::error("set_agent_target failed! Failed to get the agent id!"),
+        }
+    }
+
+    pub fn get_agent_position(&mut self, idx: u128) -> Option<Vec3> {
+        match self.agents.get(&idx) {
+            Some(agent) => {
+                match self.archipelago.get_agent_mut(*agent) {
+                    Some(agent) => {
+                        Some(Vec3::from_array(agent.position.to_array()))
+                    },
+                    None => {
+                        debugger::error("get_agent_position failed! Failed to get the agent!");
+                        None
+                    },
+                }
+            },
+            None => {
+                debugger::error("get_agent_position failed! Failed to get the agent id!");
+                None
+            },
+        }
+    }
+
+    // old:
+    pub fn add_navmesh(&mut self, id: u128, dimensions: NavMeshDimensions) {
+    }
+
+    pub fn add_obstacle(&mut self, transform: NavMeshObstacleTransform) {
+    }
+
+    pub fn create_grids(&mut self) {
+    }
+
+    pub fn find_path(&self, start_point: Vec2, finish_point: Vec2) -> Option<Vec<Vec2>> {
+        None
+    }
+}
+
+fn validate_navmesh(navmesh: NavigationMesh<XYZ>, previous_error: Option<usize>) -> Option<Result<ValidNavigationMesh<XYZ>, NavigationMesh<XYZ>>> {
+    let mut navmesh = navmesh;
+    match navmesh.clone().validate() {
+        Ok(valid_navmesh) => {
+            Some(Ok(valid_navmesh))
+        },
+        Err(err) => {
+            match err {
+                ValidationError::ConcavePolygon(idx) => {
+                    if let Some(previous_error) = previous_error {
+                        if previous_error == idx {
+                            navmesh.polygons.remove(idx);
+                            navmesh.polygon_type_indices.remove(idx);
+
+                            return validate_navmesh(navmesh, Some(idx))
+                        }
+                    }
+
+                    navmesh.polygons[idx].reverse();
+
+                    validate_navmesh(navmesh, Some(idx))
+                },
+                _ => {
+                    debugger::error("Failed to create a navmesh! Navmesh validation error.");
+                    None
+                }
+            }
+        },
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct NavMeshDimensions {
@@ -64,164 +392,6 @@ impl NavMeshObstacleTransform {
             position_z,
             area_size,
         }
-    }
-}
-
-impl NavigationManager {
-    pub fn add_navmesh(&mut self, id: u128, dimensions: NavMeshDimensions) {
-        self.navmesh_dimensions.insert(id, dimensions);
-        self.create_grids();
-    }
-
-    pub fn add_obstacle(&mut self, transform: NavMeshObstacleTransform) {
-        let obstacle_x1 = transform.position_x - transform.area_size[0] / 2;
-        let obstacle_x2 = transform.position_x + transform.area_size[0] / 2;
-        let obstacle_z1 = transform.position_z - transform.area_size[1] / 2;
-        let obstacle_z2 = transform.position_z + transform.area_size[1] / 2;
-
-        for (navmesh_id, navmesh_dim) in self.navmesh_dimensions.iter() {
-            let navmesh_x1 = navmesh_dim.position[0] - navmesh_dim.area_size[0] as i32 / 2;
-            let navmesh_x2 = navmesh_dim.position[0] + navmesh_dim.area_size[0] as i32 / 2;
-            let navmesh_z1 = navmesh_dim.position[1] - navmesh_dim.area_size[1] as i32 / 2;
-            let navmesh_z2 = navmesh_dim.position[1] + navmesh_dim.area_size[1] as i32 / 2;
-
-            // if obstacle is on this navmesh
-            if (obstacle_x1 >= navmesh_x1 && obstacle_x2 <= navmesh_x2)
-                && (obstacle_z1 >= navmesh_z1 && obstacle_z2 <= navmesh_z2)
-            {
-                match self.navmesh_obstacles.get_mut(navmesh_id) {
-                    Some(obstacles) => {
-                        obstacles.push(transform);
-                        //dbg!(obstacles);
-                    },
-                    None => {
-                        self.navmesh_obstacles.insert(*navmesh_id, vec![transform]);
-                    }
-                }
-
-                break;
-            }
-        }
-    }
-
-    pub fn update(&mut self) {
-        self.create_grids();
-        self.navmesh_obstacles.clear();
-    }
-
-    pub fn create_grids(&mut self) {
-        for (navmesh_id, dim) in self.navmesh_dimensions.iter() {
-            let navmesh_position_x = dim.position[0];
-            let navmesh_position_z = dim.position[1];
-            let area_size_x = dim.area_size[0];
-            let area_size_z = dim.area_size[1];
-
-            let navmesh_x1 = navmesh_position_x - area_size_x / 2;
-            let navmesh_z1 = navmesh_position_z - area_size_z / 2;
-
-            let mut grid = PathingGrid::new(area_size_x as usize, area_size_z as usize, false);
-
-            for obstacle in self
-                .navmesh_obstacles
-                .get(navmesh_id)
-                .unwrap_or(&Vec::new())
-            {
-                let obstacle_size_x = obstacle.area_size[0];
-                let obstacle_size_z = obstacle.area_size[1];
-
-                let obstacle_x1 = obstacle.position_x - obstacle_size_x / 2;
-                let obstacle_z1 = obstacle.position_z - obstacle_size_z / 2;
-                let obstacle_x2 = obstacle.position_x + obstacle_size_x / 2;
-                let obstacle_z2 = obstacle.position_z + obstacle_size_z / 2;
-                //dbg!(obstacle_x1, obstacle_x2);
-
-                let distance_to_obstacle_x1 = navmesh_x1.abs_diff(obstacle_x1) as i32;
-                let distance_to_obstacle_x2 = navmesh_x1.abs_diff(obstacle_x2) as i32;
-                let distance_to_obstacle_z1 = navmesh_z1.abs_diff(obstacle_z1) as i32;
-                let distance_to_obstacle_z2 = navmesh_z1.abs_diff(obstacle_z2) as i32;
-
-                let rect_x = (distance_to_obstacle_x1 + distance_to_obstacle_x2) / 2;
-                let rect_y = (distance_to_obstacle_z1 + distance_to_obstacle_z2) / 2;
-
-                let rect_w = distance_to_obstacle_x1.abs_diff(distance_to_obstacle_x2) as i32;
-                let rect_h = distance_to_obstacle_z1.abs_diff(distance_to_obstacle_z2) as i32;
-
-                let rect = Rect::new(rect_x, rect_y, rect_w, rect_h);
-                grid.set_rectangle(&rect, true);
-            }
-
-            grid.allow_diagonal_move = true;
-            grid.heuristic_factor = 1.3;
-            grid.generate_components();
-            self.navmesh_grids.insert(*navmesh_id, grid);
-        }
-    }
-
-    pub fn find_path(&self, start_world: Vec2, finish_world: Vec2) -> Option<Vec<Vec2>> {
-        let start_x = start_world.x.round() as i32;
-        let start_z = start_world.y.round() as i32;
-
-        let finish_x = finish_world.x.round() as i32;
-        let finish_z = finish_world.y.round() as i32;
-
-        for (navmesh_id, dim) in self.navmesh_dimensions.iter() {
-            let navmesh_position_x = dim.position[0];
-            let navmesh_position_z = dim.position[1];
-            let area_size_x = dim.area_size[0];
-            let area_size_z = dim.area_size[1];
-
-            let navmesh_x1 = navmesh_position_x - area_size_x as i32 / 2;
-            let navmesh_x2 = navmesh_position_x + area_size_x as i32 / 2;
-            let navmesh_z1 = navmesh_position_z - area_size_z as i32 / 2;
-            let navmesh_z2 = navmesh_position_z + area_size_z as i32 / 2;
-
-            if (start_x >= navmesh_x1 && start_x <= navmesh_x2)
-                && (start_z >= navmesh_z1 && start_z <= navmesh_z2)
-                && (finish_x >= navmesh_x1 && finish_x <= navmesh_x2)
-                && (finish_z >= navmesh_z1 && finish_z <= navmesh_z2)
-            {
-                match self.navmesh_grids.get(navmesh_id) {
-                    Some(grid) => {
-                        let mut count = 0;
-                        for x in 0..grid.width() {
-                            for y in 0..grid.height() {
-                                let val = grid.get(x, y);
-                                if val == true {
-                                    count += 1;
-                                }
-                            }
-                        }
-                        //dbg!(count);
-
-                        let grid_start_x = navmesh_x1.abs_diff(start_x);
-                        let grid_start_z = navmesh_z1.abs_diff(start_z);
-                        let grid_finish_x = navmesh_x1.abs_diff(finish_x);
-                        let grid_finish_z = navmesh_z1.abs_diff(finish_z);
-
-                        let grid_start = Point::new(grid_start_x as i32, grid_start_z as i32);
-                        let grid_finish = Point::new(grid_finish_x as i32, grid_finish_z as i32);
-
-                        match grid.get_path_single_goal(grid_start, grid_finish, false) {
-                            Some(path) => {
-                                let mut converted_path = path.iter().map(|point| {
-                                    let point_x = point.x as f32 - navmesh_x2 as f32;
-                                    let point_z = point.y as f32 - navmesh_z2 as f32;
-                                    Vec2::new(point_x, point_z)
-                                }).collect::<Vec<Vec2>>();
-                                converted_path.push(finish_world);
-
-                                return Some(converted_path);
-                            },
-                            None => {
-                                return None;
-                            }
-                        }
-                    }
-                    None => return None,
-                }
-            }
-        }
-        None
     }
 }
 

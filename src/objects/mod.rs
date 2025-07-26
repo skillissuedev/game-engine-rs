@@ -21,6 +21,7 @@ pub mod instanced_model_transform_holder;
 pub mod master_instanced_model_object;
 pub mod model_object;
 pub mod nav_obstacle;
+pub mod nav_object;
 pub mod navmesh;
 pub mod ray;
 pub mod sound_emitter;

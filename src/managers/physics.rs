@@ -6,7 +6,7 @@ use crate::{
 };
 use bitmask_enum::bitmask;
 use glam::{Quat, Vec3};
-use nalgebra::{Quaternion, Vector3};
+use nalgebra::Vector3;
 use rapier3d::{
     dynamics::{
         CCDSolver, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointSet,
@@ -630,7 +630,6 @@ pub fn collider_type_to_collider_builder(
         }
         BodyColliderType::TriangleMesh(asset) => {
             let mut indices: Vec<[u32; 3]> = Vec::new();
-            let mut temp_indices: Vec<u32> = Vec::new();
             let mut positions_nalgebra: Vec<Point<Real>> = Vec::new();
             // checking if the root has the mesh first, otherwise search it in the children
             if asset.root.render_data.len() >= 1 {
@@ -645,16 +644,15 @@ pub fn collider_type_to_collider_builder(
                             .into(),
                         )
                     });
-                    primitive.indices.iter().for_each(|ind| {
-                        if temp_indices.len() < 3 {
-                            temp_indices.push(*ind as u32);
-                        } else {
-                            indices.push([temp_indices[0], temp_indices[1], temp_indices[2]]);
-                            temp_indices.clear();
-                            temp_indices.push(*ind as u32);
-                        }
+                    primitive.indices.chunks_exact(3).for_each(|index| {
+                        indices.push([index[0], index[1], index[2]]);
                     });
-                    collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
+                    match ColliderBuilder::trimesh(positions_nalgebra, indices) {
+                        Ok(result) => collider_builder = result,
+                        Err(err) => {
+                            debugger::error(&format!("Failed to build a trimesh collider! Error: {}", err));
+                        },
+                    }
 
                     break
                 }
@@ -671,19 +669,18 @@ pub fn collider_type_to_collider_builder(
                                 .into(),
                             )
                         });
-                        primitive.indices.iter().for_each(|ind| {
-                            if temp_indices.len() < 3 {
-                                temp_indices.push(*ind as u32);
-                            } else {
-                                indices.push([temp_indices[0], temp_indices[1], temp_indices[2]]);
-                                temp_indices.clear();
-                                temp_indices.push(*ind as u32);
-                            }
+                        primitive.indices.chunks_exact(3).for_each(|index| {
+                            indices.push([index[0], index[1], index[2]]);
                         });
                         break
                     }
                 }
-                collider_builder = ColliderBuilder::trimesh(positions_nalgebra, indices);
+                match ColliderBuilder::trimesh(positions_nalgebra, indices) {
+                    Ok(result) => collider_builder = result,
+                    Err(err) => {
+                        debugger::error(&format!("Failed to build a trimesh collider! Error: {}", err));
+                    },
+                }
             }
         }
     }
