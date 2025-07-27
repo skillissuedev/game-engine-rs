@@ -1,3 +1,4 @@
+use ez_al::WavAsset;
 use glam::{Vec2, Vec3};
 use glium::winit::keyboard::KeyCode;
 
@@ -30,6 +31,25 @@ pub fn start(args: Args, framework: &mut Framework) {
         vec![InputEventType::Key(KeyCode::Backquote)],
     );
     if networking::is_server() == false {
+        framework.preload_sound_asset("ui_click_sound".into(), "sounds/ui_click.wav")
+            .expect("Failed to load the default UI click sound!");
+        framework.preload_sound_asset("ui_hover_start_sound".into(), "sounds/ui_hover_start.wav")
+            .expect("Failed to load the default UI hover start sound!");
+        framework.preload_sound_asset("ui_hover_stop_sound".into(), "sounds/ui_hover_stop.wav")
+            .expect("Failed to load the default UI hover stop sound!");
+
+        let click = framework.get_sound_asset("ui_click_sound").expect("Failed to get the default UI click sound!");
+        let hover_start = framework.get_sound_asset("ui_hover_stop_sound").expect("Failed to get the default UI hover start sound!");
+        let hover_stop = framework.get_sound_asset("ui_hover_stop_sound").expect("Failed to get the default UI hover stop sound!");
+
+        if let Some(al) = &mut framework.al {
+            if let Some(ui) = &mut framework.ui {
+                ui.set_click_sound(al, &framework.assets, Some(click));
+                ui.set_hover_start_sound(al, &framework.assets, Some(hover_start));
+                //ui.set_hover_stop_sound(al, &framework.assets, Some(hover_stop));
+            }
+        }
+
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");

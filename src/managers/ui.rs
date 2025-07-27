@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use egui_alignments::center_vertical;
 use egui_glium::egui_winit::egui::{self, scroll_area::ScrollBarVisibility, Button, Checkbox, Color32, ColorImage, ComboBox, Context, FontFamily, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
+use ez_al::{EzAl, SoundSource};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
-use crate::framework::{DebugMode, Framework};
+use crate::{framework::{DebugMode, Framework}, managers::assets::{AssetManager, SoundAssetId}};
 use super::{assets::get_full_asset_path, debugger, physics::RenderColliderType, systems};
 
 pub struct ImageToLoad {
@@ -19,6 +19,9 @@ pub struct UiManager {
     textures: HashMap<String, TextureHandle>,
     themes: HashMap<String, Visuals>,
     window_themes: HashMap<String, Frame>,
+    click_sound: Option<SoundSource>,
+    hover_start_sound: Option<SoundSource>,
+    hover_stop_sound: Option<SoundSource>,
 }
 
 #[derive(Clone, Debug)]
@@ -69,7 +72,7 @@ pub struct UiManagerWindow {
     theme: Option<String>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Widget {
     id: String,
     size: Vec2,
@@ -77,7 +80,9 @@ pub struct Widget {
     children: Vec<Widget>,
     state: WidgetState,
     spacing: f32,
-    theme: Option<String>
+    theme: Option<String>,
+    play_click_sound: bool,
+    play_hover_sound: bool,
 }
 
 impl Default for Widget {
@@ -89,12 +94,96 @@ impl Default for Widget {
             children: Vec::new(),
             state: WidgetState::default(),
             spacing: 10.0,
-            theme: None
+            theme: None,
+            play_click_sound: false,
+            play_hover_sound: false,
         }
     }
 }
 
 impl UiManager {
+    pub fn set_click_sound(&mut self, al: &EzAl, asset_manager: &AssetManager, sound_asset: Option<SoundAssetId>) {
+        match sound_asset {
+            Some(sound_asset) => {
+                match asset_manager.get_sound_asset(&sound_asset) {
+                    Some(sound_asset) => {
+                        match SoundSource::new(al, &sound_asset.wav, ez_al::SoundSourceType::Simple) {
+                            Ok(source) => {
+                                self.click_sound = Some(source);
+                            },
+                            Err(err) => {
+                                debugger::error(
+                                    &format!("UiManager set_click_sound failed! Failed to create a SoundSource! Err: {:?}", err)
+                                );
+                            },
+                        }
+                    },
+                    None => {
+                        debugger::error(
+                            &format!("UiManager set_click_sound failed! Failed to get the sound asset with ID '{}'!", sound_asset.get_id())
+                        );
+                    },
+                }
+            },
+            None => self.click_sound = None,
+        }
+    }
+
+    pub fn set_hover_start_sound(&mut self, al: &EzAl, asset_manager: &AssetManager, sound_asset: Option<SoundAssetId>) {
+        match sound_asset {
+            Some(sound_asset) => {
+                match asset_manager.get_sound_asset(&sound_asset) {
+                    Some(sound_asset) => {
+                        match SoundSource::new(al, &sound_asset.wav, ez_al::SoundSourceType::Simple) {
+                            Ok(source) => {
+                                self.hover_start_sound = Some(source);
+                            },
+                            Err(err) => {
+                                debugger::error(
+                                    &format!("UiManager set_hover_start_sound failed! Failed to create a SoundSource! Err: {:?}", err)
+                                );
+                            },
+                        }
+                    },
+                    None => {
+                        debugger::error(
+                            &format!("UiManager set_hover_start_sound failed! Failed to get the sound asset with ID '{}'!", sound_asset.get_id())
+                        );
+                    },
+                }
+            },
+            None => self.hover_start_sound = None,
+        }
+    }
+
+    pub fn set_hover_stop_sound(&mut self, al: &EzAl, asset_manager: &AssetManager, sound_asset: Option<SoundAssetId>) {
+        match sound_asset {
+            Some(sound_asset) => {
+                match asset_manager.get_sound_asset(&sound_asset) {
+                    Some(sound_asset) => {
+                        match SoundSource::new(al, &sound_asset.wav, ez_al::SoundSourceType::Simple) {
+                            Ok(source) => {
+                                self.hover_stop_sound = Some(source);
+                            },
+                            Err(err) => {
+                                debugger::error(
+                                    &format!("UiManager set_hover_stop_sound failed! Failed to create a SoundSource! Err: {:?}", err)
+                                );
+                            },
+                        }
+                    },
+                    None => {
+                        debugger::error(
+                            &format!("UiManager set_hover_stop_sound failed! Failed to get the sound asset with ID '{}'!", sound_asset.get_id())
+                        );
+                    },
+                }
+            },
+            None => self.hover_stop_sound = None,
+        }
+    }
+
+
     pub fn render(&mut self, ctx: &Context, debug_mode: DebugMode) {
         match debug_mode {
             DebugMode::Full => {
@@ -196,13 +285,15 @@ impl UiManager {
                 }
 
                 for widget in &mut manager_window.widgets {
-                    Self::render_widget(&self.textures, ctx, ui, widget, &self.themes);
+                    Self::render_widget(&mut self.click_sound, &mut self.hover_start_sound, &mut self.hover_stop_sound, &self.textures, ctx, ui, widget, &self.themes);
                 }
             });
         }
     }
 
-    fn render_widget(textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget, themes: &HashMap<String, Visuals>) {
+    fn render_widget(click_sound: &mut Option<SoundSource>, hover_start_sound: &mut Option<SoundSource>, hover_stop_sound: &mut Option<SoundSource>,
+        textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget, themes: &HashMap<String, Visuals>) {
+
         let theme = match &widget.theme {
             Some(theme_id) => {
                 match themes.get(theme_id) {
@@ -243,7 +334,7 @@ impl UiManager {
             WidgetData::Horizontal => {
                 Some(ui.horizontal(|ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
                     }
                 }).response)
             },
@@ -251,7 +342,7 @@ impl UiManager {
                 // SCROLL BAR VISIBILITY FOR TESTING PURPOSES! remove later pls, future me
                 ScrollArea::horizontal().scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible).show(ui, |ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
                     }
                 });
                 None
@@ -259,14 +350,14 @@ impl UiManager {
             WidgetData::Vertical => {
                 Some(ui.vertical_centered(|ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
                     }
                 }).response)
             },
             WidgetData::VerticalScroll => {
                 ScrollArea::vertical().scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
                     }
                 });
                 None
@@ -274,7 +365,7 @@ impl UiManager {
             WidgetData::Scroll => {
                 ScrollArea::both().show(ui, |ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
                     }
                 });
                 None
@@ -300,6 +391,28 @@ impl UiManager {
 
         let state = match egui_widget {
             Some(state) => {
+                if widget.play_click_sound {
+                    if state.clicked() {
+                        if let Some(click_sound) = click_sound {
+                            click_sound.play_sound();
+                        }
+                    }
+                }
+
+                if widget.play_hover_sound {
+                    if !widget.state.hovered && state.hovered() {
+                        if let Some(hover) = hover_start_sound {
+                            hover.play_sound();
+                        }
+                    }
+
+                    if widget.state.hovered && !state.hovered() {
+                        if let Some(hover) = hover_stop_sound {
+                            hover.play_sound();
+                        }
+                    }
+                }
+
                 WidgetState {
                     left_clicked: state.clicked(),
                     right_clicked: state.secondary_clicked(),
@@ -563,6 +676,60 @@ impl UiManager {
             },
         }
 
+    }
+
+    pub fn set_play_click_sound(&mut self, window_id: &str, widget_id: &str, play: bool) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                for widget in &mut window.widgets {
+                    if &widget.id == widget_id {
+                        widget.play_click_sound = play;
+
+                        return
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "set_play_click_sound error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "set_play_click_sound error!\nFailed to get the window with id '{}' to get the widget with id '{}'", window_id, widget_id
+                    )
+                );
+            },
+        }
+    }
+
+    pub fn set_play_hover_sound(&mut self, window_id: &str, widget_id: &str, play: bool) {
+        match self.windows.get_mut(window_id) {
+            Some(window) => {
+                for widget in &mut window.widgets {
+                    if &widget.id == widget_id {
+                        widget.play_hover_sound = play;
+
+                        return
+                    }
+                }
+
+                debugger::error(
+                    &format!(
+                        "set_play_hover_sound error!\nFailed to get the widget with id '{}' in the window with id '{}'", widget_id, window_id
+                    )
+                );
+            },
+            None => {
+                debugger::error(
+                    &format!(
+                        "set_play_hover_sound error!\nFailed to get the window with id '{}' to get the widget with id '{}'", window_id, widget_id
+                    )
+                );
+            },
+        }
     }
 
     pub fn get_widget_state(&self, window_id: &str, widget_id: &str) -> Option<WidgetState> {
@@ -946,6 +1113,8 @@ impl UiManager {
             size,
             widget_data: WidgetData::Button(contents.into()),
             children: Vec::new(),
+            play_click_sound: true,
+            play_hover_sound: true,
             ..Default::default()
         };
 
@@ -958,6 +1127,8 @@ impl UiManager {
             size,
             widget_data: WidgetData::TextButton(contents.into(), font_size, bold),
             children: Vec::new(),
+            play_click_sound: true,
+            play_hover_sound: true,
             ..Default::default()
         };
 
