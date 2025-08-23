@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use glam::{Vec2, Vec3};
-use grid_pathfinding::PathingGrid;
 use landmass::{Agent, AgentId, AgentOptions, Archipelago, Character, CharacterId, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, SampledPoint, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
 
 use crate::{managers::debugger, objects::{nav_object::NavObjectData, Transform}};
@@ -16,10 +15,10 @@ pub struct NavigationManager {
 
     //old:
     // u128 is object's id
-    navmesh_dimensions: HashMap<u128, NavMeshDimensions>,
+    //navmesh_dimensions: HashMap<u128, NavMeshDimensions>,
     // u128 is navmesh's id
-    navmesh_obstacles: HashMap<u128, Vec<NavMeshObstacleTransform>>,
-    navmesh_grids: HashMap<u128, PathingGrid>,
+    //navmesh_obstacles: HashMap<u128, Vec<NavMeshObstacleTransform>>,
+    //navmesh_grids: HashMap<u128, PathingGrid>,
 }
 
 impl NavigationManager {
@@ -29,9 +28,6 @@ impl NavigationManager {
         Self {
             objects: HashMap::new(),
             archipelago,
-            navmesh_dimensions: HashMap::new(),
-            navmesh_obstacles: HashMap::new(),
-            navmesh_grids: HashMap::new(),
             characters: HashMap::new(),
             agents: HashMap::new(),
         }
@@ -183,7 +179,6 @@ impl NavigationManager {
                 match sampled_position {
                     Ok(sampled_position) => {
                         position = sampled_position.point();
-                        dbg!(position);
                     },
                     Err(err) => {
                         debugger::error(&format!("set_agent_position failed! Failed to sample the point! Error: {}", err));
@@ -211,7 +206,6 @@ impl NavigationManager {
                         let y = velocity.y;
                         velocity.y = velocity.z;
                         velocity.z = y;
-                        dbg!(velocity);
                         Some(velocity)
                     },
                     None => {
@@ -244,7 +238,6 @@ impl NavigationManager {
                         match sampled_target {
                             Ok(sampled_target) => {
                                 target = sampled_target.point();
-                                dbg!(target);
                             },
                             Err(err) => {
                                 debugger::error(&format!("set_agent_target failed! Failed to sample the point! Error: {}", err));

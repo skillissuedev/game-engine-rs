@@ -1,4 +1,3 @@
-use ez_al::WavAsset;
 use glam::{Vec2, Vec3};
 use glium::winit::keyboard::KeyCode;
 
@@ -9,9 +8,6 @@ use crate::{
 
 pub fn start(args: Args, framework: &mut Framework) {
     if let Some(save_name) = &args.new_save_name {
-        framework.set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(args.new_save_seed.unwrap())]);
-        framework.register_save_value("WorldGeneratorSeed");
-
         match framework.new_save(&save_name) {
             Ok(_) => println!("Successfully created a new save file!"),
             Err(err) => println!("Failed to create a new save file!\nErr: {}", err),
@@ -53,7 +49,6 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
-        add_system(Box::new(MainSystem {objects: vec![]}), framework);
     }
 
     add_system(Box::new(LuaSystem::new("player_menu", "scripts/lua/player_menu.lua").unwrap()), framework);
@@ -70,6 +65,12 @@ pub fn start(args: Args, framework: &mut Framework) {
     add_system(Box::new(LuaSystem::new("interactable_objects", "scripts/lua/interactable_objects.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_item_unlockers", "scripts/lua/vanilla_item_unlockers.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_enemies", "scripts/lua/vanilla_enemies.lua").unwrap()), framework);
+
+    add_system(Box::new(LuaSystem::new("clouds", "scripts/lua/clouds.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("water", "scripts/lua/water.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("ambiance_and_music", "scripts/lua/ambiance_and_music.lua").unwrap()), framework);
+
+    add_system(Box::new(MainSystem {objects: vec![]}), framework);
 }
 
 pub fn update(framework: &mut Framework) {

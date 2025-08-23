@@ -107,7 +107,7 @@ impl UiManager {
             Some(sound_asset) => {
                 match asset_manager.get_sound_asset(&sound_asset) {
                     Some(sound_asset) => {
-                        match SoundSource::new(al, &sound_asset.wav, ez_al::SoundSourceType::Simple) {
+                        match SoundSource::new(al, &sound_asset.asset, ez_al::SoundSourceType::Simple) {
                             Ok(source) => {
                                 self.click_sound = Some(source);
                             },
@@ -134,7 +134,7 @@ impl UiManager {
             Some(sound_asset) => {
                 match asset_manager.get_sound_asset(&sound_asset) {
                     Some(sound_asset) => {
-                        match SoundSource::new(al, &sound_asset.wav, ez_al::SoundSourceType::Simple) {
+                        match SoundSource::new(al, &sound_asset.asset, ez_al::SoundSourceType::Simple) {
                             Ok(source) => {
                                 self.hover_start_sound = Some(source);
                             },
@@ -161,7 +161,7 @@ impl UiManager {
             Some(sound_asset) => {
                 match asset_manager.get_sound_asset(&sound_asset) {
                     Some(sound_asset) => {
-                        match SoundSource::new(al, &sound_asset.wav, ez_al::SoundSourceType::Simple) {
+                        match SoundSource::new(al, &sound_asset.asset, ez_al::SoundSourceType::Simple) {
                             Ok(source) => {
                                 self.hover_stop_sound = Some(source);
                             },
@@ -187,6 +187,7 @@ impl UiManager {
     pub fn render(&mut self, ctx: &Context, debug_mode: DebugMode) {
         match debug_mode {
             DebugMode::Full => {
+                #[cfg(debug_assertions)]
                 ctx.style_mut(|style| {
                     style.debug.debug_on_hover = true;
                     style.debug.debug_on_hover_with_all_modifiers = true;
@@ -194,6 +195,7 @@ impl UiManager {
                 });
             },
             _ => {
+                #[cfg(debug_assertions)]
                 ctx.style_mut(|style| {
                     style.debug.debug_on_hover = false;
                     style.debug.debug_on_hover_with_all_modifiers = false;

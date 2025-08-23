@@ -4,13 +4,13 @@ use crate::{
     managers::{
         self, assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
     },
-    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
+    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
 };
 use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
-    backend::glutin::SimpleWindowBuilder, glutin, Display
+    backend::glutin::SimpleWindowBuilder, glutin::{self, config::ConfigTemplateBuilder}, Display
 };
 use once_cell::sync::Lazy;
 use winit::{event::ElementState, keyboard::PhysicalKey, window::Fullscreen};
@@ -46,13 +46,13 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     let mut fonts = FontDefinitions::default();
     fonts
         .font_data
-        .insert("Oswald".into(), FontData::from_static(&FONT));
+        .insert("Oswald".into(), FontData::from_static(&FONT).into());
     fonts
         .font_data
-        .insert("JetBrains Mono".into(), FontData::from_static(&MONOSPACE_FONT));
+        .insert("JetBrains Mono".into(), FontData::from_static(&MONOSPACE_FONT).into());
     fonts
         .font_data
-        .insert("Oswald Bold".into(), FontData::from_static(&BOLD_FONT));
+        .insert("Oswald Bold".into(), FontData::from_static(&BOLD_FONT).into());
 
     fonts
         .families
@@ -125,6 +125,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                         match event {
                             WindowEvent::RedrawRequested => {
+                                let timer = Instant::now();
                                 let time_since_last_frame = last_frame.elapsed();
                                 last_frame = Instant::now();
                                 update_game(&mut framework, time_since_last_frame);
@@ -206,7 +207,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
             }
             if let Some(new_fps) = get_fps(&now, &frames_count) {
                 fps = new_fps;
-                window.set_title(&format!("projectbaldej: {fps} fps"));
+                window.set_title(&format!("untitled sandbox game: {fps} fps"));
                 frames_count = 0;
                 now = Instant::now();
             }
@@ -240,30 +241,27 @@ pub fn start_game_without_render(args: Args) {
 
     game_main::start(args, &mut framework);
 
-    let tickrate_tick = Duration::from_millis(16);
-    let clock = chron::Clock::new(NonZeroU32::new(60).unwrap());
-
-    for tick in clock {
-        match tick {
-            chron::clock::Tick::Update => {
-                unsafe {
-                    let ptr = &mut framework as *mut Framework;
-                    FRAMEWORK_POINTER = ptr as usize;
-                };
-                update_game(&mut framework, tickrate_tick);
-            }
-            chron::clock::Tick::Render { interpolation: _ } => {}
-        }
-    }
+    game_loop::game_loop((), 60, 0.1, |game_loop| {
+        unsafe {
+            let ptr = &mut framework as *mut Framework;
+            FRAMEWORK_POINTER = ptr as usize;
+        };
+        update_game(&mut framework, Duration::from_secs_f64(game_loop.accumulated_time()));
+    }, |_| { });
 }
 
 fn update_game(framework: &mut Framework, delta_time: Duration) {
     framework.delta_time = delta_time;
-    framework.physics.update();
+    std::thread::scope(|scope| {
+        scope.spawn(|| framework.physics.update());
+        scope.spawn(|| framework.navigation.update(delta_time.as_secs_f32()));
+    });
+    //framework.physics.update();
+    //framework.navigation.update(delta_time.as_secs_f32());
+    
     networking::update(delta_time);
     game_main::update(framework);
     systems::update(framework);
-    framework.navigation.update(delta_time.as_secs_f32());
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -282,14 +280,13 @@ pub enum DebugMode {
     Full,
 }
 
-// TODO: fix for Windows (?)
 fn new_window<T>(
     event_loop: &glium::winit::event_loop::EventLoop<T>,
 ) -> (
     glium::winit::window::Window,
     Display<glutin::surface::WindowSurface>,
 ) {
-    let (window, display) = SimpleWindowBuilder::new().build(event_loop);
+    let (window, display) = SimpleWindowBuilder::new().with_vsync(false).with_title("usg").build(event_loop);
 
     (window, display)
 }
@@ -537,8 +534,12 @@ impl Framework {
         ModelAsset::preload_model_asset_from_gltf(self, asset_id, gltf_path)
     }
 
-    pub fn preload_sound_asset(&mut self, asset_id: String, wav_path: &str) -> Result<(), ()> {
-        SoundAsset::preload_sound_asset_from_wav(self, asset_id, wav_path)
+    pub fn preload_sound_asset(&mut self, asset_id: String, asset_path: &str) -> Result<(), ()> {
+        if asset_path.ends_with(".wav") {
+            SoundAsset::preload_sound_asset_from_wav(self, asset_id, asset_path)
+        } else {
+            SoundAsset::preload_sound_asset_from_mp3(self, asset_id, asset_path)
+        }
     }
 
     pub fn preload_texture_asset(&mut self, asset_id: String, texture_path: &str) -> Result<(), ()> {
@@ -914,6 +915,18 @@ impl Framework {
         instance: &str,
     ) -> InstancedModelObject {
         InstancedModelObject::new(name, instance.into())
+    }
+
+    pub fn new_particle_system(
+        &mut self,
+        name: &str,
+        master_object_id: &str,
+        particle_count: u32,
+        gravity: f32,
+        random_factor: f32,
+        life_seconds: f32
+    ) -> ParticleSystem {
+        ParticleSystem::new(name, master_object_id.to_string(), particle_count, gravity, random_factor, life_seconds)
     }
 
     pub fn new_master_instanced_model_object(

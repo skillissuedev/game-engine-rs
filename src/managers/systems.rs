@@ -4,6 +4,7 @@ use crate::{framework::Framework, objects::ObjectGroup, systems::System};
 use egui_glium::egui_winit::egui::Context;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use splines::Spline;
 
 use super::{
     debugger, networking,
@@ -191,12 +192,13 @@ pub struct CallList {
     pub mut_call: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SystemValue {
     String(String),
     Int(i32),
     UInt(u32),
     Float(f32),
     Bool(bool),
-    Vec(Vec<SystemValue>)
+    Spline(Spline<f32, f32>),
+    Vec(Vec<SystemValue>),
 }

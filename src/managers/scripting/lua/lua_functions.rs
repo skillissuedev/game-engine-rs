@@ -6,12 +6,11 @@ use crate::{
         self,
         shader_asset::{ShaderAsset, ShaderAssetPath},
     }, managers::{
-        self, debugger::{self, error}, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::{get_framework_pointer, LuaSpline}, systems::{self, SystemValue}
+        self, debugger, networking::{self, Message, MessageContents, MessageReceiver, MessageReliability, SyncObjectMessage}, physics::{BodyColliderType, CollisionGroups}, render::RenderLayer, scripting::lua::{get_framework_pointer, LuaSpline}, systems::{self, SystemValue}
     }, math_utils::{self, look_at_rotation, PerlinNoise}, objects::{
         Object, Transform
     }, systems::System
 };
-use egui_glium::egui_winit::egui::TextBuffer;
 use glam::Vec3;
 use mlua::Lua;
 use splines::Spline;
@@ -263,6 +262,15 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
         );
         add_function!("look_at_rotation", look_at_rotation, lua, &system_id);
 
+        let normalize =
+            lua.create_function_mut(move |_, (x, y, z):
+            (f32, f32, f32)| {
+                let rotation = Vec3::new(x, y, z).normalize();
+                Ok(vec![rotation.x, rotation.y, rotation.z])
+            }
+        );
+        add_function!("normalize", normalize, lua, &system_id);
+
         let system_id_for_functions = system_id.clone();
         let new_empty_object = 
             lua.create_function_mut(move |lua, name: String| {
@@ -478,6 +486,25 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             Ok(())
         });
         add_function!("new_instanced_model_object", new_instanced_model_object, lua, system_id);
+
+        let system_id_for_functions = system_id.clone();
+        let new_particle_system = lua.create_function_mut(move |lua, 
+            (name, master_object_id, particle_count, gravity, random_factor, life_seconds): (String, String, u32, f32, f32, f32)| {
+
+            let framework_ptr = get_framework_pointer();
+            let framework = &mut *framework_ptr;
+            let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
+            match system_option {
+                Some(system) => {
+                    let object = framework.new_particle_system(&name, &master_object_id, particle_count, gravity, random_factor, life_seconds);
+                    add_to_system_or_parent(lua, system, Box::new(object));
+                },
+                None => debugger::error("failed to call new_particle_system, system not found"),
+            }
+
+            Ok(())
+        });
+        add_function!("new_particle_system", new_particle_system, lua, system_id);
 
         let system_id_for_functions = system_id.clone();
         let new_instanced_model_transform_holder = lua.create_function_mut(move 

@@ -145,7 +145,7 @@ impl RenderManager {
                 .expect("Failed to create a SimpleFrameBuffer for the 2nd layer (render_scene in render.rs)");
         
         // 1. Cleaning
-        frame.clear_color_and_depth((0.7, 0.7, 1.0, 1.0), 1.0);
+        frame.clear_color_and_depth((0.6, 0.6, 0.6, 1.0), 1.0);
         layer1_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
         layer2_framebuffer.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0); // change to the BG color later
 
@@ -382,7 +382,7 @@ impl RenderCamera {
             rotation: Vec3::ZERO,
             y_fov_deg: 59.0,
             window_size,
-            render_distance: 500.0,
+            render_distance: 600.0,
         }
     }
 }

@@ -2,7 +2,7 @@ pub mod lua_functions;
 use crate::{
     framework::{self, DebugMode, Framework}, managers::{
         assets, debugger, networking::{Message, MessageContents}, physics::{BodyColliderType, BodyType, CollisionGroups, RenderColliderType}, render::RenderUniformValue, scripting::lua::lua_functions::add_lua_vm_to_list, systems::{self, CallList, SystemValue}
-    }, math_utils::{self, PerlinNoise}, objects::{character_controller::CharacterController, model_object::ModelObject, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
+    }, math_utils::{self, PerlinNoise}, objects::{character_controller::CharacterController, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}, systems::System
 };
 use crate::objects::Object;
 use glam::{Vec2, Vec3};
@@ -866,9 +866,18 @@ impl UserData for ObjectHandle {
                                 object.cast_shadows(cast);
                             },
                             None => {
-                                debugger::error(
-                                    &format!("lua error(system {}): cast_shadows failed in object: {}. this object is not ModelObject!", 
-                                        this.system_id, this.name));
+                                match object.downcast_mut::<MasterInstancedModelObject>() {
+                                    Some(object) => {
+                                        object.cast_shadows(cast);
+                                    },
+                                    None => {
+                                        debugger::error(
+                                            &format!("lua error(system {}): cast_shadows failed in object: {}. this object is not ModelObject or a MasterInstancedModelObject!", 
+                                                this.system_id, this.name
+                                            )
+                                        );
+                                    },
+                                }
                             },
                         }
                     }
@@ -885,6 +894,70 @@ impl UserData for ObjectHandle {
 
             Ok(())
         });
+
+        methods.add_method("start_particles", |_, this, (velocity_x, velocity_y, velocity_z, random_velocity_scale): (f32, f32, f32, f32)| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<ParticleSystem>() {
+                            Some(object) => {
+                                object.start_particles(Vec3::new(velocity_x, velocity_y, velocity_z), random_velocity_scale);
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): start_particles failed in object: {}. this object is not ParticleSystem!", 
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: start_particles failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(
+                    &format!(
+                        "lua error: start_particles failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                    )
+                ),
+            }
+
+            Ok(())
+        });
+
+        methods.add_method("set_max_particle_distance", |_, this, distance: f32| {
+            match systems::get_system_mut_with_id(&this.system_id) {
+                Some(system) => match system.find_object_mut(&this.name) {
+                    Some(object) => {
+                        match object.downcast_mut::<ParticleSystem>() {
+                            Some(object) => {
+                                object.set_max_particle_distance(distance);
+                            },
+                            None => {
+                                debugger::error(
+                                    &format!("lua error(system {}): set_max_particle_distance failed in object: {}. this object is not ParticleSystem!", 
+                                        this.system_id, this.name));
+                            },
+                        }
+                    }
+                    None => {
+                        debugger::error(
+                            &format!("lua error: set_max_particle_distance failed! failed to get object {} in system {}", this.name, this.system_id));
+                    },
+                },
+                None => debugger::error(
+                    &format!(
+                        "lua error: set_max_particle_distance failed! failed to get system {} to find object {}",
+                        this.system_id, this.name
+                    )
+                ),
+            }
+
+            Ok(())
+        });
+
+
 
         methods.add_method("play_animation", |_, this, anim_name: String| {
             match systems::get_system_mut_with_id(&this.system_id) {
@@ -1665,6 +1738,18 @@ impl<'lua> FromLua<'lua> for SystemValue {
         if let Some(value) = value.as_boolean() {
             return Ok(SystemValue::Bool(value));
         }
+        if let Some(value) = value.as_userdata() {
+            match value.take::<LuaSpline>() {
+                Ok(value) => return Ok(SystemValue::Spline(value.0)),
+                Err(err) => {
+                    return Err(Error::FromLuaConversionError { 
+                        from: "UserData",
+                        to: "SystemValue::Spline",
+                        message: Some(err.to_string()) 
+                    })
+                },
+            }
+        }
         if let Some(value) = value.as_table() {
             let mut vec: Vec<SystemValue> = Vec::new();
             if let Err(err) = value.for_each(|_: SystemValue, value: SystemValue| {
@@ -1676,7 +1761,7 @@ impl<'lua> FromLua<'lua> for SystemValue {
 
             return Ok(SystemValue::Vec(vec))
         }
-        Err(Error::FromLuaConversionError { from: "-", to: "SystemValue", message: None })
+        Err(Error::FromLuaConversionError { from: value.type_name(), to: "SystemValue::Vec", message: None })
     }
 }
 
@@ -1761,6 +1846,7 @@ impl<'lua> IntoLua<'lua> for SystemValue {
             SystemValue::Float(value) => Ok(value.into_lua(lua)?),
             SystemValue::Bool(value) => Ok(value.into_lua(lua)?),
             SystemValue::Vec(value) => Ok(value.into_lua(lua)?),
+            SystemValue::Spline(value) => Ok(LuaSpline(value).into_lua(lua)?),
         }
     }
 }
@@ -2350,26 +2436,7 @@ impl<'lua> FromLuaMulti<'lua> for Framework {
 }
 
 pub(crate) struct LuaSpline(pub Spline<f32, f32>);
-/*
-impl<'lua> IntoLua<'lua> for LuaSpline {
-    fn into_lua(self, lua: &'lua Lua) -> mlua::Result<mlua::Value<'lua>> {
-        let table = lua.create_table()?;
-        for key in self.0.keys() {
-            let key_table = lua.create_table()?;
-            key_table.set(1, key.value)?;
-            let interpolation = serde_bare::to_vec(&key.interpolation);
-            match interpolation {
-                Ok(interpolation) => key_table.set(2, interpolation)?,
-                Err(err) => debugger::error(
-                    &format!("LuaSpline into_lua error! Failed to serialize interpolation! Err: {}", err)
-                ),
-            }
-            table.set(key.t, key.value)?;
-        }
 
-        Ok(mlua::Value::Table(table))
-    }
-}*/
 impl UserData for LuaSpline {
     fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {}
 

@@ -32,7 +32,7 @@ impl SoundEmitter {
         if let Some(al) = &framework.al {
             match framework.assets.get_sound_asset(&asset) {
                 Some(asset) => {
-                    match SoundSource::new(al, &asset.wav, emitter_type) {
+                    match SoundSource::new(al, &asset.asset, emitter_type) {
                         Ok(source) => source_option = Some(source),
                         Err(err) => {
                             debugger::error(&format!("SoundEmitter error!\nFailed to create a SoundSource.\nError: {:?}", err));
@@ -102,6 +102,15 @@ impl SoundEmitter {
                 None
             }
             SoundSourceType::Positional => Some(self.max_distance),
+        }
+    }
+
+    pub fn set_volume(&mut self, sound_volume: f32) {
+        match &mut self.source {
+            Some(source) => source.set_volume(sound_volume),
+            None => {
+                debugger::error("Failed to set the volume of a SoundEmitter object! Can't get the SoundSource.");
+            },
         }
     }
 

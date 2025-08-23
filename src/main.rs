@@ -1,8 +1,9 @@
-use std::{net::Ipv4Addr, time::Duration};
+use std::{collections::HashMap, net::Ipv4Addr};
 
 use clap::Parser;
 use framework::DebugMode;
-use rand::Rng;
+
+use crate::managers::saves::SavesManager;
 mod assets;
 mod framework;
 mod game;
@@ -12,34 +13,16 @@ mod objects;
 mod systems;
 
 fn main() {
-    std::thread::sleep(Duration::from_millis(250));
-
-    let mut args = Args::parse();
+    let args = Args::parse();
     println!("run args:\n{:#?}\n---\n\n", &args);
 
     if let Some(save_name) = &args.new_save_name {
         println!("New save name is {}", save_name);
 
-        let seed: u32;
-        match &args.new_save_seed {
-            Some(arg_seed) => {
-                println!("New save seed is {}", arg_seed);
-                seed = *arg_seed;
-            }
-            None => {
-                println!("New save seed isn't specified. Setting a random one.");
-                seed = rand::thread_rng().gen_range(1..u32::MAX);
-            }
-        }
-        args.new_save_seed = Some(seed);
-
-        //set_global_system_value("WorldGeneratorSeed", vec![SystemValue::UInt(seed)]);
-        //register_save_value("WorldGeneratorSeed");
-
-        /*match new_save(&save_name) {
+        match SavesManager::default().new_save(&save_name, &HashMap::new()) {
             Ok(_) => println!("Successfully created a new save file!"),
             Err(err) => println!("Failed to create a new save file!\nErr: {}", err),
-        }*/
+        }
         framework::start_game_without_render(args.clone());
         return;
     }
@@ -78,8 +61,6 @@ struct Args {
     pub load_save: Option<String>,
     #[arg(long)]
     pub debug: bool,
-    #[arg(long)]
-    pub new_save_seed: Option<u32>,
     #[arg(long)]
     pub new_save_name: Option<String>,
     #[arg(long = "connect")]

@@ -25,6 +25,7 @@ pub struct MasterInstancedModelObject {
     objects_global_transforms: HashMap<String, Mat4>,
     animation_data: Option<CurrentAnimationData>,
     bone_offsets: HashMap<String, Mat4>,
+    cast_shadows: bool,
 }
 
 impl MasterInstancedModelObject {
@@ -51,6 +52,7 @@ impl MasterInstancedModelObject {
             objects_global_transforms: HashMap::new(),
             animation_data: None,
             bone_offsets: HashMap::new(),
+            cast_shadows: true,
         }
     }
 }
@@ -164,6 +166,10 @@ impl Object for MasterInstancedModelObject {
 }
 
 impl MasterInstancedModelObject {
+    pub fn cast_shadows(&mut self, cast: bool) {
+        self.cast_shadows = cast;
+    }
+
     fn model_object_transform(&self) -> Mat4 {
         let global_transform = self.global_transform();
         let global_rotation = deg_vec_to_rad(global_transform.rotation);
@@ -236,7 +242,7 @@ impl MasterInstancedModelObject {
                 // gotta do 'em after setting all transforms
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
-                cast_shadows: true,
+                cast_shadows: self.cast_shadows,
             };
 
             for (bone_name, offset) in render_data.bone_offsets.clone() {

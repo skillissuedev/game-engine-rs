@@ -11,34 +11,34 @@ splines = { version = "4.2.0", features = ["serde"] }
 glam = { version = "0.28", features = ["serde"] }
 serde_bare = "0.5.0"
 serde = { version = "1.0.188", features = ["derive"] }
-ez_al = "0.3.1"
+ez_al = "0.5.0"
 mlua = { version = "0.9.9", features = ["lua54", "vendored"] }
 once_cell = "1.18.0"
 renet = "0.0.13"
 machineid-rs = "1.2.4"
 rapier3d = "0.26.1"
 nalgebra = { version = "0.33.0", features = ["convert-glam028"] }
-chron = "0.1.3"
+#chron = "0.1.3" AGPL
 bitmask-enum = "2.2.3"
 downcast-rs = "1.2.0"
-grid_pathfinding = "0.2.1"
-grid_util = "=0.1.1"
+#grid_pathfinding = "0.2.1"
+#grid_util = "=0.1.1"
 rand = "0.8.5"
 toml = "0.8.13"
 serde_json = "1.0.117"
 clap = { version = "4.5.6", features = ["derive"] }
-glutin = { version = "0.31.0" }
+glutin = { version = "0.32.0" }
 raw-window-handle = "0.6.2"
 egui_glium = { git = "https://github.com/skillissuedev/egui_glium", features = ["clipboard", "serde"] }
-glium = { version = "0.35.0", features = ["glutin-winit", "winit"] }
-winit = { version = "0.30.5", features = ["serde"] }
+#egui_glium = { version = "0.31.1" }
+#glium = { version = "0.36.0", features = ["glutin-winit", "winit"] }
+glium = { git = "https://github.com/glium/glium" }
+winit = { version = "0.30.12", features = ["serde"] }
 noise = "0.9.0"
-russimp = { version = "3.2.1", features = ["prebuilt"] }
-recast_navigation = "0.1.0"
+russimp = { git = "https://github.com/skillissuedev/russimp", features = ["prebuilt", "static-link"] }
 landmass = "0.8.0"
 parry3d = "=0.17.0"
-egui_commonmark = "0.21.1"
-egui_alignments = "=0.2.5"
+game-loop = "1.3.0"
 
 [profile.dev.package.rapier3d]
 opt-level = 3

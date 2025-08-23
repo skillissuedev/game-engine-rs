@@ -18,6 +18,7 @@ pub mod character_controller;
 pub mod empty_object;
 pub mod instanced_model_object;
 pub mod instanced_model_transform_holder;
+pub mod particle_system;
 pub mod master_instanced_model_object;
 pub mod model_object;
 pub mod nav_obstacle;

@@ -165,11 +165,6 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
     let point_lights_attenuation = UniformBuffer::new(display, point_lights_attenuation)
         .expect("UniformBuffer::new() failed (point_lights_attenuation) - object_render.rs");
 
-    // Sort objects by distance
-    quicksort(&mut distance_objects);
-    quicksort(&mut transparent_distance_objects);
-    transparent_distance_objects.reverse();
-
     let view_matrix = camera.get_view_matrix().to_cols_array_2d();
     let proj_matrix = camera.get_projection_matrix().to_cols_array_2d();
     let camera_position = camera.translation.to_array();
@@ -178,6 +173,10 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
         (shadow_camera.close_shadow_proj * shadow_camera.close_shadow_view).to_cols_array_2d();
     let far_shadow_viewproj =
         (shadow_camera.far_shadow_proj * shadow_camera.far_shadow_view).to_cols_array_2d();
+
+    // Sort objects by distance
+    quicksort(&mut transparent_distance_objects);
+    transparent_distance_objects.reverse();
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
@@ -233,17 +232,19 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
 
         let mut draw_parameters = DrawParameters {
             depth: glium::Depth {
-                test: glium::draw_parameters::DepthTest::IfLess,
+                test: draw_parameters::DepthTest::IfLess,
                 write: true,
                 ..Default::default()
             },
-            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-            polygon_mode: glium::draw_parameters::PolygonMode::Fill,
+            backface_culling: draw_parameters::BackfaceCullingMode::CullClockwise,
+            polygon_mode: draw_parameters::PolygonMode::Fill,
             ..Default::default()
         };
 
         if transparent == true {
+            draw_parameters.backface_culling = draw_parameters::BackfaceCullingMode::CullingDisabled;
             draw_parameters.blend = draw_parameters::Blend::alpha_blending();
+            draw_parameters.depth.write = false;
         }
 
         let vbo = &render_object.vbo;
