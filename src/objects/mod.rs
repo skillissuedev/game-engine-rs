@@ -92,7 +92,7 @@ pub trait Object: std::fmt::Debug + Downcast {
                 Transform {
                     position: base_transformations.position + transform.position,
                     rotation: base_transformations.rotation + transform.rotation,
-                    scale: base_transformations.scale + transform.scale,
+                    scale: base_transformations.scale * transform.scale,
                 }
             },
             None => base_transformations,

@@ -1,36 +1,98 @@
-use crate::assets::{
-    model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset
-};
+use crate::{assets::{
+    model_asset::{self, ModelAsset}, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset
+}, managers::debugger::warn};
 
 use super::debugger::{crash, error};
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, sync::{Arc, RwLock}, time::Instant};
 
 #[derive(Default)]
 pub struct AssetManager {
-    loaded_model_assets: HashMap<String, ModelAsset>,
+    loaded_model_assets: Arc<RwLock<HashMap<String, Arc<ModelAsset>>>>,
     loaded_sound_assets: HashMap<String, SoundAsset>,
     loaded_texture_assets: HashMap<String, TextureAsset>,
     loaded_shader_assets: HashMap<String, ShaderAsset>,
 }
 
 impl AssetManager {
-    pub fn preload_model_asset(
+    pub(crate) fn preload_model_asset(
         &mut self,
         asset_id: String,
-        asset: ModelAsset,
+        path: String,
     ) -> Result<ModelAssetId, AssetManagerError> {
-        match self.loaded_model_assets.get(&asset_id) {
-            Some(_) => {
-                error(
+        // don't preload the asset if it's already there
+        {
+            let loaded_model_assets = self.loaded_model_assets.read().expect("loaded_model_assets is poisoned! :(");
+            let preloaded_asset = loaded_model_assets.get(&asset_id);
+            if let Some(_) = preloaded_asset {
+                warn(
                     &format!("AssetManager error!\nFailed to preload ModelAsset '{}'\nError: ModelAsset with this id already exists!", asset_id)
                 );
-                Err(AssetManagerError::AssetAlreadyLoaded)
-            }
-            None => {
-                self.loaded_model_assets.insert(asset_id.clone(), asset);
-                Ok(ModelAssetId { id: asset_id })
+                return Err(AssetManagerError::AssetAlreadyLoaded);
             }
         }
+
+        match ModelAsset::from_gltf(&path) {
+            Ok(asset) => {
+                let asset = Arc::new(asset);
+                self.loaded_model_assets.write().unwrap().insert(asset_id.clone(), asset);
+                println!("write finished!");
+            }
+            Err(err) => {
+                error(&format!("Failed to preload the ModelAsset!\nFailed to load the asset\nError: {:?}\nPath: {}", err, path));
+                return Err(AssetManagerError::AssetCreationError);
+            }
+        }
+
+        Ok(ModelAssetId { id: asset_id })
+    }
+
+    pub(crate) fn background_preload_model_asset(
+        &mut self,
+        asset_id: String,
+        path: String,
+    ) -> Result<ModelAssetId, AssetManagerError> {
+        // don't preload the asset if it's already there
+        {
+            let loaded_model_assets = self.loaded_model_assets.read().expect("loaded_model_assets is poisoned! :(");
+            let preloaded_asset = loaded_model_assets.get(&asset_id);
+            if let Some(_) = preloaded_asset {
+                warn(
+                    &format!("AssetManager error!\nFailed to preload ModelAsset '{}'\nError: ModelAsset with this id already exists!", asset_id)
+                );
+                return Err(AssetManagerError::AssetAlreadyLoaded)
+            }
+        }
+
+        // Making an asset that'll be in place of the real asset while it's being loaded
+        let temporary_asset = ModelAsset { 
+            is_loaded: false, 
+            path: path.to_owned(), 
+            root: model_asset::ModelAssetObject {
+                render_data: Vec::new(),
+                children: HashMap::new(),
+                object_name: None,
+                default_transform: glam::Mat4::IDENTITY,
+            }, 
+            animations: HashMap::new(),
+        };
+
+        let loaded_model_assets = self.loaded_model_assets.clone();
+        loaded_model_assets.write().unwrap().insert(asset_id.clone(), Arc::new(temporary_asset));
+        let asset_id_2 = asset_id.clone();
+
+        // start loading the real asset
+        std::thread::spawn(move || {
+            match ModelAsset::from_gltf(&path) {
+                Ok(asset) => {
+                    loaded_model_assets.write().unwrap().insert(asset_id_2, Arc::new(asset));
+                }
+                Err(err) => {
+                    error(&format!("Failed to preload the ModelAsset!\nFailed to load the asset\nError: {:?}\nPath: {}", err, path));
+                }
+            }
+        });
+
+        Ok(ModelAssetId { id: asset_id })
     }
 
     pub fn preload_sound_asset(
@@ -91,7 +153,7 @@ impl AssetManager {
     }
 
     pub fn get_model_asset_id(&self, id: &str) -> Option<ModelAssetId> {
-        match self.loaded_model_assets.get(id) {
+        match self.loaded_model_assets.read().expect("loaded_model_assets is poisoned :(").get(id) {
             Some(_) => Some(ModelAssetId { id: id.into() }),
             None => None,
         }
@@ -132,9 +194,10 @@ impl AssetManager {
         }
     }
 
-    pub fn get_model_asset(&self, asset_id: &ModelAssetId) -> Option<&ModelAsset> {
-        match self.loaded_model_assets.get(asset_id.get_id()) {
-            Some(model_asset) => Some(&model_asset),
+    pub(crate) fn get_model_asset(&self, asset_id: &ModelAssetId) -> Option<Arc<ModelAsset>> {
+        let loaded_model_assets = self.loaded_model_assets.read().expect("loaded_model_assets is poisoned :(");
+        match loaded_model_assets.get(asset_id.get_id()) {
+            Some(model_asset) => Some(model_asset.clone()),
             None => None,
         }
     }

@@ -70,7 +70,7 @@ impl RenderManager {
         };
         let camera = RenderCamera::new((1280, 720));
 
-        let directional_light_dir = Vec3::new(0.3, -0.8, 0.0);
+        let directional_light_dir = Vec3::new(-0.5, -0.6, -0.4).normalize();
         let shadow_camera = RenderShadowCamera::new(&camera, directional_light_dir);
 
         let framebuffer_vbo = VertexBuffer::new(&display, &[
@@ -158,10 +158,11 @@ impl RenderManager {
                 .expect("Failed to create a SimpleFrameBuffer for the far shadow (render_scene in render.rs)");
         close_shadow_framebuffer.clear_depth(1.0);
         far_shadow_framebuffer.clear_depth(1.0);
-        if self.update_shadowmap_timer.elapsed().as_secs_f32() > 0.5 {
-            self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
-            self.update_shadowmap_timer = Instant::now();
-        }
+        //if self.update_shadowmap_timer.elapsed().as_secs_f32() > 0.33 {
+            //self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
+            //self.update_shadowmap_timer = Instant::now();
+        //}
+        self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
 
         object_render::shadow_render_objects(
             &mut close_shadow_framebuffer,
@@ -449,9 +450,9 @@ impl RenderShadowCamera {
     pub(crate) fn new(camera: &RenderCamera, light_dir: Vec3) -> RenderShadowCamera {
         let view = camera.get_view_matrix();
         let close_corners = Self::get_frustum_corners_world_space(
-            camera.get_projection_matrix_with_max_distance(100.0), view);
+            camera.get_projection_matrix_with_max_distance(120.0), view);
         let close_corners_1 = Self::get_frustum_corners(
-            camera.get_projection_matrix_with_max_distance(100.0)
+            camera.get_projection_matrix_with_max_distance(120.0)
         );
         let far_corners = Self::get_frustum_corners_world_space(
             camera.get_projection_matrix(), view);
@@ -524,7 +525,9 @@ impl RenderShadowCamera {
         center /= Vec3::new(corners.len() as f32, corners.len() as f32, corners.len() as f32);
 
         //Mat4::look_at_rh(center + Vec3::new(0.0, 30.0, 0.0) + light_dir, center, Vec3::Y)
-        Mat4::look_at_rh(center - light_dir, center, Vec3::Y)
+        let light_right = Vec3::Y.cross(light_dir).normalize();
+        let light_up = light_dir.cross(light_right);
+        Mat4::look_at_rh(center - light_dir, center, light_up)
     }
 
     fn shadow_proj(corners: &Vec<Vec4>) -> Mat4 {
@@ -545,5 +548,4 @@ impl RenderShadowCamera {
 
         Mat4::orthographic_rh_gl(min_x - 50.0, max_x + 50.0, min_y - 50.0, max_y + 50.0, min_z - 50.0, max_z + 50.0)
     }
-
 }

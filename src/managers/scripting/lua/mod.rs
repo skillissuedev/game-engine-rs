@@ -2040,6 +2040,16 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("background_preload_model_asset",
+            |_, framework, (asset_id, gltf_path): (String, String)| {
+                match framework.background_preload_model_asset(asset_id.clone(), &gltf_path) {
+                    Ok(_) => println!("(Background) Preloaded ModelAsset with id '{}'!", asset_id),
+                    Err(_) => println!("(Background) Failed to preload ModelAsset with id '{}'!", asset_id),
+                }
+                Ok(())
+            }
+        );
+
         methods.add_method_mut("preload_sound_asset",
             |_, framework, (asset_id, wav_path): (String, String)| {
                 match framework.preload_sound_asset(asset_id.clone(), &wav_path) {

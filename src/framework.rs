@@ -160,10 +160,13 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 {
                                     let render = framework.render.as_mut().unwrap();
 
+                                    let mut listener_front = render.camera.front();
+                                    listener_front.x = -listener_front.x;
+
                                     set_listener_transform(
                                         framework.al.as_ref().unwrap(),
                                         render.camera.translation,
-                                        render.camera.front(),
+                                        listener_front,
                                     );
 
                                     render.render_scene(&framework.assets, &mut egui_glium);
@@ -530,8 +533,18 @@ impl Framework {
     }
 
     // AssetManager
-    pub fn preload_model_asset(&mut self, asset_id: String, gltf_path: &str) -> Result<(), ()> {
-        ModelAsset::preload_model_asset_from_gltf(self, asset_id, gltf_path)
+    pub fn preload_model_asset(&mut self, asset_id: String, asset_path: &str) -> Result<(), ()> {
+        match self.assets.preload_model_asset(asset_id, asset_path.into()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn background_preload_model_asset(&mut self, asset_id: String, asset_path: &str) -> Result<(), ()> {
+        match self.assets.background_preload_model_asset(asset_id, asset_path.into()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(()),
+        }
     }
 
     pub fn preload_sound_asset(&mut self, asset_id: String, asset_path: &str) -> Result<(), ()> {

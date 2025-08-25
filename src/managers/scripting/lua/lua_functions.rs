@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::read_to_string};
 
 use super::{ObjectHandle, SYSTEMS_LUA_VMS};
 use crate::{
@@ -134,6 +134,26 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             Ok(())
         });
         add_function!("clear_current_parent", clear_current_parent, lua, &system_id);
+
+        // Load contents of a file (like another script).
+        let read_to_string = lua.create_function(move |lua, path: String| {
+            match read_to_string(managers::assets::get_full_asset_path(&path)) {
+                Ok(chunk) => {
+                    return Ok(Some(chunk))
+                },
+                Err(err) => {
+                    debugger::error(
+                        &format!(
+                            "failed to call 'read_to_string', failed to read a scipt! Path: {}, Err: {}",
+                            path,
+                            err
+                        )
+                    );
+                },
+            }
+            Ok(None)
+        });
+        add_function!("read_to_string", read_to_string, lua, system_id);
 
         // delete and find objects
         let system_id_for_functions = system_id.clone();

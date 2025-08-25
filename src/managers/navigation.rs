@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{Arc, RwLock}};
 
 use glam::{Vec2, Vec3};
 use landmass::{Agent, AgentId, AgentOptions, Archipelago, Character, CharacterId, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, SampledPoint, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
@@ -8,8 +8,8 @@ use crate::{managers::debugger, objects::{nav_object::NavObjectData, Transform}}
 use super::assets::AssetManager;
 
 pub struct NavigationManager {
-    objects: HashMap<u128, IslandId>,
-    archipelago: Archipelago<XYZ>,
+    objects: Arc<RwLock<HashMap<u128, IslandId>>>,
+    archipelago: Arc<RwLock<Archipelago<XYZ>>>,
     characters: HashMap<u128, CharacterId>,
     agents: HashMap<u128, AgentId>,
 
@@ -23,10 +23,10 @@ pub struct NavigationManager {
 
 impl NavigationManager {
     pub fn new() -> NavigationManager {
-        let archipelago = Archipelago::new(AgentOptions::from_agent_radius(1.0));
+        let archipelago = Arc::new(RwLock::new(Archipelago::new(AgentOptions::from_agent_radius(1.0))));
 
         Self {
-            objects: HashMap::new(),
+            objects: Arc::new(RwLock::new(HashMap::new())),
             archipelago,
             characters: HashMap::new(),
             agents: HashMap::new(),
@@ -68,26 +68,31 @@ impl NavigationManager {
                     },
                 };
 
-                let navmesh = NavigationMesh {
-                    vertices,
-                    polygons,
-                    polygon_type_indices,
-                };
-                match validate_navmesh(navmesh, None) {
-                    Some(navmesh) => {
-                        if let Ok(navmesh) = navmesh {
-                            let island_id = self.archipelago.add_island(
-                                Island::new(transform, navmesh.into(), HashMap::new())
-                            );
-                            self.objects.insert(id, island_id);
-                        }
-                    },
-                    None => (),
-                }
+                let archipelago = self.archipelago.clone();
+                let objects = self.objects.clone();
+
+                std::thread::spawn(move || {
+                    let navmesh = NavigationMesh {
+                        vertices,
+                        polygons,
+                        polygon_type_indices,
+                    };
+                    match validate_navmesh(navmesh, None) {
+                        Some(navmesh) => {
+                            if let Ok(navmesh) = navmesh {
+                                let island_id = archipelago.write().expect("archipelago was poisoned :(").add_island(
+                                    Island::new(transform, navmesh.into(), HashMap::new())
+                                );
+                                objects.write().expect("objects was poisoned :c").insert(id, island_id);
+                            }
+                        },
+                        None => (),
+                    }
+                });
             },
             NavObjectData::DynamicCapsule(radius) => {
                 let pos = transform.position;
-                let character_id = self.archipelago.add_character(Character {
+                let character_id = self.archipelago.write().expect("archipelago was poisoned :(").add_character(Character {
                     position: landmass::Vec3::new(pos.x, pos.z, pos.y),
                     velocity: landmass::Vec3::ZERO,
                     radius: *radius,
@@ -98,18 +103,20 @@ impl NavigationManager {
     }
 
     pub fn update(&mut self, delta_time: f32) {
-        self.archipelago.update(delta_time);
-        for agent_id in self.archipelago.get_agent_ids().collect::<Vec<_>>() {
-            let agent = self.archipelago.get_agent_mut(agent_id)
-                .expect("No agent for some reason?");
-            agent.velocity = *agent.get_desired_velocity();
+        if let Ok(mut archipelago) = self.archipelago.try_write() {
+            archipelago.update(delta_time);
+            for agent_id in archipelago.get_agent_ids().collect::<Vec<_>>() {
+                let agent = archipelago.get_agent_mut(agent_id)
+                    .expect("No agent for some reason?");
+                agent.velocity = *agent.get_desired_velocity();
+            }
         }
     }
 
     pub fn set_island_transform(&mut self, idx: u128, transform: Transform) {
-        match self.objects.get(&idx) {
+        match self.objects.read().unwrap().get(&idx) {
             Some(island) => {
-                match self.archipelago.get_island_mut(*island) {
+                match self.archipelago.write().unwrap().get_island_mut(*island) {
                     Some(mut island) => {
                         let pos = transform.position;
                         let transform: landmass::Transform<XYZ> = landmass::Transform {
@@ -129,7 +136,7 @@ impl NavigationManager {
     pub fn set_character_position(&mut self, idx: u128, position: Vec3) {
         match self.characters.get(&idx) {
             Some(character) => {
-                match self.archipelago.get_character_mut(*character) {
+                match self.archipelago.write().unwrap().get_character_mut(*character) {
                     Some(character) => {
                         let position = landmass::Vec3::new(position.x, position.z, position.y);
 
@@ -148,15 +155,17 @@ impl NavigationManager {
         position.y = position.z;
         position.z = y;
 
-        let sample_point = self.archipelago.sample_point(position, &PointSampleDistance3d {
+        let mut archipelago = self.archipelago.write().unwrap();
+        let sample_point = archipelago.sample_point(position, &PointSampleDistance3d {
             horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+
         match sample_point {
             Ok(position) => {
                 let position = position.point();
 
-                let mut agent = Agent::create(/*position*/landmass::Vec3::ZERO, landmass::Vec3::ZERO, radius, speed, speed);
+                let mut agent = Agent::create(position/*landmass::Vec3::ZERO*/, landmass::Vec3::ZERO, radius, speed, speed);
                 agent.target_reached_condition = TargetReachedCondition::StraightPathDistance(Some(0.5));
-                self.agents.insert(idx, self.archipelago.add_agent(agent));
+                self.agents.insert(idx, archipelago.add_agent(agent));
             },
             Err(err) => {
                 dbg!(err);
@@ -172,8 +181,9 @@ impl NavigationManager {
                 position.y = position.z;
                 position.z = y;
 
-                let sampled_position = self.archipelago.sample_point(position, &PointSampleDistance3d {
-                    horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+                let mut archipelago = self.archipelago.write().unwrap();
+                let sampled_position = archipelago.sample_point(position, &PointSampleDistance3d {
+                    horizontal_distance: 0.1, distance_above: 10.0, distance_below: 10.0, vertical_preference_ratio: 0.0 });
                 let position: landmass::Vec3;
 
                 match sampled_position {
@@ -186,7 +196,7 @@ impl NavigationManager {
                     },
                 }
 
-                match self.archipelago.get_agent_mut(*agent) {
+                match archipelago.get_agent_mut(*agent) {
                     Some(agent) => {
                         agent.position = position;
                     },
@@ -200,7 +210,8 @@ impl NavigationManager {
     pub fn get_agent_velocity(&self, idx: u128) -> Option<Vec3> {
         match self.agents.get(&idx) {
             Some(agent) => {
-                match self.archipelago.get_agent(*agent) {
+                let archipelago = self.archipelago.read().unwrap();
+                match archipelago.get_agent(*agent) {
                     Some(agent) => {
                         let mut velocity = Vec3::from_array(agent.velocity.to_array());
                         let y = velocity.y;
@@ -231,7 +242,8 @@ impl NavigationManager {
                         target.y = target.z;
                         target.z = y;
 
-                        let sampled_target = self.archipelago.sample_point(target, &PointSampleDistance3d {
+                        let mut archipelago = self.archipelago.write().unwrap();
+                        let sampled_target = archipelago.sample_point(target, &PointSampleDistance3d {
                             horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
                         let target: landmass::Vec3;
 
@@ -245,7 +257,7 @@ impl NavigationManager {
                             },
                         }
 
-                        match self.archipelago.get_agent_mut(*agent) {
+                        match archipelago.get_agent_mut(*agent) {
                             Some(agent) => {
                                 agent.current_target = Some(target);
                             },
@@ -253,7 +265,8 @@ impl NavigationManager {
                         }
                     },
                     None => {
-                        match self.archipelago.get_agent_mut(*agent) {
+                        let mut archipelago = self.archipelago.write().unwrap();
+                        match archipelago.get_agent_mut(*agent) {
                             Some(agent) => {
                                 agent.current_target = None;
                             },
@@ -269,7 +282,7 @@ impl NavigationManager {
     pub fn get_agent_position(&mut self, idx: u128) -> Option<Vec3> {
         match self.agents.get(&idx) {
             Some(agent) => {
-                match self.archipelago.get_agent_mut(*agent) {
+                match self.archipelago.read().unwrap().get_agent(*agent) {
                     Some(agent) => {
                         Some(Vec3::from_array(agent.position.to_array()))
                     },

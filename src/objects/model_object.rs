@@ -97,9 +97,9 @@ impl Object for ModelObject {
                 self.uniforms_queue.clear();
             }
 
-            self.loop_animation_if_needed(asset);
-            self.update_all_object_transforms(asset);
-            self.update_all_render_objects(render, asset);
+            self.loop_animation_if_needed(&asset);
+            self.update_all_object_transforms(&asset);
+            self.update_all_render_objects(render, &asset);
         } else {
             self.error = true;
             debugger::error(

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::debugger;
 use crate::{
     assets::model_asset::ModelAsset,
@@ -609,7 +611,7 @@ pub enum BodyColliderType {
     /// first is radius, second is height,
     Cylinder(f32, f32),
     /// just uses first object it finds
-    TriangleMesh(ModelAsset),
+    TriangleMesh(Arc<ModelAsset>),
 }
 
 pub fn collider_type_to_collider_builder(

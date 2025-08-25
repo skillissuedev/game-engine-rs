@@ -18,6 +18,7 @@ pub(crate) enum ModelAssetError {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModelAsset {
+    pub is_loaded: bool,
     pub path: String,
     pub(crate) root: ModelAssetObject,
     pub(crate) animations: HashMap<String, ModelAssetAnimation>,
@@ -59,25 +60,6 @@ pub(crate) struct ModelAssetAnimationChannel {
 }
 
 impl ModelAsset {
-    pub fn preload_model_asset_from_gltf(framework: &mut Framework, asset_id: String, path: &str) -> Result<(), ()> {
-        match Self::from_gltf(path) {
-            Ok(asset) => {
-                if let Err(err) = framework.assets.preload_model_asset(asset_id.to_string(), asset) {
-                    debugger::error(&format!(
-                        "Failed to preload the ModelAsset!\nAssetManager error: {:?}\nPath: {}",
-                        err, path
-                    ));
-                    return Err(());
-                }
-            }
-            Err(err) => {
-                debugger::error(&format!("Failed to preload the ModelAsset!\nFailed to load the asset\nError: {:?}\nPath: {}", err, path));
-                return Err(());
-            }
-        }
-        Ok(())
-    }
-
     pub fn from_gltf(path: &str) -> Result<ModelAsset, ModelAssetError> {
         let path = &assets::get_full_asset_path(path);
         let scene = Scene::from_file(path, vec![
@@ -104,6 +86,7 @@ impl ModelAsset {
                     root,
                     path: path.to_owned(),
                     animations,
+                    is_loaded: true,
                 })
             },
             Err(err) => {

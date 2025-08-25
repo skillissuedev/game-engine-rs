@@ -58,7 +58,7 @@ pub fn start(args: Args, framework: &mut Framework) {
     add_system(Box::new(LuaSystem::new("experience", "scripts/lua/experience.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("wild_tiles", "scripts/lua/wild_tiles.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_biomes", "scripts/lua/vanilla_biomes.lua").unwrap()), framework);
-    add_system(Box::new(LuaSystem::new("vanilla_props", "scripts/lua/vanilla_props.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("props_manager", "scripts/lua/props_manager.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("vanilla_items", "scripts/lua/vanilla_items.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("land_unlock", "scripts/lua/land_unlock.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("land_placement", "scripts/lua/land_placement.lua").unwrap()), framework);
@@ -69,6 +69,8 @@ pub fn start(args: Args, framework: &mut Framework) {
     add_system(Box::new(LuaSystem::new("clouds", "scripts/lua/clouds.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("water", "scripts/lua/water.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("ambiance_and_music", "scripts/lua/ambiance_and_music.lua").unwrap()), framework);
+
+    add_system(Box::new(LuaSystem::new("props", "scripts/lua/props.lua").unwrap()), framework);
 
     add_system(Box::new(MainSystem {objects: vec![]}), framework);
 }
