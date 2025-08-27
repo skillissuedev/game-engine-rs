@@ -1,5 +1,5 @@
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
+    assets::{shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
     game::game_main,
     managers::{
         self, assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
@@ -10,12 +10,12 @@ use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, 
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
-    backend::glutin::SimpleWindowBuilder, glutin::{self, config::ConfigTemplateBuilder}, Display
+    backend::glutin::SimpleWindowBuilder, glutin, Display
 };
 use once_cell::sync::Lazy;
 use winit::{event::ElementState, keyboard::PhysicalKey, window::Fullscreen};
 use std::{
-    collections::HashMap, fs, num::NonZeroU32, time::{Duration, Instant}
+    collections::HashMap, fs, time::{Duration, Instant}
 };
 use glium::winit::{
     event::{Event, MouseButton, WindowEvent},
@@ -125,7 +125,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                         match event {
                             WindowEvent::RedrawRequested => {
-                                let timer = Instant::now();
                                 let time_since_last_frame = last_frame.elapsed();
                                 last_frame = Instant::now();
                                 update_game(&mut framework, time_since_last_frame);

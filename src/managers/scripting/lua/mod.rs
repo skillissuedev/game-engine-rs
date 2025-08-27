@@ -2031,18 +2031,28 @@ impl UserData for Framework {
         );
 
         methods.add_method_mut("preload_model_asset",
-            |_, framework, (asset_id, gltf_path): (String, String)| {
-                match framework.preload_model_asset(asset_id.clone(), &gltf_path) {
+            |_, framework, (asset_id, asset_path): (String, Option<String>)| {
+                let asset_path = match asset_path {
+                    Some(asset_path) => asset_path,
+                    None => asset_id.clone(),
+                };
+
+                match framework.preload_model_asset(asset_id.clone(), &asset_path) {
                     Ok(_) => println!("Preloaded ModelAsset with id '{}'!", asset_id),
-                    Err(_) => println!("Failed to preload ModelAsset with id '{}'!", asset_id),
+                    Err(_) => (),
                 }
                 Ok(())
             }
         );
 
         methods.add_method_mut("background_preload_model_asset",
-            |_, framework, (asset_id, gltf_path): (String, String)| {
-                match framework.background_preload_model_asset(asset_id.clone(), &gltf_path) {
+            |_, framework, (asset_id, asset_path): (String, Option<String>)| {
+                let asset_path = match asset_path {
+                    Some(asset_path) => asset_path,
+                    None => asset_id.clone(),
+                };
+
+                match framework.background_preload_model_asset(asset_id.clone(), &asset_path) {
                     Ok(_) => println!("(Background) Preloaded ModelAsset with id '{}'!", asset_id),
                     Err(_) => println!("(Background) Failed to preload ModelAsset with id '{}'!", asset_id),
                 }
@@ -2051,20 +2061,30 @@ impl UserData for Framework {
         );
 
         methods.add_method_mut("preload_sound_asset",
-            |_, framework, (asset_id, wav_path): (String, String)| {
-                match framework.preload_sound_asset(asset_id.clone(), &wav_path) {
+            |_, framework, (asset_id, asset_path): (String, Option<String>)| {
+                let asset_path = match asset_path {
+                    Some(asset_path) => asset_path,
+                    None => asset_id.clone(),
+                };
+
+                match framework.preload_sound_asset(asset_id.clone(), &asset_path) {
                     Ok(_) => println!("Preloaded SoundAsset with id '{}'!", asset_id),
-                    Err(_) => println!("Failed to preload SoundAsset with id '{}'!", asset_id),
+                    Err(_) => (),
                 }
                 Ok(())
             }
         );
 
         methods.add_method_mut("preload_texture_asset",
-            |_, framework, (asset_id, path): (String, String)| {
-                match framework.preload_texture_asset(asset_id.clone(), &path) {
+            |_, framework, (asset_id, asset_path): (String, Option<String>)| {
+                let asset_path = match asset_path {
+                    Some(asset_path) => asset_path,
+                    None => asset_id.clone(),
+                };
+
+                match framework.preload_texture_asset(asset_id.clone(), &asset_path) {
                     Ok(_) => println!("Preloaded TextureAsset with id '{}'!", asset_id),
-                    Err(_) => println!("Failed to preload TextureAsset with id '{}'!", asset_id),
+                    Err(_) => (),
                 }
                 Ok(())
             }

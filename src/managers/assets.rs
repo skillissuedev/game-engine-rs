@@ -25,7 +25,7 @@ impl AssetManager {
             let preloaded_asset = loaded_model_assets.get(&asset_id);
             if let Some(_) = preloaded_asset {
                 warn(
-                    &format!("AssetManager error!\nFailed to preload ModelAsset '{}'\nError: ModelAsset with this id already exists!", asset_id)
+                    &format!("AssetManager warning! Failed to preload ModelAsset '{}'! Error: ModelAsset with this id already exists!", asset_id)
                 );
                 return Err(AssetManagerError::AssetAlreadyLoaded);
             }
@@ -57,7 +57,7 @@ impl AssetManager {
             let preloaded_asset = loaded_model_assets.get(&asset_id);
             if let Some(_) = preloaded_asset {
                 warn(
-                    &format!("AssetManager error!\nFailed to preload ModelAsset '{}'\nError: ModelAsset with this id already exists!", asset_id)
+                    &format!("AssetManager warning: Failed to preload ModelAsset '{}'! Error: ModelAsset with this id already exists!", asset_id)
                 );
                 return Err(AssetManagerError::AssetAlreadyLoaded)
             }
@@ -102,8 +102,8 @@ impl AssetManager {
     ) -> Result<SoundAssetId, AssetManagerError> {
         match self.loaded_sound_assets.get(&asset_id) {
             Some(_) => {
-                error(
-                    &format!("AssetManager error!\nFailed to preload SoundAsset '{}'\nError: SoundAsset with this id already exists!", asset_id)
+                warn(
+                    &format!("AssetManager warning: Failed to preload SoundAsset '{}'! Error: SoundAsset with this id already exists!", asset_id)
                 );
                 Err(AssetManagerError::AssetAlreadyLoaded)
             }
@@ -121,8 +121,8 @@ impl AssetManager {
     ) -> Result<TextureAssetId, AssetManagerError> {
         match self.loaded_texture_assets.get(&asset_id) {
             Some(_) => {
-                error(
-                    &format!("AssetManager error!\nFailed to preload TextureAsset '{}'\nError: TextureAsset with this id already exists!", asset_id)
+                warn(
+                    &format!("AssetManager warning: Failed to preload TextureAsset '{}'! Error: TextureAsset with this id already exists!", asset_id)
                 );
                 Err(AssetManagerError::AssetAlreadyLoaded)
             }
@@ -140,8 +140,8 @@ impl AssetManager {
     ) -> Result<ShaderAssetId, AssetManagerError> {
         match self.loaded_shader_assets.get(&asset_id) {
             Some(_) => {
-                error(
-                    &format!("AssetManager error!\nFailed to preload ShaderAsset '{}'\nError: ShaderAsset with this id already exists!", asset_id)
+                warn(
+                    &format!("AssetManager error: Failed to preload ShaderAsset '{}'! Error: ShaderAsset with this id already exists!", asset_id)
                 );
                 Err(AssetManagerError::AssetAlreadyLoaded)
             }
