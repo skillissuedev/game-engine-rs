@@ -68,7 +68,7 @@ pub fn start(args: Args, framework: &mut Framework) {
 
     add_system(Box::new(LuaSystem::new("clouds", "scripts/lua/clouds.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("water", "scripts/lua/water.lua").unwrap()), framework);
-    add_system(Box::new(LuaSystem::new("ambiance_and_music", "scripts/lua/ambiance_and_music.lua").unwrap()), framework);
+    //add_system(Box::new(LuaSystem::new("ambiance_and_music", "scripts/lua/ambiance_and_music.lua").unwrap()), framework);
 
     add_system(Box::new(LuaSystem::new("props", "scripts/lua/props.lua").unwrap()), framework);
 

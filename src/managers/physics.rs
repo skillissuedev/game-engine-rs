@@ -256,12 +256,14 @@ impl PhysicsManager {
         body_parameters: ObjectBodyParameters,
         position: Vec3,
         rotation: Vec3,
+        scale: Vec3,
     ) {
         if let Some(body) = body_parameters.rigid_body_handle {
             match self.rigid_body_set.get_mut(body) {
                 Some(_) => {
                     self.set_body_position(body_parameters, position);
                     self.set_body_rotation(body_parameters, rotation);
+                    self.set_body_scale(body_parameters, scale);
                 }
                 None => debugger::error(&format!(
                     "set_body_transformations error\nfailed to get rigid body with handle {:?}",
@@ -362,6 +364,35 @@ impl PhysicsManager {
                     debugger::error(&format!(
                         "set_body_rotation error\nfailed to get rigid body with handle {:?}",
                         body_parameters.rigid_body_handle
+                    ));
+                }
+            }
+        } else {
+            debugger::error(&format!(
+                "set_body_rotation error\nfailed to get rigid body with handle {:?}",
+                body_parameters.rigid_body_handle
+            ));
+        }
+    }
+
+    pub fn set_body_scale(&mut self, body_parameters: ObjectBodyParameters, scale: Vec3) {
+        if let Some(collider) = body_parameters.collider_handle {
+            match self.collider_set.get_mut(collider) {
+                Some(collider) => {
+                    match collider.shape().shape_type() {
+                        rapier3d::prelude::ShapeType::Ball => {
+                        },
+                        rapier3d::prelude::ShapeType::Cuboid => todo!(),
+                        rapier3d::prelude::ShapeType::Capsule => todo!(),
+                        rapier3d::prelude::ShapeType::TriMesh => todo!(),
+                        rapier3d::prelude::ShapeType::Cylinder => todo!(),
+                        _ => unreachable!()
+                    }
+                }
+                None => {
+                    debugger::error(&format!(
+                        "set_body_scale error\nfailed to get collider with handle {:?}",
+                        body_parameters.collider_handle
                     ));
                 }
             }

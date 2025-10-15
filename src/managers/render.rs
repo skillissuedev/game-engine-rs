@@ -30,7 +30,6 @@ pub(crate) struct RenderManager {
     pub(crate) window_size: (u32, u32),
     pub(crate) textures: RenderManagerTextures,
     pub(crate) camera: RenderCamera,
-    pub(crate) pixelation_amount: f32,
     pub(crate) display: Display<WindowSurface>,
     pub(crate) framebuffer_vbo: VertexBuffer<Vertex>,
     pub(crate) framebuffer_program: Program,
@@ -41,31 +40,30 @@ pub(crate) struct RenderManager {
     pub(crate) directional_light_dir: Vec3,
     pub(crate) directional_light_strength: f32,
     // it's so stupid, so maybe i'll change it at some point
-    pub(crate) update_shadowmap_timer: Instant,
     pub(crate) shadow_camera: RenderShadowCamera,
 }
 
 impl RenderManager {
     pub fn new(display: Display<WindowSurface>) -> RenderManager {
-        let pixelation_amount = 1.2;
+        let resolution = Self::calculate_resolution((1280, 720));
         let textures = RenderManagerTextures {
             close_shadow_texture: 
-                DepthTexture2d::empty(&display, 8192, 8192)
+                DepthTexture2d::empty(&display, 2048, 2048)
                     .expect("close_shadow_texture creation error!"),
             far_shadow_texture:
-                DepthTexture2d::empty(&display, 4096, 4096)
+                DepthTexture2d::empty(&display, 2048, 2048)
                     .expect("far_shadow_texture creation error!"),
             layer_1_texture:
-                Texture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
+                Texture2d::empty(&display, resolution.0, resolution.1)
                     .expect("layer_1_texture creation error!"),
             layer_2_texture:
-                Texture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
+                Texture2d::empty(&display, resolution.0, resolution.1)
                     .expect("layer_2_texture creation error!"),
             layer_1_depth: 
-                DepthTexture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
+                DepthTexture2d::empty(&display, resolution.0, resolution.1)
                     .expect("layer_1_depth creation error!"),
             layer_2_depth:
-                DepthTexture2d::empty(&display, (1280.0 / pixelation_amount) as u32, (720.0 / pixelation_amount) as u32)
+                DepthTexture2d::empty(&display, resolution.0, resolution.1)
                     .expect("layer_2_depth creation error!"),
         };
         let camera = RenderCamera::new((1280, 720));
@@ -114,7 +112,6 @@ impl RenderManager {
             window_size: (1280, 720),
             textures,
             camera,
-            pixelation_amount,
             display,
             framebuffer_vbo,
             framebuffer_program,
@@ -124,7 +121,6 @@ impl RenderManager {
             lights: Vec::new(),
             directional_light_dir,
             directional_light_strength: 0.6,
-            update_shadowmap_timer: Instant::now(),
             shadow_camera,
         }
     }
@@ -232,33 +228,39 @@ impl RenderManager {
         ).expect("Failed to render layer 2 framebuffer - RenderManager (render_framebuffer_plane)");
     }
 
+    pub fn calculate_resolution(window_size: (u32, u32)) -> (u32, u32) {
+        let aspect_ratio = window_size.0 as f32 / window_size.1 as f32;
+        let target_height = 480;
+        let width = (target_height as f32 * aspect_ratio).ceil() as u32;
+
+        (width, target_height)
+    }
+
     pub fn resize(&mut self, window_size: (u32, u32)) {
         let display = &self.display;
         display.resize(window_size);
 
         self.window_size = window_size;
-        let pixelation_amount = self.pixelation_amount;
-        let x = window_size.0 as f32;
-        let y = window_size.1 as f32;
+        let resolution = Self::calculate_resolution(window_size);
 
         self.textures = RenderManagerTextures {
             close_shadow_texture: 
-                DepthTexture2d::empty(display, window_size.0 * 2, window_size.1 * 2)
+                DepthTexture2d::empty(display, 2048, 2048)
                     .expect("close_shadow_texture creation error!"),
             far_shadow_texture:
-                DepthTexture2d::empty(display, window_size.0 * 2, window_size.1 * 2)
+                DepthTexture2d::empty(display, 2048, 2048)
                     .expect("far_shadow_texture creation error!"),
             layer_1_texture:
-                Texture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
+                Texture2d::empty(display, resolution.0, resolution.1)
                     .expect("layer_1_texture creation error!"),
             layer_2_texture:
-                Texture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
+                Texture2d::empty(display, resolution.0, resolution.1)
                     .expect("layer_2_texture creation error!"),
             layer_1_depth: 
-                DepthTexture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
+                DepthTexture2d::empty(display, resolution.0, resolution.1)
                     .expect("layer_1_depth creation error!"),
             layer_2_depth:
-                DepthTexture2d::empty(display, (x / pixelation_amount) as u32, (y / pixelation_amount) as u32)
+                DepthTexture2d::empty(display, resolution.0, resolution.1)
                     .expect("layer_2_depth creation error!"),
         };
     }
@@ -524,10 +526,11 @@ impl RenderShadowCamera {
         }
         center /= Vec3::new(corners.len() as f32, corners.len() as f32, corners.len() as f32);
 
-        //Mat4::look_at_rh(center + Vec3::new(0.0, 30.0, 0.0) + light_dir, center, Vec3::Y)
         let light_right = Vec3::Y.cross(light_dir).normalize();
         let light_up = light_dir.cross(light_right);
-        Mat4::look_at_rh(center - light_dir, center, light_up)
+        //Mat4::look_at_rh(center + Vec3::new(0.0, 30.0, 0.0) - light_dir, center, light_up)
+        Mat4::look_at_rh(center + Vec3::Y - light_dir, center, light_up)
+        //Mat4::look_at_rh(center - light_dir, center, light_up)
     }
 
     fn shadow_proj(corners: &Vec<Vec4>) -> Mat4 {

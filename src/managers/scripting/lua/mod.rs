@@ -591,10 +591,13 @@ impl UserData for ObjectHandle {
             },
         );
 
-        methods.add_method("set_scale", |_, this, (x, y, z): (f32, f32, f32)| {
+        methods.add_method("set_scale", |_, this, (x, y, z, set_body_scale): (f32, f32, f32, Option<bool>)| {
+            let framework = &mut *get_framework_pointer();
+            let set_body_scale = set_body_scale.unwrap_or(true);
+
             match systems::get_system_mut_with_id(&this.system_id) {
                 Some(system) => match system.find_object_mut(&this.name) {
-                    Some(object) => object.set_scale(Vec3::new(x, y, z)),
+                    Some(object) => object.set_scale(framework, Vec3::new(x, y, z), set_body_scale),
                     None => debugger::error(&format!(
                             "lua error: set_scale failed! failed to get object {} in system {}",
                             this.name, this.system_id

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::current};
 use egui_glium::egui_winit::egui::{self, scroll_area::ScrollBarVisibility, Button, Checkbox, Color32, ColorImage, ComboBox, Context, FontFamily, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
 use ez_al::{EzAl, SoundSource};
 use glam::{Vec2, Vec3};
@@ -19,9 +19,12 @@ pub struct UiManager {
     textures: HashMap<String, TextureHandle>,
     themes: HashMap<String, Visuals>,
     window_themes: HashMap<String, Frame>,
+    // The list of sounds that UI Manager can play when interacting with widgets.
     click_sound: Option<SoundSource>,
     hover_start_sound: Option<SoundSource>,
     hover_stop_sound: Option<SoundSource>,
+    // Used to avoid constantly playing the hover sound when rebuilding the window.
+    last_hovered_widget: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -232,7 +235,7 @@ impl UiManager {
                         Some(frame) => {
                             if manager_window.transparent {
                                 window = window
-                                    .frame(egui::Frame::none())
+                                    .frame(egui::Frame::NONE)
                                     .title_bar(false)
                                     .scroll(false)
                             } else {
@@ -245,7 +248,7 @@ impl UiManager {
                         None => {
                             if manager_window.transparent {
                                 window = window
-                                    .frame(egui::Frame::none())
+                                    .frame(egui::Frame::NONE)
                                     .title_bar(false)
                                     .scroll(false)
                             } else {
@@ -259,7 +262,7 @@ impl UiManager {
                 None => {
                     if manager_window.transparent {
                         window = window
-                            .frame(egui::Frame::none())
+                            .frame(egui::Frame::NONE)
                             .title_bar(false)
                             .scroll(false)
                     } else {
@@ -287,13 +290,15 @@ impl UiManager {
                 }
 
                 for widget in &mut manager_window.widgets {
-                    Self::render_widget(&mut self.click_sound, &mut self.hover_start_sound, &mut self.hover_stop_sound, &self.textures, ctx, ui, widget, &self.themes);
+                    Self::render_widget(&mut self.click_sound, &mut self.hover_start_sound, &mut self.hover_stop_sound,
+                        &mut self.last_hovered_widget, &self.textures, ctx, ui, widget, &self.themes);
                 }
             });
         }
     }
 
     fn render_widget(click_sound: &mut Option<SoundSource>, hover_start_sound: &mut Option<SoundSource>, hover_stop_sound: &mut Option<SoundSource>,
+        last_hovered_widget: &mut Option<String>,
         textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget, themes: &HashMap<String, Visuals>) {
 
         let theme = match &widget.theme {
@@ -336,7 +341,7 @@ impl UiManager {
             WidgetData::Horizontal => {
                 Some(ui.horizontal(|ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, last_hovered_widget, textures, ctx, ui, widget, themes);
                     }
                 }).response)
             },
@@ -344,7 +349,7 @@ impl UiManager {
                 // SCROLL BAR VISIBILITY FOR TESTING PURPOSES! remove later pls, future me
                 ScrollArea::horizontal().scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible).show(ui, |ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, last_hovered_widget, textures, ctx, ui, widget, themes);
                     }
                 });
                 None
@@ -352,14 +357,14 @@ impl UiManager {
             WidgetData::Vertical => {
                 Some(ui.vertical_centered(|ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, last_hovered_widget, textures, ctx, ui, widget, themes);
                     }
                 }).response)
             },
             WidgetData::VerticalScroll => {
                 ScrollArea::vertical().scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, last_hovered_widget, textures, ctx, ui, widget, themes);
                     }
                 });
                 None
@@ -367,7 +372,7 @@ impl UiManager {
             WidgetData::Scroll => {
                 ScrollArea::both().show(ui, |ui| {
                     for widget in &mut widget.children {
-                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, textures, ctx, ui, widget, themes);
+                        Self::render_widget(click_sound, hover_start_sound, hover_stop_sound, last_hovered_widget, textures, ctx, ui, widget, themes);
                     }
                 });
                 None
@@ -380,7 +385,7 @@ impl UiManager {
             WidgetData::ProgressBar(value, text, text_size) =>
                 Some(ui.add_sized(size, ProgressBar::new(*value).fill(Color32::from_rgb(80, 80, 80))
                     .text(RichText::new(text.clone()).size(*text_size).color(Color32::from_rgb(180, 180, 180)))
-                    .desired_height(size.y).rounding(0.0))
+                    .desired_height(size.y).corner_radius(0.0))
                 ),
             WidgetData::Image(image_path) => {
                 let texture = textures.get(image_path);
@@ -401,19 +406,38 @@ impl UiManager {
                     }
                 }
 
-                if widget.play_hover_sound {
-                    if !widget.state.hovered && state.hovered() {
+                if widget.play_hover_sound && state.hovered() {
+                    if let None = last_hovered_widget {
+                        *last_hovered_widget = Some(widget.id.to_string());
                         if let Some(hover) = hover_start_sound {
                             hover.play_sound();
                         }
                     }
 
-                    if widget.state.hovered && !state.hovered() {
+                    if let Some(last_hovered_widget) = last_hovered_widget {
+                        if *last_hovered_widget != widget.id {
+                            *last_hovered_widget = widget.id.clone();
+                            if let Some(hover) = hover_start_sound {
+                                hover.play_sound();
+                            }
+                        }
+                    }
+                }
+                /*
+                let mut reset_last_hovered_widget = false;
+                if let Some(last_hovered_widget) = last_hovered_widget {
+                    if *last_hovered_widget == widget.id && !state.hovered() {
+                        reset_last_hovered_widget = true;
                         if let Some(hover) = hover_stop_sound {
                             hover.play_sound();
                         }
                     }
                 }
+
+                if reset_last_hovered_widget {
+                    dbg!(reset_last_hovered_widget);
+                    *last_hovered_widget = None;
+                }*/
 
                 WidgetState {
                     left_clicked: state.clicked(),
@@ -1406,6 +1430,23 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                                 }
                             });
                         });
+                        ui.collapsing("properties", |ui| {
+                            for group in object.object_properties().clone() {
+                                ui.collapsing(RichText::new(group.0).strong(), |ui| {
+                                    for element in group.1 {
+                                        match element {
+                                            systems::SystemValue::String(string) => ui.label(string),
+                                            systems::SystemValue::Int(int) => ui.label(int.to_string()),
+                                            systems::SystemValue::UInt(int) => ui.label(int.to_string()),
+                                            systems::SystemValue::Float(float) => ui.label(float.to_string()),
+                                            systems::SystemValue::Bool(bool) => ui.label(bool.to_string()),
+                                            systems::SystemValue::Spline(_) => ui.label("inspecting splines is unsupported :c"),
+                                            systems::SystemValue::Vec(_) => ui.label("inspecting vectors is unsupported :c"),
+                                        };
+                                    }
+                                });
+                            }
+                        });
 
                         ui.label("local position:");
                         if let Some(pos) = draw_vec3_editor_inspector(
@@ -1432,7 +1473,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                             &object.local_transform().scale,
                             true,
                         ) {
-                            object.set_scale(sc);
+                            object.set_scale(framework, sc, false);
                         }
 
                         // collider

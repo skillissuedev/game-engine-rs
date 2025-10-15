@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, Mutex, RwLock}, time::Instant};
+use std::{collections::HashMap, sync::{Arc, Mutex, RwLock}};
 
 use glam::{Vec2, Vec3};
-use landmass::{Agent, AgentId, AgentOptions, Archipelago, Character, CharacterId, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, SampledPoint, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
+use landmass::{Agent, AgentId, Archipelago, ArchipelagoOptions, Character, CharacterId, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
 
 use crate::{managers::debugger, objects::{nav_object::NavObjectData, Transform}};
 
@@ -23,7 +23,7 @@ pub struct NavigationManager {
 
 impl NavigationManager {
     pub fn new() -> NavigationManager {
-        let archipelago = Arc::new(Mutex::new(Archipelago::new(AgentOptions::from_agent_radius(1.0))));
+        let archipelago = Arc::new(Mutex::new(Archipelago::new(ArchipelagoOptions::from_agent_radius(1.0))));
 
         Self {
             objects: Arc::new(RwLock::new(HashMap::new())),
@@ -76,12 +76,13 @@ impl NavigationManager {
                         vertices,
                         polygons,
                         polygon_type_indices,
+                        height_mesh: None,
                     };
                     match validate_navmesh(navmesh, None) {
                         Some(navmesh) => {
                             if let Ok(navmesh) = navmesh {
                                 let island_id = archipelago.lock().expect("archipelago was poisoned :(").add_island(
-                                    Island::new(transform, navmesh.into(), HashMap::new())
+                                    Island::new(transform, navmesh.into())
                                 );
                                 objects.write().expect("objects was poisoned :c").insert(id, island_id);
                             }
@@ -161,7 +162,7 @@ impl NavigationManager {
 
         let mut archipelago = self.archipelago.lock().unwrap();
         let sample_point = archipelago.sample_point(position, &PointSampleDistance3d {
-            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0, animation_link_max_vertical_distance: 0.0, });
 
         match sample_point {
             Ok(position) => {
@@ -187,7 +188,7 @@ impl NavigationManager {
 
                 let mut archipelago = self.archipelago.lock().unwrap();
                 let sampled_position = archipelago.sample_point(position, &PointSampleDistance3d {
-                    horizontal_distance: 0.1, distance_above: 10.0, distance_below: 10.0, vertical_preference_ratio: 0.0 });
+                    horizontal_distance: 0.1, distance_above: 10.0, distance_below: 10.0, vertical_preference_ratio: 0.0, animation_link_max_vertical_distance: 0.0, });
                 let position: landmass::Vec3;
 
                 match sampled_position {
@@ -248,7 +249,7 @@ impl NavigationManager {
 
                         let mut archipelago = self.archipelago.lock().unwrap();
                         let sampled_target = archipelago.sample_point(target, &PointSampleDistance3d {
-                            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0 });
+                            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0, animation_link_max_vertical_distance: 0.0, });
                         let target: landmass::Vec3;
 
                         match sampled_target {

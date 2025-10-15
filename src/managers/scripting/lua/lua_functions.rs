@@ -749,10 +749,12 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
             move |_, (name, sc_x, sc_y, sc_z): (String, f32, f32, f32)| {
                 match managers::systems::get_system_mut_with_id(&system_id_for_functions) {
                     Some(system) => {
+                        let framework_ptr = get_framework_pointer();
+                        let framework = &mut *framework_ptr;
                         let object_option = system.find_object_mut(&name);
                         match object_option {
                             Some(object) => {
-                                object.set_scale(Vec3::new(sc_x, sc_y, sc_z))
+                                object.set_scale(framework, Vec3::new(sc_x, sc_y, sc_z), true)
                             }
                             None => debugger::error(
                                 "failed to call set_object_rotation, object not found",

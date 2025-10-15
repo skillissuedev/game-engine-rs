@@ -253,7 +253,6 @@ impl ModelObject {
                 ibo,
                 model_object_transform: Mat4::IDENTITY,
                 instanced_master_name: None,
-                // gotta do 'em after setting all transforms
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
                 cast_shadows: true,
