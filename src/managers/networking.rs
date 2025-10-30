@@ -16,7 +16,7 @@ use std::{
 
 use super::{debugger, systems::{get_system_mut_with_id, SystemValue}};
 
-static mut MAX_BYTES_PER_TICK: u64 = 100 * 1024 * 1024;
+//static mut MAX_BYTES_PER_TICK: u64 = 100 * 1024 * 1024;
 static mut CURRENT_NETWORKING_MODE: NetworkingMode = NetworkingMode::Disconnected(None);
 static mut CURRENT_NETWORK_EVENTS: Vec<NetworkEvent> = vec![];
 static mut CLIENT_ID: u64 = 0;

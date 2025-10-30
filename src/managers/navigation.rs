@@ -12,13 +12,6 @@ pub struct NavigationManager {
     archipelago: Arc<Mutex<Archipelago<XYZ>>>,
     characters: HashMap<u128, CharacterId>,
     agents: HashMap<u128, AgentId>,
-
-    //old:
-    // u128 is object's id
-    //navmesh_dimensions: HashMap<u128, NavMeshDimensions>,
-    // u128 is navmesh's id
-    //navmesh_obstacles: HashMap<u128, Vec<NavMeshObstacleTransform>>,
-    //navmesh_grids: HashMap<u128, PathingGrid>,
 }
 
 impl NavigationManager {

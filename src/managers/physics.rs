@@ -26,19 +26,17 @@ use rapier3d::{
 const GRAVITY: Vector3<f32> = vector![0.0, -9.81, 0.0];
 
 pub struct PhysicsManager {
-    pub rigid_body_set: RigidBodySet, // = RigidBodySet::new()
-    pub collider_set: ColliderSet,    // = Lazy::new(|| ColliderSet::new());
-    pub integration_parameters: IntegrationParameters, // = Lazy::new(|| {
-    //IntegrationParameters::default()
-    pub physics_pipeline: PhysicsPipeline, // = Lazy::new(|| PhysicsPipeline::new());
-    pub island_manager: IslandManager,     // = Lazy::new(|| IslandManager::new());
-    pub broad_phase: DefaultBroadPhase,           // = Lazy::new(|| BroadPhase::new());
-    pub narrow_phase: NarrowPhase,         // = Lazy::new(|| NarrowPhase::new());
-    pub impulse_joint_set: ImpulseJointSet, // = Lazy::new(|| ImpulseJointSet::new());
-    pub multibody_joint_set: MultibodyJointSet, // =
-    //    Lazy::new(|| MultibodyJointSet::new());
-    pub ccd_solver: CCDSolver,         // = Lazy::new(|| CCDSolver::new());
-    pub query_pipeline: QueryPipeline, // = Lazy::new(|| QueryPipeline::new());
+    pub rigid_body_set: RigidBodySet,
+    pub collider_set: ColliderSet,
+    pub integration_parameters: IntegrationParameters,
+    pub physics_pipeline: PhysicsPipeline,
+    pub island_manager: IslandManager,
+    pub broad_phase: DefaultBroadPhase,
+    pub narrow_phase: NarrowPhase,
+    pub impulse_joint_set: ImpulseJointSet,
+    pub multibody_joint_set: MultibodyJointSet,
+    pub ccd_solver: CCDSolver,
+    pub query_pipeline: QueryPipeline,
 }
 
 impl Default for PhysicsManager {

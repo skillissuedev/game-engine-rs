@@ -1,6 +1,5 @@
 pub mod main_system;
 pub mod player_manager;
-pub mod world_generator;
 
 use crate::{
     framework::Framework,

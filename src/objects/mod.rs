@@ -235,12 +235,6 @@ pub trait Object: std::fmt::Debug + Downcast {
         let mut transform = self.local_transform();
         transform.scale = scale;
         self.set_local_transform(transform);
-
-        if let Some(parameters) = self.body_parameters() {
-            if set_rigid_body_scale == true {
-                framework.physics.set_body_rotation(parameters, scale);
-            }
-        }
     }
 
     fn add_child(&mut self, mut object: Box<dyn Object>) {

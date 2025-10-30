@@ -1,5 +1,4 @@
-use std::{collections::HashMap, time::Instant};
-
+use std::collections::HashMap;
 use egui_glium::EguiGlium;
 use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
@@ -39,7 +38,6 @@ pub(crate) struct RenderManager {
     pub(crate) lights: Vec<RenderPointLight>,
     pub(crate) directional_light_dir: Vec3,
     pub(crate) directional_light_strength: f32,
-    // it's so stupid, so maybe i'll change it at some point
     pub(crate) shadow_camera: RenderShadowCamera,
 }
 

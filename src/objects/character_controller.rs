@@ -9,7 +9,7 @@ use crate::{
     },
     math_utils::{self, deg_to_rad},
 };
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 use rapier3d::{
     control::{CharacterLength, KinematicCharacterController},
     geometry::{ActiveCollisionTypes, ColliderHandle},
@@ -107,8 +107,6 @@ impl Object for CharacterController {
                     self.move_controller_ignoring_rotation(framework, velocity);
                     framework.navigation.set_agent_position(object_id, self.transform.position);
                     framework.navigation.set_agent_target(object_id, Some(target));
-                    dbg!(framework.navigation.get_agent_position(object_id));
-                    dbg!(self.global_transform().position);
                 },
                 None => {
                     framework.navigation.add_agent(object_id, movement.speed, self.transform.position, 1.0);

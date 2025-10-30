@@ -141,15 +141,3 @@ impl std::fmt::Debug for NavigationGround {
     }
 }
 
-enum CurrentAxis {
-    X,
-    Y,
-    Z,
-}
-
-#[derive(Debug)]
-pub enum NavMeshError {
-    HeightmapError,
-    RasterizeError,
-    PolyMeshError,
-}

@@ -36,7 +36,7 @@ pub fn start(args: Args, framework: &mut Framework) {
 
         let click = framework.get_sound_asset("ui_click_sound").expect("Failed to get the default UI click sound!");
         let hover_start = framework.get_sound_asset("ui_hover_stop_sound").expect("Failed to get the default UI hover start sound!");
-        let hover_stop = framework.get_sound_asset("ui_hover_stop_sound").expect("Failed to get the default UI hover stop sound!");
+        //let hover_stop = framework.get_sound_asset("ui_hover_stop_sound").expect("Failed to get the default UI hover stop sound!");
 
         if let Some(al) = &mut framework.al {
             if let Some(ui) = &mut framework.ui {
@@ -71,6 +71,7 @@ pub fn start(args: Args, framework: &mut Framework) {
     //add_system(Box::new(LuaSystem::new("ambiance_and_music", "scripts/lua/ambiance_and_music.lua").unwrap()), framework);
 
     add_system(Box::new(LuaSystem::new("props", "scripts/lua/props.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("building", "scripts/lua/building.lua").unwrap()), framework);
 
     add_system(Box::new(MainSystem {objects: vec![]}), framework);
 }
@@ -83,36 +84,6 @@ pub fn update(framework: &mut Framework) {
                 framework.set_debug_mode(DebugMode::None);
             }
         }
-    }/*
-    let mut camera_pos = framework.get_camera_position().unwrap();
-    let mut camera_rot = framework.get_camera_rotation().unwrap();
-
-    if framework.input.is_bind_pressed("forward") {
-        camera_pos.z -= 1.0;
     }
-
-    if framework.input.is_bind_pressed("backward") {
-        camera_pos.z += 1.0;
-    }
-
-    if framework.input.is_bind_pressed("left") {
-        camera_pos.x -= 1.0;
-    }
-
-    if framework.input.is_bind_pressed("right") {
-        camera_pos.x += 1.0;
-    }
-
-    if framework.input.is_bind_pressed("cam_left") {
-        camera_rot.y -= 15.0;
-    }
-
-    if framework.input.is_bind_pressed("cam_right") {
-        camera_rot.y += 15.0;
-    }
-
-    framework.set_camera_position(camera_pos);
-    framework.set_camera_rotation(camera_rot);*/
 }
 
-//pub fn render() {}

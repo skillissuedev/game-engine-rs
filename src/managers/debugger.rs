@@ -1,7 +1,7 @@
 use colored::Colorize;
 
 pub fn crash(text: &str) {
-    println!("{}", "project baldej crashed!".red());
+    println!("{}", "usg crashed!".red());
     println!("{}\n{}", "Error:".red(), text.red());
     println!("\n\n\n\n");
     panic!();
