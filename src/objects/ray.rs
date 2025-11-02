@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use glam::Vec3;
-use rapier3d::{geometry::InteractionGroups, pipeline::QueryFilter};
+use rapier3d::{geometry::InteractionGroups, pipeline::QueryFilter, prelude::QueryFilterFlags};
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 
@@ -162,10 +162,11 @@ impl Ray {
             .position
             .distance(global_transform.position + self.direction);
 
-        let query_filter = QueryFilter::new().groups(InteractionGroups::new(
+        let mut query_filter = QueryFilter::new().groups(InteractionGroups::new(
             CollisionGroups::Group1.bits().into(),
             self.mask.bits().into(),
         ));
+        query_filter.flags = QueryFilterFlags::empty();
 
         let ray =
             rapier3d::geometry::Ray::new(global_transform.position.into(), self.direction.into());

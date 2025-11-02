@@ -1,12 +1,12 @@
-use glam::{Vec2, Vec3};
 use glium::winit::keyboard::KeyCode;
-
 use crate::{
-    assets::{model_asset::ModelAsset, shader_asset::ShaderAsset}, framework::{DebugMode, Framework}, managers::{assets::ModelAssetId, input::InputEventType, networking, render::{RenderLayer, RenderObjectData, RenderShader}, scripting::lua::LuaSystem, systems::{add_system, SystemValue}}, objects::{point_light::PointLight, Transform}, systems::main_system::MainSystem, Args//, systems::player_manager::PlayerManager, Args,
-    //systems::player_manager::PlayerManager,
+    framework::{DebugMode, Framework},
+    managers::{input::InputEventType, networking, physics::CollisionGroups, scripting::lua::LuaSystem, systems::add_system},
+    systems::main_system::MainSystem, Args
 };
 
 pub fn start(args: Args, framework: &mut Framework) {
+    println!("Groups 1 and 3: {}", CollisionGroups::Group3.or(CollisionGroups::Group1).bits());
     if let Some(save_name) = &args.new_save_name {
         match framework.new_save(&save_name) {
             Ok(_) => println!("Successfully created a new save file!"),

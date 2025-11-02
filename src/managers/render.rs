@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use egui_glium::EguiGlium;
 use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
+use winit::window;
 
 use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
 
@@ -46,7 +47,7 @@ impl RenderManager {
         let resolution = Self::calculate_resolution((1280, 720));
         let textures = RenderManagerTextures {
             close_shadow_texture: 
-                DepthTexture2d::empty(&display, 2048, 2048)
+                DepthTexture2d::empty(&display, 4096, 4096)
                     .expect("close_shadow_texture creation error!"),
             far_shadow_texture:
                 DepthTexture2d::empty(&display, 2048, 2048)
@@ -239,11 +240,11 @@ impl RenderManager {
         display.resize(window_size);
 
         self.window_size = window_size;
-        let resolution = Self::calculate_resolution(window_size);
+        let resolution = window_size;//Self::calculate_resolution(window_size);
 
         self.textures = RenderManagerTextures {
             close_shadow_texture: 
-                DepthTexture2d::empty(display, 2048, 2048)
+                DepthTexture2d::empty(display, 4096, 4096)
                     .expect("close_shadow_texture creation error!"),
             far_shadow_texture:
                 DepthTexture2d::empty(display, 2048, 2048)
@@ -450,9 +451,9 @@ impl RenderShadowCamera {
     pub(crate) fn new(camera: &RenderCamera, light_dir: Vec3) -> RenderShadowCamera {
         let view = camera.get_view_matrix();
         let close_corners = Self::get_frustum_corners_world_space(
-            camera.get_projection_matrix_with_max_distance(120.0), view);
+            camera.get_projection_matrix_with_max_distance(90.0), view);
         let close_corners_1 = Self::get_frustum_corners(
-            camera.get_projection_matrix_with_max_distance(120.0)
+            camera.get_projection_matrix_with_max_distance(90.0)
         );
         let far_corners = Self::get_frustum_corners_world_space(
             camera.get_projection_matrix(), view);
@@ -527,8 +528,7 @@ impl RenderShadowCamera {
         let light_right = Vec3::Y.cross(light_dir).normalize();
         let light_up = light_dir.cross(light_right);
         //Mat4::look_at_rh(center + Vec3::new(0.0, 30.0, 0.0) - light_dir, center, light_up)
-        Mat4::look_at_rh(center + Vec3::Y - light_dir, center, light_up)
-        //Mat4::look_at_rh(center - light_dir, center, light_up)
+        Mat4::look_at_rh(center - light_dir, center, light_up)
     }
 
     fn shadow_proj(corners: &Vec<Vec4>) -> Mat4 {

@@ -14,7 +14,7 @@ use crate::{
 use rapier3d::{
     dynamics::{RigidBodyBuilder, RigidBodyHandle, RigidBodyType},
     geometry::{ActiveCollisionTypes, ColliderHandle, ColliderSet, CollisionEvent},
-    pipeline::ActiveEvents,
+    pipeline::ActiveEvents, prelude::ActiveHooks,
 };
 
 use super::{gen_object_id, Object, ObjectGroup, Transform};
@@ -56,7 +56,7 @@ impl Trigger {
         let mut collider =
             physics::collider_type_to_collider_builder(collider, membership_group, mask)
                 .sensor(true)
-                .active_events(ActiveEvents::COLLISION_EVENTS)
+                .active_events(ActiveEvents::all())
                 .active_collision_types(
                     ActiveCollisionTypes::default()
                         | ActiveCollisionTypes::FIXED_FIXED
@@ -150,7 +150,11 @@ impl Object for Trigger {
     }
 
     fn body_parameters(&self) -> Option<ObjectBodyParameters> {
-        None
+        Some(ObjectBodyParameters {
+            rigid_body_handle: Some(self.body_handle),
+            collider_handle: Some(self.collider_handle),
+            render_collider_type: None,
+        })
     }
 
     fn object_id(&self) -> &u128 {

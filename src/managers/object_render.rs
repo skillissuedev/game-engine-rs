@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, Display, DrawParameters, Program, Surface, Texture2d};
+use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
 
 use crate::managers::render::RenderLayer;
 
@@ -33,13 +33,13 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
         UniformBuffer::new(display, render_object.joint_inverse_bind_matrices)
         .expect("UniformBuffer::new() failed (inverse_bind_matrices) - object_render.rs");
 
-    let draw_parameters = DrawParameters {
+    let mut draw_parameters = DrawParameters {
         depth: glium::Depth {
             test: glium::draw_parameters::DepthTest::IfLess,
             write: true,
             ..Default::default()
         },
-        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
         polygon_mode: glium::draw_parameters::PolygonMode::Fill,
         /*polygon_offset: PolygonOffset {
             factor: 1.0,
@@ -85,6 +85,8 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
                     inverse_bind_matrices: &inverse_bind_matrices,
                 };
 
+                draw_parameters.backface_culling = BackfaceCullingMode::CullClockwise;
+
                 far_framebuffer.draw(
                     (vbo, per_instance_buffer.per_instance().unwrap()),
                     ibo,
@@ -114,6 +116,8 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
                 joint_matrices: &joints,
                 inverse_bind_matrices: &inverse_bind_matrices,
             };
+
+            draw_parameters.backface_culling = BackfaceCullingMode::CullClockwise;
 
             far_framebuffer.draw(vbo, ibo, program, &uniforms, &draw_parameters)
                 .expect("Failed to render the object to the far shadow map");
