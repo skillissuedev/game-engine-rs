@@ -6,7 +6,8 @@ use crate::{
     },
     objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
 };
-use egui_glium::egui_winit::egui::{self, FontData, FontDefinitions, FontFamily, Id, Window};
+use clap::builder::styling::Color;
+use egui_glium::egui_winit::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Id, Shadow, Stroke, Style, Window};
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
@@ -70,6 +71,17 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         .insert(0, "JetBrains Mono".into());
 
     egui_glium.egui_ctx().set_fonts(fonts);
+
+
+    let mut ui_visuals = egui::Visuals::default();
+    ui_visuals.window_fill = Color32::from_rgb(217, 217, 217);
+    ui_visuals.window_corner_radius = CornerRadius::same(110);
+    ui_visuals.window_shadow = Shadow::NONE;
+    ui_visuals.widgets.open.bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.open.fg_stroke = Stroke::new(1.0, Color32::from_rgb(217, 217, 217));
+    ui_visuals.widgets.open.fg_stroke = Stroke::new(1.0, Color32::from_rgb(217, 217, 217));
+    egui_glium.egui_ctx().set_visuals(ui_visuals);
+
     let mut ui_state = managers::ui::UiState::default();
 
     let mut frames_count: usize = 0;

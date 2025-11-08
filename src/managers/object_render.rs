@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
+use glium::{draw_parameters::{self, PolygonOffset}, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
 
 use crate::managers::render::RenderLayer;
 
@@ -39,15 +39,8 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
             write: true,
             ..Default::default()
         },
-        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
         polygon_mode: glium::draw_parameters::PolygonMode::Fill,
-        /*polygon_offset: PolygonOffset {
-            factor: 1.0,
-            units: 0.4,
-            point: true,
-            line: true,
-            fill: true,
-        },*/
         ..Default::default()
     };
 

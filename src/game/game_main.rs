@@ -1,12 +1,14 @@
+use egui_glium::egui_winit::egui::Visuals;
 use glium::winit::keyboard::KeyCode;
 use crate::{
     framework::{DebugMode, Framework},
-    managers::{input::InputEventType, networking, physics::CollisionGroups, scripting::lua::LuaSystem, systems::add_system},
+    managers::{input::InputEventType, networking, scripting::lua::LuaSystem, systems::add_system},
     systems::main_system::MainSystem, Args
 };
 
 pub fn start(args: Args, framework: &mut Framework) {
-    println!("Groups 1 and 3: {}", CollisionGroups::Group3.or(CollisionGroups::Group1).bits());
+    println!("{}", serde_json::to_string_pretty(&Visuals::dark()).unwrap());
+
     if let Some(save_name) = &args.new_save_name {
         match framework.new_save(&save_name) {
             Ok(_) => println!("Successfully created a new save file!"),

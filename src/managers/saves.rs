@@ -18,21 +18,19 @@ pub struct SavesManager {
 impl SavesManager { 
     pub fn load_save(&mut self, save_name: &str) -> Result<HashMap<String, Vec<SystemValue>>, ()> {
         let mut global_values: HashMap<String, Vec<SystemValue>> = HashMap::new();
-        let save_value_names_file_path = "saves/".to_string() + save_name + "/save_values.json";
+        let save_value_names_file_path = "saves/".to_string() + save_name + "/save_values.val";
         let save_value_names_file_path = get_full_asset_path(&save_value_names_file_path);
 
-        match fs::read_to_string(&save_value_names_file_path) {
-            Ok(save_values_names_json) => {
-                match serde_json::from_str::<Vec<String>>(&save_values_names_json) {
+        match fs::read(&save_value_names_file_path) {
+            Ok(save_values_names) => {
+                match serde_bare::from_slice::<Vec<String>>(&save_values_names) {
                     Ok(save_value_names) => {
                         for value_name in save_value_names {
-                            match load_value_from_file(save_name, &value_name) {
-                                Some(value) => {
-                                    global_values.insert(value_name, value);
-                                },
-                                None => (),
+                            if let Some(value) = load_value_from_file(save_name, &value_name) {
+                                global_values.insert(value_name, value);
                             }
                         }
+
                         self.current_save_name = Some(save_name.into());
                         return Ok(global_values)
                     },
@@ -81,7 +79,6 @@ impl SavesManager {
     ) -> Result<(), io::Error> {
         let save_dir_path = "saves/";
         let save_dir_path = get_full_asset_path(save_dir_path);
-        dbg!(&save_dir_path);
 
         if !Path::new(&save_dir_path).exists() {
             if let Err(err) = fs::create_dir(&save_dir_path) {
@@ -94,11 +91,9 @@ impl SavesManager {
         }
 
         let save_path = save_dir_path.to_string() + save_name + "/";
-        dbg!(&save_path);
 
         if !Path::new(&save_path).exists() {
             let create_dir = fs::create_dir(&save_path);
-            dbg!(&create_dir);
             if let Err(err) = create_dir {
                 debugger::error(&format!(
                     "saves manager's new_save error!\nfailed to create 'saves/{}/' directory!\nerr: {}",
@@ -106,10 +101,10 @@ impl SavesManager {
                 ));
                 return Err(err);
             }
-            if let Err(err) = File::create_new(save_path + "save_values.json") {
+            if let Err(err) = File::create_new(save_path + "save_values.val") {
                 debugger::error(
                     &format!(
-                        "saves manager's new_save error!\nfailed to create 'saves/{}/save_values.json' file!\nerr: {}",
+                        "saves manager's new_save error!\nfailed to create 'saves/{}/save_values.val' file!\nerr: {}",
                         save_name, err
                     )
                 );
@@ -187,14 +182,12 @@ impl SavesManager {
 }
 
 fn save_value_to_file(current_save_name: &str, value: &impl Serialize, value_name: &str) {
-    let json = serde_json::to_string_pretty(value);
+    let result = serde_bare::to_vec(value);
 
-    match json {
-        Ok(json) => {
-            let save_file_path = "saves/".to_string() + current_save_name + "/" + value_name + ".json";
+    match result {
+        Ok(value) => {
+            let save_file_path = "saves/".to_string() + current_save_name + "/" + value_name + ".val";
             let save_file_path = get_full_asset_path(&save_file_path);
-            dbg!(&save_file_path);
-
 
             if Path::new(&save_file_path).exists() {
                 if let Err(err) = fs::remove_file(&save_file_path) {
@@ -206,7 +199,7 @@ fn save_value_to_file(current_save_name: &str, value: &impl Serialize, value_nam
 
             match File::create(&save_file_path) {
                 Ok(mut file) => {
-                    if let Err(err) = file.write_all(json.as_bytes()) {
+                    if let Err(err) = file.write_all(&value) {
                         debugger::error(
                             &format!("save manager's save_game error!\nfailed to write the file\nerr: {}, path: {}", err, save_file_path)
                         );
@@ -229,13 +222,13 @@ fn save_value_to_file(current_save_name: &str, value: &impl Serialize, value_nam
 }
 
 fn load_value_from_file(current_save_name: &str, value_name: &str) -> Option<Vec<SystemValue>> {
-    let save_file_path = "saves/".to_string() + current_save_name + "/" + value_name + ".json";
+    let save_file_path = "saves/".to_string() + current_save_name + "/" + value_name + ".val";
     let save_file_path = get_full_asset_path(&save_file_path);
 
-    let mut json = String::new();
+    let mut bytes = Vec::new();
     match File::open(&save_file_path) {
         Ok(mut file) => {
-            if let Err(err) = file.read_to_string(&mut json) {
+            if let Err(err) = file.read_to_end(&mut bytes) {
                 debugger::error(
                     &format!("save manager's load_game error!\nfailed to read the save file\nerr: {}, path: {}", err, save_file_path)
                 );
@@ -250,8 +243,8 @@ fn load_value_from_file(current_save_name: &str, value_name: &str) -> Option<Vec
         }
     }
 
-    let values: Result<Vec<SystemValue>, serde_json::Error> =
-        serde_json::from_str(&json);
+    let values: Result<Vec<SystemValue>, serde_bare::error::Error> =
+        serde_bare::from_slice(&bytes);
 
     match values {
         Ok(values) => Some(values),
