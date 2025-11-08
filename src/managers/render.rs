@@ -5,7 +5,7 @@ use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, impl
 use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
 use super::{assets::{AssetManager, TextureAssetId}, debugger, object_render};
 
-const CLOSE_SHADOW_MAP_SIZE: u32 = 8196;
+const CLOSE_SHADOW_MAP_SIZE: u32 = 4096;
 const FAR_SHADOW_MAP_SIZE: u32 = 4096;
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -451,9 +451,9 @@ impl RenderShadowCamera {
     pub(crate) fn new(camera: &RenderCamera, light_dir: Vec3) -> RenderShadowCamera {
         let view = camera.get_view_matrix();
         let close_corners = Self::get_frustum_corners_world_space(
-            camera.get_projection_matrix_with_max_distance(110.0), view);
+            camera.get_projection_matrix_with_max_distance(60.0), view);
         let close_corners_1 = Self::get_frustum_corners(
-            camera.get_projection_matrix_with_max_distance(110.0)
+            camera.get_projection_matrix_with_max_distance(60.0)
         );
         let far_corners = Self::get_frustum_corners_world_space(
             camera.get_projection_matrix(), view);
