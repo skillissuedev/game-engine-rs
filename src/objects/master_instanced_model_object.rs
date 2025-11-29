@@ -3,7 +3,7 @@ use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use glium::{index::PrimitiveType, IndexBuffer, Program, VertexBuffer};
 use super::{gen_object_id, model_object::CurrentAnimationData, Object, ObjectGroup, Transform};
-use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
+use crate::{assets::{model_asset::{ModelAsset, ModelAssetAnimation, ModelAssetObject}, shader_asset::ShaderAsset}, framework::Framework, managers::{assets::{AssetManager, ModelAssetId, ShaderAssetId, TextureAssetId}, debugger, physics::ObjectBodyParameters, render::{RenderLayer, RenderManager, RenderObjectData, RenderShader}}, math_utils::deg_vec_to_rad};
 
 #[derive(Debug)]
 pub struct MasterInstancedModelObject {
@@ -17,7 +17,7 @@ pub struct MasterInstancedModelObject {
     object_properties: HashMap<String, Vec<crate::managers::systems::SystemValue>>,
     model_asset_id: ModelAssetId,
     texture_asset_id: Option<TextureAssetId>,
-    shader: ShaderAsset,
+    shader: ShaderAssetId,
     layer: RenderLayer,
     transparent: bool,
     started: bool,
@@ -29,7 +29,7 @@ pub struct MasterInstancedModelObject {
 }
 
 impl MasterInstancedModelObject {
-    pub fn new(name: &str, model_asset_id: ModelAssetId, texture_asset_id: Option<TextureAssetId>, shader_asset: ShaderAsset,
+    pub fn new(name: &str, model_asset_id: ModelAssetId, texture_asset_id: Option<TextureAssetId>, shader_asset_id: ShaderAssetId,
             layer: RenderLayer, transparent: bool) -> Self {
         let object_id = gen_object_id();
 
@@ -44,7 +44,7 @@ impl MasterInstancedModelObject {
             object_properties: HashMap::new(),
             model_asset_id,
             texture_asset_id,
-            shader: shader_asset,
+            shader: shader_asset_id,
             layer,
             transparent,
             started: false,
@@ -67,8 +67,8 @@ impl Object for MasterInstancedModelObject {
         if self.error == true { return }
 
 
-        let assets = &framework.assets;
-        let asset = framework.assets.get_model_asset(&self.model_asset_id);
+        let assets = &mut framework.assets;
+        let asset = assets.get_model_asset(&self.model_asset_id);
         if let Some(asset) = asset {
             let render = framework
                 .render.as_mut()
@@ -76,8 +76,7 @@ impl Object for MasterInstancedModelObject {
 
             // initialize the object if it wasn't already
             if self.started == false {
-                let shader_asset = self.shader.clone();
-                self.add_all_objects(assets, render, shader_asset);
+                self.add_all_objects(assets, render);
                 self.started = true;
             }
 
@@ -179,17 +178,44 @@ impl MasterInstancedModelObject {
         Mat4::from_scale_rotation_translation(global_transform.scale, global_rotation, global_transform.position)
     }
 
-    fn add_all_objects(&mut self, assets: &AssetManager, render: &mut RenderManager, shader: ShaderAsset) {
+    fn add_all_objects(&mut self, assets: &mut AssetManager, render: &mut RenderManager) {
         let mut objects_list: HashMap<String, Vec<RenderObjectData>> = HashMap::new();
         let asset = assets.get_model_asset(&self.model_asset_id);
+        let shader = assets.get_shader_asset_mut(&self.shader);
         if let Some(asset) = asset {
-            self.add_objects_to_list(&shader, render, asset.root.object_name.clone().unwrap_or(String::new()), &asset.root, &mut objects_list, None);
+            if let Some(shader) = shader {
+                if let None = shader.program {
+                    let program = Program::from_source(
+                        &render.display,
+                        &shader.vertex_shader_source,
+                        &shader.fragment_shader_source,
+                        None
+                    );
+
+                    let program = match program {
+                        Ok(program) => program,
+                        Err(err) => {
+                            debugger::error(
+                                &format!(
+                                    "Failed to compile the shader! Error: {}\n - MasterInstancedModelObject's update", 
+                                    err
+                                )
+                            );
+                            self.error = true;
+                            return
+                        },
+                    };
+                    shader.program = Some(program);
+                }
+
+                self.add_objects_to_list(&render, asset.root.object_name.clone().unwrap_or(String::new()), &asset.root, &mut objects_list, None);
+            }
         }
 
         render.add_object(self.id, objects_list);
     }
 
-    fn add_objects_to_list(&mut self, shader_asset: &ShaderAsset, render: &RenderManager, node_id: String, node: &ModelAssetObject, objects_list: &mut HashMap<String, Vec<RenderObjectData>>, parent_transform: Option<Mat4>) {
+    fn add_objects_to_list(&mut self, render: &RenderManager, node_id: String, node: &ModelAssetObject, objects_list: &mut HashMap<String, Vec<RenderObjectData>>, parent_transform: Option<Mat4>) {
         let transparent = self.transparent;
         let layer = &self.layer;
 
@@ -202,26 +228,6 @@ impl MasterInstancedModelObject {
         
         objects_list.insert(node_id.clone(), Vec::new());
         for render_data in &node.render_data {
-            let program = Program::from_source(
-                &render.display,
-                &shader_asset.vertex_shader_source,
-                &shader_asset.fragment_shader_source,
-                None
-            );
-
-            let program = match program {
-                Ok(program) => program,
-                Err(err) => {
-                    debugger::error(
-                        &format!(
-                            "Failed to compile the shader! Error: {}\n - MasterInstancedModelObject's update", 
-                            err
-                        )
-                    );
-                    self.error = true;
-                    return
-                },
-            };
 
             let vbo = VertexBuffer::new(&render.display, &render_data.vertices)
                 .expect("Failed to create a VBO!");
@@ -233,7 +239,7 @@ impl MasterInstancedModelObject {
                 transparent,
                 uniforms: HashMap::new(),
                 texture_asset_id: self.texture_asset_id.clone(),
-                shader: RenderShader::Program(program),
+                shader: self.shader.clone(),
                 layer: layer.clone(),
                 vbo,
                 ibo,
@@ -253,7 +259,7 @@ impl MasterInstancedModelObject {
         }
 
         for (child_idx, child) in &node.children {
-            self.add_objects_to_list(shader_asset, render, child_idx.to_owned(), child, objects_list, Some(transform));
+            self.add_objects_to_list(render, child_idx.to_owned(), child, objects_list, Some(transform));
         }
     }
 

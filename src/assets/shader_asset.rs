@@ -1,5 +1,7 @@
 use std::fs::read_to_string;
 
+use glium::Program;
+
 use crate::{
     framework::Framework,
     managers::{assets::get_full_asset_path, debugger::error},
@@ -14,10 +16,13 @@ pub static mut DEFAULT_FRAMEBUFFER_FRAGMENT_SHADER_PATH: &str = "shaders/default
 pub static mut DEFAULT_INSTANCED_VERTEX_SHADER_PATH: &str = "shaders/default_instanced.vert";
 pub static mut DEFAULT_INSTANCED_FRAGMENT_SHADER_PATH: &str = "shaders/default_instanced.frag";
 
-#[derive(Debug, Clone)]
+static mut LAST_SHADER_ID: usize = 0;
+
+#[derive(Debug)]
 pub struct ShaderAsset {
     pub vertex_shader_source: String,
     pub fragment_shader_source: String,
+    pub program: Option<Program>,
 }
 
 #[derive(Debug, Clone)]
@@ -89,8 +94,8 @@ impl ShaderAsset {
         if fragment_shader_source.is_err() {
             let fragment_shader_source = fragment_shader_source.err().unwrap();
             error(&format!(
-                "vertex shader asset loading error!\npath: {}\nerror:{}",
-                path.vertex_shader_path, fragment_shader_source
+                "fragment shader asset loading error!\npath: {}\nerror:{}",
+                path.fragment_shader_path, fragment_shader_source
             ));
             return Err(ShaderError::FragShaderLoadErr);
         }
@@ -101,6 +106,7 @@ impl ShaderAsset {
         let asset = ShaderAsset {
             vertex_shader_source,
             fragment_shader_source,
+            program: None,
         };
 
         Ok(asset)

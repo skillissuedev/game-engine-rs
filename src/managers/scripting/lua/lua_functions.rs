@@ -340,8 +340,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
         let system_id_for_functions = system_id.clone();
         let new_model_object = lua.create_function_mut(
-            move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, is_transparent, layer):
-            (String, String, Option<String>, Option<String>, Option<String>, bool, Option<u8>)| {
+            move |lua, (name, model_asset_id, texture_asset_id, shader_asset_id, is_transparent, layer):
+            (String, String, Option<String>, Option<String>, bool, Option<u8>)| {
                 let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
                 let framework_ptr = get_framework_pointer();
                 let framework = &mut *framework_ptr;
@@ -361,19 +361,10 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             },
                             None => texture_asset = None,
                         }
-                        let mut shader_asset_path = ShaderAssetPath {
-                            vertex_shader_path: assets::shader_asset::get_default_vertex_shader_path(),
-                            fragment_shader_path: assets::shader_asset::get_default_fragment_shader_path(),
-                        };
-                        if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
-                            shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
-                        }
-                        if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
-                            shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
-                        }
-                        let shader_asset = ShaderAsset::load_from_file(&shader_asset_path);
+
+                        let shader_asset = framework.get_shader_asset(&shader_asset_id.unwrap_or("default".to_string()));
                         match shader_asset {
-                            Ok(shader_asset) => {
+                            Some(shader_asset) => {
                                 let model_asset = framework.get_model_asset(&model_asset_id);
                                 match model_asset {
                                     Some(model_asset) => {
@@ -402,8 +393,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                         debugger::error("lua error: error when calling new_model_object, failed to get the model asset!"),
                                 }
                             },
-                            Err(err) => 
-                                debugger::error(&format!("lua error: error when calling new_model_object, failed to load the shader asset!\nerr: {:?}", err)),
+                            None => 
+                                debugger::error(&format!("lua error: error when calling new_model_object, failed to load the shader asset!")),
                         }
                     },
                     None => debugger::error("failed to call new_model_object, system not found"),
@@ -414,8 +405,8 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
 
         let system_id_for_functions = system_id.clone();
         let new_master_instanced_model_object = lua.create_function_mut(
-            move |lua, (name, model_asset_id, texture_asset_id, vertex_shader_asset_path, fragment_shader_asset_path, is_transparent, layer):
-            (String, String, Option<String>, Option<String>, Option<String>, bool, Option<u8>)| {
+            move |lua, (name, model_asset_id, texture_asset_id, shader_asset_id, is_transparent, layer):
+            (String, String, Option<String>, Option<String>, bool, Option<u8>)| {
                 let system_option = systems::get_system_mut_with_id(&system_id_for_functions);
                 let framework_ptr = get_framework_pointer();
                 let framework = &mut *framework_ptr;
@@ -435,19 +426,10 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                             },
                             None => texture_asset = None,
                         }
-                        let mut shader_asset_path = ShaderAssetPath {
-                            vertex_shader_path: assets::shader_asset::get_default_instanced_vertex_shader_path(),
-                            fragment_shader_path: assets::shader_asset::get_default_instanced_fragment_shader_path(),
-                        };
-                        if let Some(vertex_shader_asset_path) = vertex_shader_asset_path {
-                            shader_asset_path.vertex_shader_path = vertex_shader_asset_path;
-                        }
-                        if let Some(fragment_shader_asset_path) = fragment_shader_asset_path {
-                            shader_asset_path.fragment_shader_path = fragment_shader_asset_path;
-                        }
-                        let shader_asset = ShaderAsset::load_from_file(&shader_asset_path);
+
+                        let shader_asset = framework.get_shader_asset(&shader_asset_id.unwrap_or("default_instanced".to_string()));
                         match shader_asset {
-                            Ok(shader_asset) => {
+                            Some(shader_asset) => {
                                 let model_asset = framework.get_model_asset(&model_asset_id);
                                 match model_asset {
                                     Some(model_asset) => {
@@ -477,9 +459,9 @@ pub fn add_lua_vm_to_list(system_id: String, lua: Lua) {
                                         debugger::error("lua error: error when calling new_master_instanced_model_object, failed to get the model asset!"),
                                 }
                             },
-                            Err(err) => {
+                            None => {
                                 debugger::error(
-                                    &format!("lua error: error when calling new_master_instanced_model_object, failed to load the shader asset!\nerr: {:?}", err)
+                                    &format!("lua error: error when calling new_master_instanced_model_object, failed to load the shader asset!")
                                 )
                             },
                         }

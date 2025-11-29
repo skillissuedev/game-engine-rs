@@ -152,6 +152,13 @@ impl AssetManager {
         }
     }
 
+    pub fn get_shader_asset_id(&self, id: &str) -> Option<ShaderAssetId> {
+        match self.loaded_shader_assets.get(id) {
+            Some(_) => Some(ShaderAssetId { id: id.into() }),
+            None => None,
+        }
+    }
+
     pub fn get_model_asset_id(&self, id: &str) -> Option<ModelAssetId> {
         match self.loaded_model_assets.read().expect("loaded_model_assets is poisoned :(").get(id) {
             Some(_) => Some(ModelAssetId { id: id.into() }),
@@ -183,6 +190,20 @@ impl AssetManager {
     pub fn get_texture_asset(&self, asset_id: &TextureAssetId) -> Option<&TextureAsset> {
         match self.loaded_texture_assets.get(asset_id.get_id()) {
             Some(texture_asset) => Some(&texture_asset),
+            None => None,
+        }
+    }
+
+    pub fn get_shader_asset(&self, asset_id: &ShaderAssetId) -> Option<&ShaderAsset> {
+        match self.loaded_shader_assets.get(asset_id.get_id()) {
+            Some(shader_asset) => Some(&shader_asset),
+            None => None,
+        }
+    }
+
+    pub fn get_shader_asset_mut(&mut self, asset_id: &ShaderAssetId) -> Option<&mut ShaderAsset> {
+        match self.loaded_shader_assets.get_mut(asset_id.get_id()) {
+            Some(shader_asset) => Some(shader_asset),
             None => None,
         }
     }
@@ -275,7 +296,7 @@ impl TextureAssetId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShaderAssetId {
     id: String,
 }

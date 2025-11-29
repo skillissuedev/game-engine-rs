@@ -51,6 +51,14 @@ pub fn start(args: Args, framework: &mut Framework) {
         framework
             .preload_texture_asset("default".into(), "textures/default_texture.png")
             .expect("Failed to load the default texture!");
+
+        framework
+            .preload_shader_asset("default".into(), "shaders/default.vert", "shaders/default.frag")
+            .expect("Failed to load the default shader!");
+
+        framework
+            .preload_shader_asset("default_instanced".into(), "shaders/default_instanced.vert", "shaders/default_instanced.frag")
+            .expect("Failed to load the default instanced shader!");
     }
 
     add_system(Box::new(LuaSystem::new("player_menu", "scripts/lua/player_menu.lua").unwrap()), framework);

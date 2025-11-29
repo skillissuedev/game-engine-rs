@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
-use glium::{draw_parameters::{self, PolygonOffset}, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
+use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
 
 use crate::managers::render::RenderLayer;
 
@@ -16,15 +16,24 @@ pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, f
         for (_, render_node) in render_objects_list {
             for render_object in render_node {
                 if !render_object.transparent && render_object.cast_shadows {
-                    shadow_draw_objects(close_framebuffer, far_framebuffer, instanced_positions, &shadow_camera, render_object, display, program, instanced_program);
+                    shadow_draw_objects(true, close_framebuffer, instanced_positions, &shadow_camera, render_object, display, program, instanced_program);
                 } 
             }
         }
     }
 
+    for (_, render_objects_list) in objects_list {
+        for (_, render_node) in render_objects_list {
+            for render_object in render_node {
+                if !render_object.transparent && render_object.cast_shadows {
+                    shadow_draw_objects(false, far_framebuffer, instanced_positions, &shadow_camera, render_object, display, program, instanced_program);
+                } 
+            }
+        }
+    }
 }
 
-fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
+fn shadow_draw_objects(is_close: bool, framebuffer: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
         shadow_camera: &RenderShadowCamera, render_object: &RenderObjectData, display: &Display<WindowSurface>, program: &Program,
         instanced_program: &Program) {
     let joints = UniformBuffer::new(display, render_object.joint_matrices)
@@ -33,13 +42,13 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
         UniformBuffer::new(display, render_object.joint_inverse_bind_matrices)
         .expect("UniformBuffer::new() failed (inverse_bind_matrices) - object_render.rs");
 
-    let mut draw_parameters = DrawParameters {
+    let draw_parameters = DrawParameters {
         depth: glium::Depth {
             test: glium::draw_parameters::DepthTest::IfLess,
             write: true,
             ..Default::default()
         },
-        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
+        //backface_culling: glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
         polygon_mode: glium::draw_parameters::PolygonMode::Fill,
         ..Default::default()
     };
@@ -56,64 +65,52 @@ fn shadow_draw_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffe
                 let per_instance_buffer =
                     glium::vertex::VertexBuffer::dynamic(display, &per_instance_data).unwrap();
 
-                let uniforms = uniform! {
-                    view: shadow_camera.close_shadow_view.to_cols_array_2d(),
-                    proj: shadow_camera.close_shadow_proj.to_cols_array_2d(),
-                    joint_matrices: &joints,
-                    inverse_bind_matrices: &inverse_bind_matrices,
+                let uniforms = match is_close {
+                    true => uniform! {
+                        view: shadow_camera.close_shadow_view.to_cols_array_2d(),
+                        proj: shadow_camera.close_shadow_proj.to_cols_array_2d(),
+                        joint_matrices: &joints,
+                        inverse_bind_matrices: &inverse_bind_matrices,
+                    },
+                    false => uniform! {
+                        view: shadow_camera.far_shadow_view.to_cols_array_2d(),
+                        proj: shadow_camera.far_shadow_proj.to_cols_array_2d(),
+                        joint_matrices: &joints,
+                        inverse_bind_matrices: &inverse_bind_matrices,
+                    },
                 };
 
-                close_framebuffer.draw(
+                framebuffer.draw(
                     (vbo, per_instance_buffer.per_instance().unwrap()),
                     ibo,
                     instanced_program,
                     &uniforms,
                     &draw_parameters
                 ).expect("Failed to render the instanced object to the close shadow map");
-
-                let uniforms = uniform! {
-                    view: shadow_camera.far_shadow_view.to_cols_array_2d(),
-                    proj: shadow_camera.far_shadow_proj.to_cols_array_2d(),
-                    joint_matrices: &joints,
-                    inverse_bind_matrices: &inverse_bind_matrices,
-                };
-
-                draw_parameters.backface_culling = BackfaceCullingMode::CullClockwise;
-
-                far_framebuffer.draw(
-                    (vbo, per_instance_buffer.per_instance().unwrap()),
-                    ibo,
-                    instanced_program,
-                    &uniforms,
-                    &draw_parameters
-                ).expect("Failed to render the instanced object to the far shadow map");
             }
         },
         None => {
-            let uniforms = uniform! {
-                view: shadow_camera.close_shadow_view.to_cols_array_2d(),
-                proj: shadow_camera.close_shadow_proj.to_cols_array_2d(),
-                model: render_object.transform.to_cols_array_2d(),
-                model_object: render_object.model_object_transform.to_cols_array_2d(),
-                joint_matrices: &joints,
-                inverse_bind_matrices: &inverse_bind_matrices,
+            let uniforms = match is_close {
+                true => uniform! {
+                    view: shadow_camera.close_shadow_view.to_cols_array_2d(),
+                    proj: shadow_camera.close_shadow_proj.to_cols_array_2d(),
+                    model: render_object.transform.to_cols_array_2d(),
+                    model_object: render_object.model_object_transform.to_cols_array_2d(),
+                    joint_matrices: &joints,
+                    inverse_bind_matrices: &inverse_bind_matrices,
+                },
+                false => uniform! {
+                    view: shadow_camera.far_shadow_view.to_cols_array_2d(),
+                    proj: shadow_camera.far_shadow_proj.to_cols_array_2d(),
+                    model: render_object.transform.to_cols_array_2d(),
+                    model_object: render_object.model_object_transform.to_cols_array_2d(),
+                    joint_matrices: &joints,
+                    inverse_bind_matrices: &inverse_bind_matrices,
+                },
             };
 
-            close_framebuffer.draw(vbo, ibo, program, &uniforms, &draw_parameters)
+            framebuffer.draw(vbo, ibo, program, &uniforms, &draw_parameters)
                 .expect("Failed to render the object to the close shadow map");
-            let uniforms = uniform! {
-                view: shadow_camera.far_shadow_view.to_cols_array_2d(),
-                proj: shadow_camera.far_shadow_proj.to_cols_array_2d(),
-                model: render_object.transform.to_cols_array_2d(),
-                model_object: render_object.model_object_transform.to_cols_array_2d(),
-                joint_matrices: &joints,
-                inverse_bind_matrices: &inverse_bind_matrices,
-            };
-
-            draw_parameters.backface_culling = BackfaceCullingMode::CullClockwise;
-
-            far_framebuffer.draw(vbo, ibo, program, &uniforms, &draw_parameters)
-                .expect("Failed to render the object to the far shadow map");
         },
     };
 }
@@ -199,9 +196,14 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
         point_lights_attenuation: &UniformBuffer<[(f32, f32); 64]>, light_direction: Vec3, light_strength: f32) {
     for (_, render_object) in distance_objects {
         // Render it!
-        let shader = match &render_object.shader {
-            crate::managers::render::RenderShader::NotLinked => continue, // We'll skip rendering this object for now,
-            crate::managers::render::RenderShader::Program(program) => program,
+        let shader = match assets.get_shader_asset(&render_object.shader) {
+            Some(shader) => {
+                match &shader.program {
+                    Some(program) => program,
+                    None => continue,
+                }
+            },
+            None => continue,
         };
 
         let texture_asset = match &render_object.texture_asset_id {
@@ -233,7 +235,7 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
                 write: true,
                 ..Default::default()
             },
-            backface_culling: draw_parameters::BackfaceCullingMode::CullClockwise,
+            //backface_culling: draw_parameters::BackfaceCullingMode::CullClockwise,
             polygon_mode: draw_parameters::PolygonMode::Fill,
             ..Default::default()
         };

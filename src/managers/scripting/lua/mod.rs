@@ -2078,6 +2078,17 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("preload_shader_asset",
+            |_, framework, (asset_id, vertex_path, fragment_path): (String, String, String)| {
+                match framework.preload_shader_asset(asset_id.clone(), &vertex_path, &fragment_path) {
+                    Ok(_) => println!("Preloaded ShaderAsset with id '{}'!", asset_id),
+                    Err(_) => (),
+                }
+                Ok(())
+            }
+        );
+
+
         methods.add_method_mut("preload_texture_asset",
             |_, framework, (asset_id, asset_path): (String, Option<String>)| {
                 let asset_path = match asset_path {

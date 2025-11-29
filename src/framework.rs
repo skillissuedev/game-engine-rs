@@ -1,10 +1,7 @@
 use crate::{
-    assets::{shader_asset::ShaderAsset, sound_asset::SoundAsset, texture_asset::TextureAsset},
-    game::game_main,
-    managers::{
-        self, assets::{get_full_asset_path, AssetManager, ModelAssetId, SoundAssetId, TextureAssetId}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
-    },
-    objects::{character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger, Transform}, Args,
+    Args, assets::{shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset, texture_asset::TextureAsset}, game::game_main, managers::{
+        self, assets::{AssetManager, ModelAssetId, ShaderAssetId, SoundAssetId, TextureAssetId, get_full_asset_path}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
+    }, objects::{Transform, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}
 };
 use clap::builder::styling::Color;
 use egui_glium::egui_winit::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Id, Shadow, Stroke, Style, Window};
@@ -137,6 +134,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                         match event {
                             WindowEvent::RedrawRequested => {
+                                let timer = Instant::now();
                                 let time_since_last_frame = last_frame.elapsed();
                                 last_frame = Instant::now();
                                 update_game(&mut framework, time_since_last_frame);
@@ -551,6 +549,21 @@ impl Framework {
         }
     }
 
+    pub fn preload_shader_asset(&mut self, asset_id: String, vert_path: &str, frag_path: &str) -> Result<(), ()> {
+        match ShaderAsset::load_from_file(&ShaderAssetPath {
+            vertex_shader_path: vert_path.into(),
+            fragment_shader_path: frag_path.into(),
+        }) {
+            Ok(shader) => {
+                return match self.assets.preload_shader_asset(asset_id, shader) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(()),
+                }
+            },
+            Err(_) => Err(()),
+        }
+    }
+
     pub fn background_preload_model_asset(&mut self, asset_id: String, asset_path: &str) -> Result<(), ()> {
         match self.assets.background_preload_model_asset(asset_id, asset_path.into()) {
             Ok(_) => Ok(()),
@@ -572,6 +585,10 @@ impl Framework {
 
     pub fn get_model_asset(&self, asset_id: &str) -> Option<ModelAssetId> {
         self.assets.get_model_asset_id(asset_id)
+    }
+
+    pub fn get_shader_asset(&self, asset_id: &str) -> Option<ShaderAssetId> {
+        self.assets.get_shader_asset_id(asset_id)
     }
 
     pub fn get_texture_asset(&self, asset_id: &str) -> Option<TextureAssetId> {
@@ -958,11 +975,11 @@ impl Framework {
         name: &str,
         model_asset_id: ModelAssetId,
         texture_asset_id: Option<TextureAssetId>,
-        shader_asset: ShaderAsset,
+        shader_asset_id: ShaderAssetId,
         is_transparent: bool,
         layer: RenderLayer,
     ) -> MasterInstancedModelObject {
-        MasterInstancedModelObject::new(name, model_asset_id, texture_asset_id, shader_asset, layer, is_transparent)
+        MasterInstancedModelObject::new(name, model_asset_id, texture_asset_id, shader_asset_id, layer, is_transparent)
     }
 
     pub fn new_instanced_model_transform_holder(
@@ -979,7 +996,7 @@ impl Framework {
         name: &str,
         model_asset_id: ModelAssetId,
         texture_asset_id: Option<TextureAssetId>,
-        shader_asset: ShaderAsset,
+        shader_asset: ShaderAssetId,
         is_transparent: bool,
         layer: RenderLayer
     ) -> ModelObject {

@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 use egui_glium::EguiGlium;
 use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
-use crate::{assets::shader_asset::ShaderAsset, math_utils::deg_to_rad};
+use crate::{assets::shader_asset::ShaderAsset, managers::assets::ShaderAssetId, math_utils::deg_to_rad};
 use super::{assets::{AssetManager, TextureAssetId}, debugger, object_render};
 
 const CLOSE_SHADOW_MAP_SIZE: u32 = 4096;
-const FAR_SHADOW_MAP_SIZE: u32 = 4096;
+const FAR_SHADOW_MAP_SIZE: u32 = 2048;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Vertex {
@@ -189,6 +189,7 @@ impl RenderManager {
         );
 
         self.render_framebuffer_plane(&mut frame);
+
 
         egui_glium
             .paint(display, &mut frame);
@@ -405,7 +406,7 @@ pub(crate) struct RenderObjectData {
     pub(crate) transparent: bool,
     pub(crate) uniforms: HashMap<String, RenderUniformValue>,
     pub(crate) texture_asset_id: Option<TextureAssetId>,
-    pub(crate) shader: RenderShader,
+    pub(crate) shader: ShaderAssetId,
     pub(crate) layer: RenderLayer,
     pub(crate) vbo: VertexBuffer<Vertex>,
     pub(crate) ibo: IndexBuffer<u32>,
