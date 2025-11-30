@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::{Arc, Mutex, RwLock}};
 
 use glam::{Vec2, Vec3};
-use landmass::{Agent, AgentId, Archipelago, ArchipelagoOptions, Character, CharacterId, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
+use landmass::{Agent, AgentId, Archipelago, ArchipelagoOptions, Character, CharacterId, CoordinateSystem, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
 
 use crate::{managers::debugger, objects::{nav_object::NavObjectData, Transform}};
 
 use super::assets::AssetManager;
 
 pub struct NavigationManager {
-    objects: Arc<RwLock<HashMap<u128, IslandId>>>,
-    archipelago: Arc<Mutex<Archipelago<XYZ>>>,
+    objects: Arc<RwLock<HashMap<u128, Vec<IslandId>>>>,
+    archipelago: Arc<Mutex<Archipelago<XYZFlip>>>,
     characters: HashMap<u128, CharacterId>,
     agents: HashMap<u128, AgentId>,
 }
@@ -31,27 +31,34 @@ impl NavigationManager {
             NavObjectData::StaticMesh(model_asset_id) => {
                 let pos = transform.position;
                 let rot = transform.rotation;
-                let transform: landmass::Transform<XYZ> = landmass::Transform {
-                    translation: landmass::Vec3::new(pos.x, pos.z, pos.y),
-                    rotation: rot.y.to_radians(), //???
-                };
-                let mut vertices = vec![];
-                let mut polygons = Vec::new();
-                let mut polygon_type_indices = Vec::new();
+
+                struct NavmeshBuildData {
+                    vertices: Vec<landmass::Vec3>,
+                    polygons: Vec<Vec<usize>>,
+                    polygon_type_indices: Vec<usize>
+                }
+
+                let mut build_data = vec![];
 
                 match assets.get_model_asset(model_asset_id) {
                     Some(asset) => {
                         for data in &asset.root.render_data {
+                            let mut current_build_data = NavmeshBuildData {
+                                vertices: vec![],
+                                polygons: vec![],
+                                polygon_type_indices: vec![],
+                            };
                             for vertex in &data.vertices {
                                 let pos = vertex.position;
-                                vertices.push(landmass::Vec3::new(pos[0], pos[2], pos[1]));
+                                current_build_data.vertices.push(landmass::Vec3::new(pos[0], pos[2], pos[1]));
                             }
 
                             for index in data.indices.chunks_exact(3) {
-                                polygons.push(vec![index[0] as usize, index[1] as usize, index[2] as usize]);
-                                polygon_type_indices.push(0);
+                                current_build_data.polygons.push(vec![index[0] as usize, index[1] as usize, index[2] as usize]);
+                                current_build_data.polygon_type_indices.push(0);
                             }
 
+                            build_data.push(current_build_data);
                             break
                         }
                     },
@@ -61,28 +68,38 @@ impl NavigationManager {
                     },
                 };
 
-                let archipelago = self.archipelago.clone();
-                let objects = self.objects.clone();
+                for build_data in build_data {
+                    let archipelago = self.archipelago.clone();
+                    let objects = self.objects.clone();
 
-                std::thread::spawn(move || {
-                    let navmesh = NavigationMesh {
-                        vertices,
-                        polygons,
-                        polygon_type_indices,
-                        height_mesh: None,
-                    };
-                    match validate_navmesh(navmesh, None) {
-                        Some(navmesh) => {
-                            if let Ok(navmesh) = navmesh {
-                                let island_id = archipelago.lock().expect("archipelago was poisoned :(").add_island(
-                                    Island::new(transform, navmesh.into())
-                                );
-                                objects.write().expect("objects was poisoned :c").insert(id, island_id);
-                            }
-                        },
-                        None => (),
-                    }
-                });
+                    std::thread::spawn(move || {
+                        let transform: landmass::Transform<XYZFlip> = landmass::Transform {
+                            translation: landmass::Vec3::new(pos.x, pos.z, pos.y),
+                            rotation: rot.y.to_radians(), //???
+                        };
+
+                        let navmesh = NavigationMesh {
+                            vertices: build_data.vertices,
+                            polygons: build_data.polygons,
+                            polygon_type_indices: build_data.polygon_type_indices,
+                            height_mesh: None,
+                        };
+                        match validate_navmesh(navmesh, 0) {
+                            Some(navmesh) => {
+                                if let Ok(navmesh) = navmesh {
+                                    let island_id = archipelago.lock().expect("archipelago was poisoned :(").add_island(
+                                        Island::new(transform, navmesh.into())
+                                    );
+                                    dbg!(island_id);
+                                    objects.write().expect("objects was poisoned :c").get_mut(&id)
+                                        .expect("failed to open the vec of object's island ids")
+                                        .push(island_id);
+                                }
+                            },
+                            None => (),
+                        }
+                    });
+                }
             },
             NavObjectData::DynamicCapsule(radius) => {
                 let pos = transform.position;
@@ -113,18 +130,20 @@ impl NavigationManager {
 
     pub fn set_island_transform(&mut self, idx: u128, transform: Transform) {
         match self.objects.read().unwrap().get(&idx) {
-            Some(island) => {
-                match self.archipelago.lock().unwrap().get_island_mut(*island) {
-                    Some(mut island) => {
-                        let pos = transform.position;
-                        let transform: landmass::Transform<XYZ> = landmass::Transform {
-                            translation: landmass::Vec3::new(pos.x, pos.z, pos.y),
-                            rotation: transform.rotation.y.to_radians(),
-                        };
+            Some(islands) => {
+                for island in islands {
+                    match self.archipelago.lock().unwrap().get_island_mut(*island) {
+                        Some(mut island) => {
+                            let pos = transform.position;
+                            let transform: landmass::Transform<XYZFlip> = landmass::Transform {
+                                translation: landmass::Vec3::new(pos.x, pos.z, pos.y),
+                                rotation: transform.rotation.y.to_radians(),
+                            };
 
-                        island.set_transform(transform);
-                    },
-                    None => debugger::error("Failed to update the island transform! Failed to get the island."),
+                            island.set_transform(transform);
+                        },
+                        None => debugger::error("Failed to update the island transform! Failed to get the island."),
+                    }
                 }
             },
             None => debugger::error("Failed to update the island transform! Failed to get the island id."),
@@ -312,7 +331,7 @@ impl NavigationManager {
     }
 }
 
-fn validate_navmesh(navmesh: NavigationMesh<XYZ>, previous_error: Option<usize>) -> Option<Result<ValidNavigationMesh<XYZ>, NavigationMesh<XYZ>>> {
+fn validate_navmesh(navmesh: NavigationMesh<XYZFlip>, err_count: usize) -> Option<Result<ValidNavigationMesh<XYZFlip>, NavigationMesh<XYZFlip>>> {
     let mut navmesh = navmesh;
     match navmesh.clone().validate() {
         Ok(valid_navmesh) => {
@@ -321,18 +340,15 @@ fn validate_navmesh(navmesh: NavigationMesh<XYZ>, previous_error: Option<usize>)
         Err(err) => {
             match err {
                 ValidationError::ConcavePolygon(idx) => {
-                    if let Some(previous_error) = previous_error {
-                        if previous_error == idx {
-                            navmesh.polygons.remove(idx);
-                            navmesh.polygon_type_indices.remove(idx);
-
-                            return validate_navmesh(navmesh, Some(idx))
-                        }
+                    if err_count > 1000 {
+                        debugger::error("Failed to create a navmesh from a mesh! Navmesh validation error (> 1000 errors)");
+                        return None
                     }
 
-                    navmesh.polygons[idx].reverse();
+                    navmesh.polygons.remove(idx);
+                    navmesh.polygon_type_indices.remove(idx);
 
-                    validate_navmesh(navmesh, Some(idx))
+                    return validate_navmesh(navmesh, err_count + 1)
                 },
                 _ => {
                     debugger::error("Failed to create a navmesh! Navmesh validation error.");
@@ -399,3 +415,19 @@ impl NavMeshObstacleTransform {
     }
 }
 
+pub struct XYZFlip;
+
+impl CoordinateSystem for XYZFlip {
+    type Coordinate = landmass::Vec3;
+    type SampleDistance = PointSampleDistance3d;
+
+    const FLIP_POLYGONS: bool = true;
+
+    fn to_landmass(v: &Self::Coordinate) -> landmass::Vec3 {
+        landmass::Vec3::from_array(v.to_array())
+    }
+
+    fn from_landmass(v: &landmass::Vec3) -> Self::Coordinate {
+        *v
+    }
+}
