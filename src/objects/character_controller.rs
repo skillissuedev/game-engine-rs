@@ -47,7 +47,7 @@ impl CharacterController {
         controller.max_slope_climb_angle = deg_to_rad(80.0);
         controller.snap_to_ground = Some(CharacterLength::Absolute(0.3));
         controller.up = nalgebra::Vector::y_axis();
-        controller.offset = CharacterLength::Absolute(0.2);
+        controller.offset = CharacterLength::Absolute(0.3);
 
         let mask = match mask {
             Some(mask) => mask,

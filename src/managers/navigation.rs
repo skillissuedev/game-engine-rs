@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::{Arc, Mutex, RwLock}};
 
 use glam::{Vec2, Vec3};
-use landmass::{Agent, AgentId, Archipelago, ArchipelagoOptions, Character, CharacterId, CoordinateSystem, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, TargetReachedCondition, ValidNavigationMesh, ValidationError, XYZ};
+use landmass::{Agent, AgentId, Archipelago, ArchipelagoOptions, Character, CharacterId, CoordinateSystem, FromAgentRadius, Island, IslandId, NavigationMesh, PointSampleDistance3d, TargetReachedCondition, ValidNavigationMesh, ValidationError};
 
 use crate::{managers::debugger, objects::{nav_object::NavObjectData, Transform}};
 
@@ -86,13 +86,13 @@ impl NavigationManager {
                             polygon_type_indices: build_data.polygon_type_indices,
                             height_mesh: None,
                         };
+
                         match validate_navmesh(navmesh, 0) {
                             Some(navmesh) => {
                                 if let Ok(navmesh) = navmesh {
                                     let island_id = archipelago.lock().expect("archipelago was poisoned :(").add_island(
                                         Island::new(transform, navmesh.into())
                                     );
-                                    dbg!(island_id);
                                     objects.write().expect("objects was poisoned :c").get_mut(&id)
                                         .expect("failed to open the vec of object's island ids")
                                         .push(island_id);
@@ -236,6 +236,9 @@ impl NavigationManager {
                         let y = velocity.y;
                         velocity.y = velocity.z;
                         velocity.z = y;
+                        /*dbg!(velocity);
+                        dbg!(agent.current_target);
+                        dbg!(agent.state());*/
                         Some(velocity)
                     },
                     None => {
@@ -263,7 +266,8 @@ impl NavigationManager {
 
                         let mut archipelago = self.archipelago.lock().unwrap();
                         let sampled_target = archipelago.sample_point(target, &PointSampleDistance3d {
-                            horizontal_distance: 0.1, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0, animation_link_max_vertical_distance: 0.0, });
+                            horizontal_distance: 0.5, distance_above: 100.0, distance_below: 100.0, vertical_preference_ratio: 0.0, animation_link_max_vertical_distance: 0.0, });
+
                         let target: landmass::Vec3;
 
                         match sampled_target {
@@ -426,7 +430,7 @@ impl CoordinateSystem for XYZFlip {
     const FLIP_POLYGONS: bool = true;
 
     fn to_landmass(v: &Self::Coordinate) -> landmass::Vec3 {
-        landmass::Vec3::from_array(v.to_array())
+        *v
     }
 
     fn from_landmass(v: &landmass::Vec3) -> Self::Coordinate {

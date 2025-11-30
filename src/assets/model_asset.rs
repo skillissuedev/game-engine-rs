@@ -168,8 +168,6 @@ fn read_object(node: &Rc<Node>, meshes: &Vec<Mesh>) -> ModelAssetObject {
         children.insert(child.name.clone(), read_object(&child, meshes));
     }
 
-    dbg!(render_data.len());
-
     ModelAssetObject {
         render_data,
         children,
