@@ -65,7 +65,6 @@ impl AssetManager {
 
         // Making an asset that'll be in place of the real asset while it's being loaded
         let temporary_asset = ModelAsset { 
-            is_loaded: false, 
             path: path.to_owned(), 
             root: model_asset::ModelAssetObject {
                 render_data: Vec::new(),

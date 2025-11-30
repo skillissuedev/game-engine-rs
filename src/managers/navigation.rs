@@ -68,6 +68,8 @@ impl NavigationManager {
                     },
                 };
 
+
+                self.objects.write().expect("objects was poisoned :c").insert(id, vec![]);
                 for build_data in build_data {
                     let archipelago = self.archipelago.clone();
                     let objects = self.objects.clone();

@@ -18,7 +18,6 @@ pub(crate) enum ModelAssetError {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModelAsset {
-    pub is_loaded: bool,
     pub path: String,
     pub(crate) root: ModelAssetObject,
     pub(crate) animations: HashMap<String, ModelAssetAnimation>,
@@ -86,7 +85,6 @@ impl ModelAsset {
                     root,
                     path: path.to_owned(),
                     animations,
-                    is_loaded: true,
                 })
             },
             Err(err) => {
@@ -170,6 +168,7 @@ fn read_object(node: &Rc<Node>, meshes: &Vec<Mesh>) -> ModelAssetObject {
         children.insert(child.name.clone(), read_object(&child, meshes));
     }
 
+    dbg!(render_data.len());
 
     ModelAssetObject {
         render_data,
