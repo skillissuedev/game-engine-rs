@@ -463,7 +463,8 @@ impl RenderShadowCamera {
         );
 
         let close_shadow_proj = Self::shadow_proj(&close_corners_1);
-        let far_shadow_proj = Self::shadow_proj(&far_corners_1);
+        //let far_shadow_proj = Self::shadow_proj(&far_corners_1);
+        let far_shadow_proj = Self::shadow_proj(&far_corners);
         let close_shadow_view = Self::shadow_view(light_dir, &close_corners);
         let far_shadow_view = Self::shadow_view(light_dir, &far_corners);
 

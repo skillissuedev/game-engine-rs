@@ -48,7 +48,7 @@ fn shadow_draw_objects(is_close: bool, framebuffer: &mut SimpleFrameBuffer, inst
             write: true,
             ..Default::default()
         },
-        //backface_culling: glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
+        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
         polygon_mode: glium::draw_parameters::PolygonMode::Fill,
         ..Default::default()
     };
