@@ -390,7 +390,7 @@ impl UiManager {
             WidgetData::Image(image_path) => {
                 let texture = textures.get(image_path);
                 match texture {
-                    Some(texture) => Some(ui.add_sized(size, Image::new(texture).fit_to_exact_size(size).sense(Sense::click_and_drag()))),
+                    Some(texture) => Some(ui.add_sized(size, Image::new(texture).fit_to_exact_size(size).sense(Sense::all()))),
                     None => Some(ui.add_sized(size, Label::new(format!("can't load the texture! id: {}", image_path)).sense(Sense::click_and_drag())))
                 }
             },
@@ -1318,42 +1318,46 @@ impl UiManager {
     }
 
     pub fn add_image(&mut self, window_id: &str, widget_id: &str, image_path: &str, size: Vec2, parent: Option<&str>) {
-        let image = image::open(get_full_asset_path(image_path));
-        match image {
-            Ok(image) => {
-                let bytes = image.to_rgba8().into_raw();
-                let dimenstions = image.dimensions().into();
+        if self.textures.contains_key(image_path) == false {
+            let image = image::open(get_full_asset_path(image_path));
+            match image {
+                Ok(image) => {
+                    let bytes = image.to_rgba8().into_raw();
+                    let dimenstions = image.dimensions().into();
 
-                let widget = Widget {
-                    id: widget_id.into(),
-                    size,
-                    widget_data: WidgetData::Image(image_path.into()),
-                    children: Vec::new(),
-                    ..Default::default()
-                };
+                    self.images_to_load.push(ImageToLoad {
+                        id: image_path.into(),
+                        bytes,
+                        dimenstions,
+                    });
+                },
+                Err(err) => {
+                    debugger::error(&format!("add_image error!\nFailed to load the image '{}', error: {}", image_path, err));
 
-                self.images_to_load.push(ImageToLoad {
-                    id: image_path.into(),
-                    bytes,
-                    dimenstions,
-                });
+                    let widget = Widget {
+                        id: widget_id.into(),
+                        size,
+                        widget_data: WidgetData::Label(format!("failed to load image '{}'", image_path), 14.0),
+                        children: Vec::new(),
+                        ..Default::default()
+                    };
 
-                self.add_widget("add_image", window_id, widget_id, widget, parent)
-            },
-            Err(err) => {
-                debugger::error(&format!("add_image error!\nFailed to load the image '{}', error: {}", image_path, err));
-
-                let widget = Widget {
-                    id: widget_id.into(),
-                    size,
-                    widget_data: WidgetData::Label(format!("failed to load image '{}'", image_path), 14.0),
-                    children: Vec::new(),
-                    ..Default::default()
-                };
-
-                self.add_widget("add_image", window_id, widget_id, widget, parent)
-            },
+                    self.add_widget("add_image", window_id, widget_id, widget, parent);
+                    return
+                },
+            }
         }
+
+
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Image(image_path.into()),
+            children: Vec::new(),
+            ..Default::default()
+        };
+
+        self.add_widget("add_image", window_id, widget_id, widget, parent)
     }
 }
 
