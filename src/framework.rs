@@ -3,7 +3,6 @@ use crate::{
         self, assets::{AssetManager, ModelAssetId, ShaderAssetId, SoundAssetId, TextureAssetId, get_full_asset_path}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
     }, objects::{Transform, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}
 };
-use clap::builder::styling::Color;
 use egui_glium::egui_winit::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Id, Shadow, Stroke, Style, Window};
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
@@ -13,7 +12,7 @@ use glium::{
 use once_cell::sync::Lazy;
 use winit::{event::ElementState, keyboard::PhysicalKey, window::Fullscreen};
 use std::{
-    collections::HashMap, fs, time::{Duration, Instant}
+    collections::{BTreeMap, HashMap}, fs, time::{Duration, Instant}
 };
 use glium::winit::{
     event::{Event, MouseButton, WindowEvent},
@@ -89,7 +88,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     let mut framework = Framework {
         debug_mode,
         delta_time: Duration::default(),
-        last_frame_systems_update_time: HashMap::new(),
+        last_frame_systems_update_time: BTreeMap::new(),
         system_globals: HashMap::new(),
         resolution: Vec2::new(1280.0, 720.0),
 
@@ -240,7 +239,7 @@ pub fn start_game_without_render(args: Args) {
     let mut framework = Framework {
         debug_mode: DebugMode::None,
         delta_time: Duration::default(),
-        last_frame_systems_update_time: HashMap::new(),
+        last_frame_systems_update_time: BTreeMap::new(),
         system_globals: HashMap::new(),
         resolution: Vec2::new(0.0, 0.0),
 
@@ -271,7 +270,7 @@ pub fn start_game_without_render(args: Args) {
 }
 
 fn update_game(framework: &mut Framework, delta_time: Duration) {
-    framework.last_frame_systems_update_time = HashMap::new();
+    framework.last_frame_systems_update_time = BTreeMap::new();
 
     framework.delta_time = delta_time;
     let physics_and_navigation_update_time = Instant::now();
@@ -329,7 +328,7 @@ fn new_window<T>(
 pub struct Framework {
     pub debug_mode: DebugMode,
     pub delta_time: Duration,
-    pub last_frame_systems_update_time: HashMap<String, Duration>,
+    pub last_frame_systems_update_time: BTreeMap<String, Duration>,
 
     pub system_globals: HashMap<String, Vec<SystemValue>>,
     pub resolution: Vec2,
