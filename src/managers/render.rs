@@ -159,6 +159,7 @@ impl RenderManager {
         //}
         self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
 
+        let shadow_render_timer = Instant::now();
         object_render::shadow_render_objects(
             &mut close_shadow_framebuffer,
             &mut far_shadow_framebuffer,
@@ -169,9 +170,11 @@ impl RenderManager {
             &self.shadow_map_shader,
             &self.instanced_shadow_map_shader
         );
+        dbg!(shadow_render_timer.elapsed());
 
 
         // 3. Rendering objects
+        let normal_render_timer = Instant::now();
         object_render::render_objects(
             &mut layer1_framebuffer,
             &mut layer2_framebuffer,
@@ -187,6 +190,7 @@ impl RenderManager {
             self.directional_light_dir,
             self.directional_light_strength
         );
+        dbg!(normal_render_timer.elapsed());
 
         self.render_framebuffer_plane(&mut frame);
 

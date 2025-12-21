@@ -134,7 +134,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                         match event {
                             WindowEvent::RedrawRequested => {
-                                let timer = Instant::now();
                                 let time_since_last_frame = last_frame.elapsed();
                                 last_frame = Instant::now();
                                 update_game(&mut framework, time_since_last_frame);
@@ -144,6 +143,9 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 } else {
                                     let _ = window.set_cursor_grab(CursorGrabMode::None);
                                 }
+
+                                let render_timer = Instant::now();
+                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
 
                                 egui_glium.run(&window, |ctx| {
                                     match framework.debug_mode() {
@@ -170,8 +172,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                     framework.ui.as_mut().unwrap().render(ctx, framework.debug_mode);
                                 });
 
-                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
-
                                 {
                                     let render = framework.render.as_mut().unwrap();
 
@@ -186,6 +186,8 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
 
                                     render.render_scene(&framework.assets, &mut egui_glium);
                                 }
+                                let render_timer = render_timer.elapsed();
+                                framework.last_frame_systems_update_time.insert(String::from("Render Time"), render_timer);
 
                                 frames_count += 1;
                                 framework.input.update();
@@ -270,8 +272,7 @@ pub fn start_game_without_render(args: Args) {
 }
 
 fn update_game(framework: &mut Framework, delta_time: Duration) {
-    framework.last_frame_systems_update_time = BTreeMap::new();
-
+    let total_update_time = Instant::now();
     framework.delta_time = delta_time;
     let physics_and_navigation_update_time = Instant::now();
     std::thread::scope(|scope| {
@@ -290,12 +291,15 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     systems::update(framework);
     let systems_update_time = systems_update_time.elapsed();
 
+    let total_update_time = total_update_time.elapsed();
     framework.last_frame_systems_update_time
         .insert(String::from("Physics & Navigation Managers"), physics_and_navigation_update_time);
     framework.last_frame_systems_update_time
         .insert(String::from("Networking Manager"), networking_update_time);
     framework.last_frame_systems_update_time
         .insert(String::from("Systems Total Update"), systems_update_time);
+    framework.last_frame_systems_update_time
+        .insert(String::from("Total Game Update Time"), total_update_time);
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
