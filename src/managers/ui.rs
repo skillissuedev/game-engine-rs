@@ -1792,3 +1792,18 @@ pub fn draw_vec3_editor_inspector(
     return_val
 }
 
+pub fn draw_update_time(framework: &Framework, ui: &mut Ui) {
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            for (name, _) in &framework.last_frame_systems_update_time {
+                ui.label(name.to_owned() + ": ");
+            }
+        });
+
+        ui.vertical(|ui| {
+            for (_, duration) in &framework.last_frame_systems_update_time {
+                ui.label((duration.as_secs_f64() * 1000.0).to_string() + " ms");
+            }
+        });
+    });
+}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use crate::{framework::Framework, objects::ObjectGroup, systems::System};
 use egui_glium::egui_winit::egui::Context;
@@ -47,8 +47,15 @@ pub fn update(framework: &mut Framework) {
             }
         } else {
             for system in &mut SYSTEMS {
+                let update_time_intant = Instant::now();
                 system.client_update(framework);
+                let client_update_time = update_time_intant.elapsed();
                 system.update_objects(framework);
+                let client_objects_update_time = update_time_intant.elapsed() - client_update_time;
+
+                let system_id = system.system_id().to_string();
+                framework.last_frame_systems_update_time.insert(system_id.clone() + "'s client_update()", client_update_time);
+                framework.last_frame_systems_update_time.insert(system_id + "'s update_objects()", client_objects_update_time);
             }
         }
     }
@@ -67,8 +74,13 @@ pub fn render(framework: &mut Framework) {
             }
         } else {
             for system in &mut SYSTEMS {
+                let render_time_intant = Instant::now();
                 system.client_render(framework);
+                let client_render_time = render_time_intant.elapsed();
                 system.render_objects(framework);
+
+                let system_id = system.system_id().to_string();
+                framework.last_frame_systems_update_time.insert(system_id + "'s client_render()", client_render_time);
             }
         }
     }

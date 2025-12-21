@@ -89,6 +89,7 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
     let mut framework = Framework {
         debug_mode,
         delta_time: Duration::default(),
+        last_frame_systems_update_time: HashMap::new(),
         system_globals: HashMap::new(),
         resolution: Vec2::new(1280.0, 720.0),
 
@@ -155,6 +156,12 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                                     ui,
                                                     &fps,
                                                     &mut ui_state,
+                                                );
+                                            });
+                                            Window::new("update time").show(ctx, |ui| {
+                                                managers::ui::draw_update_time(
+                                                    &framework,
+                                                    ui,
                                                 );
                                             });
                                         }
@@ -233,6 +240,7 @@ pub fn start_game_without_render(args: Args) {
     let mut framework = Framework {
         debug_mode: DebugMode::None,
         delta_time: Duration::default(),
+        last_frame_systems_update_time: HashMap::new(),
         system_globals: HashMap::new(),
         resolution: Vec2::new(0.0, 0.0),
 
@@ -263,17 +271,32 @@ pub fn start_game_without_render(args: Args) {
 }
 
 fn update_game(framework: &mut Framework, delta_time: Duration) {
+    framework.last_frame_systems_update_time = HashMap::new();
+
     framework.delta_time = delta_time;
+    let physics_and_navigation_update_time = Instant::now();
     std::thread::scope(|scope| {
         scope.spawn(|| framework.physics.update());
         scope.spawn(|| framework.navigation.update(delta_time.as_secs_f32()));
     });
-    //framework.physics.update();
-    //framework.navigation.update(delta_time.as_secs_f32());
+    let physics_and_navigation_update_time = physics_and_navigation_update_time.elapsed();
     
+    let networking_update_time = Instant::now();
     networking::update(delta_time);
+    let networking_update_time = networking_update_time.elapsed();
+
     game_main::update(framework);
+
+    let systems_update_time = Instant::now();
     systems::update(framework);
+    let systems_update_time = systems_update_time.elapsed();
+
+    framework.last_frame_systems_update_time
+        .insert(String::from("Physics & Navigation Managers"), physics_and_navigation_update_time);
+    framework.last_frame_systems_update_time
+        .insert(String::from("Networking Manager"), networking_update_time);
+    framework.last_frame_systems_update_time
+        .insert(String::from("Systems Total Update"), systems_update_time);
 }
 
 fn get_fps(now: &Instant, frames: &usize) -> Option<usize> {
@@ -306,6 +329,8 @@ fn new_window<T>(
 pub struct Framework {
     pub debug_mode: DebugMode,
     pub delta_time: Duration,
+    pub last_frame_systems_update_time: HashMap<String, Duration>,
+
     pub system_globals: HashMap<String, Vec<SystemValue>>,
     pub resolution: Vec2,
 

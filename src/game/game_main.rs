@@ -82,6 +82,7 @@ pub fn start(args: Args, framework: &mut Framework) {
 
     add_system(Box::new(LuaSystem::new("props", "scripts/lua/props.lua").unwrap()), framework);
     add_system(Box::new(LuaSystem::new("building", "scripts/lua/building.lua").unwrap()), framework);
+    add_system(Box::new(LuaSystem::new("crafting", "scripts/lua/crafting.lua").unwrap()), framework);
 
     add_system(Box::new(MainSystem {objects: vec![]}), framework);
 }
