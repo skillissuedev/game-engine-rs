@@ -227,8 +227,8 @@ impl MasterInstancedModelObject {
         self.objects_global_transforms.insert(node_id.clone(), transform);
         
         objects_list.insert(node_id.clone(), Vec::new());
-        for render_data in &node.render_data {
 
+        for render_data in &node.render_data {
             let vbo = VertexBuffer::new(&render.display, &render_data.vertices)
                 .expect("Failed to create a VBO!");
             let ibo = IndexBuffer::new(&render.display, PrimitiveType::TrianglesList, &render_data.indices)
@@ -249,6 +249,7 @@ impl MasterInstancedModelObject {
                 joint_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],   
                 joint_inverse_bind_matrices: [[[0.0, 0.0, 0.0, 0.0]; 4]; 128],
                 cast_shadows: self.cast_shadows,
+                aabb: render_data.aabb.clone(),
             };
 
             for (bone_name, offset) in render_data.bone_offsets.clone() {

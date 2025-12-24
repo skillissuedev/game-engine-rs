@@ -3,7 +3,7 @@ use glam::{Mat4, Quat, Vec3};
 use russimp::{mesh::Mesh, node::Node, scene::{PostProcess, Scene}};
 //use gltf::{animation::util::ReadOutputs, Gltf};
 use splines::{Interpolation, Key, Spline};
-use crate::{framework::Framework, managers::{assets, debugger, render::{RenderManager, Vertex}}};
+use crate::{framework::Framework, managers::{assets, debugger, render::{AABB, RenderManager, Vertex}}};
 
 #[derive(Debug, Clone)]
 pub(crate) enum ModelAssetError {
@@ -37,6 +37,7 @@ pub(crate) struct ModelAssetObjectRenderData {
     pub(crate) indices: Vec<u32>,
     pub(crate) bone_names: HashMap<usize, String>,
     pub(crate) bone_offsets: HashMap<String, Mat4>,
+    pub(crate) aabb: AABB,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,7 @@ impl ModelAsset {
         let scene = Scene::from_file(path, vec![
             PostProcess::Triangulate,
             PostProcess::FlipUVs,
+            PostProcess::GenerateBoundingBoxes,
         ]);
 
         match scene {
@@ -155,7 +157,15 @@ fn read_object(node: &Rc<Node>, meshes: &Vec<Mesh>) -> ModelAssetObject {
                 }
             }
         }
-        render_data.push(ModelAssetObjectRenderData { vertices, indices, bone_names, bone_offsets });
+
+        let aabb_min = mesh.aabb.min;
+        let aabb_max = mesh.aabb.max;
+        let aabb = AABB {
+            min: Vec3::new(aabb_min.x, aabb_min.y, aabb_min.z),
+            max: Vec3::new(aabb_max.x, aabb_max.y, aabb_max.z),
+        };
+
+        render_data.push(ModelAssetObjectRenderData { vertices, indices, bone_names, bone_offsets, aabb });
     }
 
     let default_transform = Mat4::from_cols_array(&[node.transformation.a1, node.transformation.b1, node.transformation.c1, node.transformation.d1, 

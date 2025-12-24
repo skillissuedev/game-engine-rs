@@ -123,6 +123,38 @@ impl RenderManager {
             shadow_camera,
         }
     }
+/*
+    pub fn get_min_max_world_frustum_corners(&self) -> FrustumCullingCorners {
+        let view = self.camera.get_view_matrix();
+        let proj = self.camera.get_projection_matrix();
+
+        let mut min_x = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut min_y = f32::MAX;
+        let mut max_y = f32::MIN;
+        let mut min_z = f32::MAX;
+        let mut max_z = f32::MIN;
+        let corners = RenderShadowCamera::get_frustum_corners_world_space(proj, view);
+        for corner in corners {
+            if corner.x < min_x { min_x = corner.x }
+            else if corner.x > max_x { max_x = corner.x }
+            if corner.y < min_y { min_y = corner.y }
+            else if corner.y > max_y { max_y = corner.y }
+            if corner.z < min_z { min_z = corner.z }
+            else if corner.z > max_z { max_z = corner.z }
+        };
+
+        return FrustumCullingCorners {
+            min_x_min_y_min_z: Vec4::new(min_x, min_y, min_z, 1.0),
+            max_x_min_y_min_z: Vec4::new(max_x, min_y, min_z, 1.0),
+            min_x_max_y_min_z: Vec4::new(min_x, max_y, min_z, 1.0),
+            max_x_max_y_min_z: Vec4::new(max_x, max_y, min_z, 1.0),
+            min_x_min_y_max_z: Vec4::new(min_x, min_y, max_z, 1.0),
+            max_x_min_y_max_z: Vec4::new(max_x, min_y, max_z, 1.0),
+            min_x_max_y_max_z: Vec4::new(min_x, max_y, max_z, 1.0),
+            max_x_max_y_max_z: Vec4::new(max_x, max_y, max_z, 1.0),
+        }
+    }*/
 
     pub fn render_scene(&mut self, assets: &AssetManager, egui_glium: &mut EguiGlium) {
         // 1. Clean everything (frame, FBs etc.)
@@ -153,10 +185,6 @@ impl RenderManager {
                 .expect("Failed to create a SimpleFrameBuffer for the far shadow (render_scene in render.rs)");
         close_shadow_framebuffer.clear_depth(1.0);
         far_shadow_framebuffer.clear_depth(1.0);
-        //if self.update_shadowmap_timer.elapsed().as_secs_f32() > 0.33 {
-            //self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
-            //self.update_shadowmap_timer = Instant::now();
-        //}
         self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
 
         let shadow_render_timer = Instant::now();
@@ -418,6 +446,7 @@ pub(crate) struct RenderObjectData {
     pub(crate) joint_inverse_bind_matrices: [[[f32; 4]; 4]; 128],
     pub(crate) instanced_master_name: Option<String>,
     pub(crate) cast_shadows: bool,
+    pub(crate) aabb: AABB,
 }
 
 #[derive(Debug, Clone)]
@@ -467,8 +496,8 @@ impl RenderShadowCamera {
         );
 
         let close_shadow_proj = Self::shadow_proj(&close_corners_1);
-        //let far_shadow_proj = Self::shadow_proj(&far_corners_1);
-        let far_shadow_proj = Self::shadow_proj(&far_corners);
+        let far_shadow_proj = Self::shadow_proj(&far_corners_1);
+        //let far_shadow_proj = Self::shadow_proj(&far_corners);
         let close_shadow_view = Self::shadow_view(light_dir, &close_corners);
         let far_shadow_view = Self::shadow_view(light_dir, &far_corners);
 
@@ -481,7 +510,7 @@ impl RenderShadowCamera {
     }
 
     // from https://learnopengl.com/Guest-Articles/2021/CSM
-    fn get_frustum_corners(proj: Mat4) -> Vec<Vec4> {
+    pub fn get_frustum_corners(proj: Mat4) -> Vec<Vec4> {
         let inv = proj.inverse();
 
         let mut corners: Vec<Vec4> = Vec::new();
@@ -503,7 +532,7 @@ impl RenderShadowCamera {
     }
 
     // from https://learnopengl.com/Guest-Articles/2021/CSM
-    fn get_frustum_corners_world_space(proj: Mat4, view: Mat4) -> Vec<Vec4> {
+    pub fn get_frustum_corners_world_space(proj: Mat4, view: Mat4) -> Vec<Vec4> {
         let inv = (proj * view).inverse();
 
         let mut corners: Vec<Vec4> = Vec::new();
@@ -554,5 +583,43 @@ impl RenderShadowCamera {
         }
 
         Mat4::orthographic_rh_gl(min_x - 50.0, max_x + 50.0, min_y - 50.0, max_y + 50.0, min_z - 50.0, max_z + 50.0)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AABB {
+    pub min: Vec3,
+    pub max: Vec3,
+}
+
+pub fn is_aabb_inside_frustum(projection_matrix: Mat4, view_matrix: Mat4, model_matrix: Mat4, aabb: &AABB) -> bool {
+    let aabb_corners = [
+        Vec4::new(aabb.min.x, aabb.min.y, aabb.min.z, 1.0),
+        Vec4::new(aabb.max.x, aabb.min.y, aabb.min.z, 1.0), // X y z
+        Vec4::new(aabb.min.x, aabb.max.y, aabb.min.z, 1.0), // x Y z
+        Vec4::new(aabb.max.x, aabb.max.y, aabb.min.z, 1.0), // X Y z
+
+        Vec4::new(aabb.min.x, aabb.min.y, aabb.max.z, 1.0), // x y Z
+        Vec4::new(aabb.max.x, aabb.min.y, aabb.max.z, 1.0), // X y Z
+        Vec4::new(aabb.min.x, aabb.max.y, aabb.max.z, 1.0), // x Y Z
+        Vec4::new(aabb.max.x, aabb.max.y, aabb.max.z, 1.0), // X Y Z
+    ];
+
+    for corner in aabb_corners {
+        if is_within_clip_space(projection_matrix * view_matrix * model_matrix * corner) {
+            return true
+        }
+    }
+
+    false
+}
+
+fn is_within_clip_space(point: Vec4) -> bool {
+    if (point.x >= -point.w && point.x <= point.w)
+        && (point.y >= -point.w && point.y <= point.w)
+        && (point.z >= -point.w && point.z <= point.w) {
+        true
+    } else {
+        false
     }
 }

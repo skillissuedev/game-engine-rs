@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use glam::{Mat4, Vec3};
 use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
 
-use crate::managers::render::RenderLayer;
+use crate::managers::render::{RenderLayer, is_aabb_inside_frustum};
 
 use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera, RenderUniformValue}};
 
@@ -195,7 +195,15 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
         point_lights: &UniformBuffer<[(f32, f32, f32, f32); 64]>, point_lights_colors: &UniformBuffer<[(f32, f32, f32, f32); 64]>,
         point_lights_attenuation: &UniformBuffer<[(f32, f32); 64]>, light_direction: Vec3, light_strength: f32) {
     for (_, render_object) in distance_objects {
-        // Render it!
+        if let None = render_object.instanced_master_name {
+            let view_mat4 = Mat4::from_cols_array_2d(&view_matrix);
+            let proj_mat4 = Mat4::from_cols_array_2d(&proj_matrix);
+            let model_mat4 = render_object.model_object_transform;
+            if is_aabb_inside_frustum(proj_mat4, view_mat4, model_mat4, &render_object.aabb) == false {
+                continue;
+            }
+        }
+
         let shader = match assets.get_shader_asset(&render_object.shader) {
             Some(shader) => {
                 match &shader.program {
@@ -274,7 +282,7 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
             camera_position: &camera_position,
         };
 
-        // uniforms!
+        // uniforms
         let mut uniform_matrices: Vec<(String, [[f32; 4]; 4])> = Vec::new();
         let mut uniform_floats: Vec<(String, f32)> = Vec::new();
         let mut uniform_vectors: Vec<(String, [f32; 3])> = Vec::new();
