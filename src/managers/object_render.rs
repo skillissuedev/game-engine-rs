@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use glam::{Mat4, Vec3};
 use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
+use rapier3d::parry::transformation::utils::transform;
 
-use crate::managers::render::{RenderLayer, is_aabb_inside_frustum};
+use crate::managers::render::{AABB, RenderLayer, is_aabb_inside_frustum_aabb};
 
 use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera, RenderUniformValue}};
 
@@ -118,7 +119,7 @@ fn shadow_draw_objects(is_close: bool, framebuffer: &mut SimpleFrameBuffer, inst
 pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
     close_shadow_texture: &DepthTexture2d, far_shadow_texture: &DepthTexture2d, objects_list: &HashMap<u128, HashMap<String, Vec<RenderObjectData>>>,
     camera: &RenderCamera, shadow_camera: &RenderShadowCamera, assets: &AssetManager, display: &Display<WindowSurface>, lights: &Vec<RenderPointLight>,
-    light_direction: Vec3, light_strength: f32) {
+    light_direction: Vec3, light_strength: f32, frustum_aabb: AABB) {
     // we'll let the model object set the transformations of every node of the asset
 
     let mut distance_objects: Vec<(f32, &RenderObjectData)> = Vec::new();
@@ -176,14 +177,14 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
         &distance_objects, assets, display, view_matrix, proj_matrix, camera_position,
         false, close_shadow_viewproj, far_shadow_viewproj, &point_lights,
-        &point_lights_colors, &point_lights_attenuation, light_direction, light_strength
+        &point_lights_colors, &point_lights_attenuation, light_direction, light_strength, &frustum_aabb
     );
 
     draw_objects(
         layer_1, layer_2, instanced_positions, close_shadow_texture, far_shadow_texture,
         &transparent_distance_objects, assets, display, view_matrix, proj_matrix, camera_position,
         true, close_shadow_viewproj, far_shadow_viewproj, &point_lights,
-        &point_lights_colors, &point_lights_attenuation, light_direction, light_strength
+        &point_lights_colors, &point_lights_attenuation, light_direction, light_strength, &frustum_aabb
     );
 }
 
@@ -193,13 +194,11 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
         assets: &AssetManager, display: &Display<WindowSurface>, view_matrix: [[f32; 4]; 4], proj_matrix: [[f32; 4]; 4], camera_position: [f32; 3],
         transparent: bool, close_shadow_viewproj: [[f32; 4]; 4], far_shadow_viewproj: [[f32; 4]; 4],
         point_lights: &UniformBuffer<[(f32, f32, f32, f32); 64]>, point_lights_colors: &UniformBuffer<[(f32, f32, f32, f32); 64]>,
-        point_lights_attenuation: &UniformBuffer<[(f32, f32); 64]>, light_direction: Vec3, light_strength: f32) {
+        point_lights_attenuation: &UniformBuffer<[(f32, f32); 64]>, light_direction: Vec3, light_strength: f32, frustum_aabb: &AABB) {
     for (_, render_object) in distance_objects {
         if let None = render_object.instanced_master_name {
-            let view_mat4 = Mat4::from_cols_array_2d(&view_matrix);
-            let proj_mat4 = Mat4::from_cols_array_2d(&proj_matrix);
             let model_mat4 = render_object.model_object_transform;
-            if is_aabb_inside_frustum(proj_mat4, view_mat4, model_mat4, &render_object.aabb) == false {
+            if is_aabb_inside_frustum_aabb(model_mat4, &render_object.aabb, frustum_aabb) == false {
                 continue;
             }
         }
@@ -338,7 +337,10 @@ fn draw_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut SimpleFrameBuffer
 
         match &render_object.instanced_master_name {
             Some(master_name) => {
+                let model_aabb = &render_object.aabb;
                 if let Some(transforms) = instanced_positions.get(master_name) {
+                    let mut transforms = transforms.clone();
+                    transforms.retain(|transform| is_aabb_inside_frustum_aabb(*transform, model_aabb, frustum_aabb));
                     let per_instance_data: Vec<Instance> = transforms.iter()
                         .map(|model| Instance { model: model.to_cols_array_2d() }).collect();
 
