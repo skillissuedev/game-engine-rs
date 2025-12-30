@@ -145,8 +145,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 }
 
                                 let render_timer = Instant::now();
-                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
-
                                 egui_glium.run(&window, |ctx| {
                                     match framework.debug_mode() {
                                         DebugMode::None => (),
@@ -171,6 +169,9 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                     systems::ui_render(ctx);
                                     framework.ui.as_mut().unwrap().render(ctx, framework.debug_mode);
                                 });
+
+                                systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
+
 
                                 {
                                     let render = framework.render.as_mut().unwrap();
