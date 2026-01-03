@@ -284,6 +284,15 @@ pub trait Object: std::fmt::Debug + Downcast {
                 if let Some(render_collider) = custom_render_collider {
                     body_parameters.set_render_collider(Some(render_collider));
                 }
+
+                let transform = self.global_transform();
+                framework.physics.set_body_transformations(
+                    body_parameters,
+                    transform.position,
+                    transform.rotation,
+                    transform.scale
+                );
+
                 self.set_body_parameters(Some(body_parameters));
             }
             None => {
