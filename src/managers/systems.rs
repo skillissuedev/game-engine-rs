@@ -70,18 +70,26 @@ pub fn render(framework: &mut Framework) {
         if networking::is_server() {
             for system in &mut SYSTEMS {
                 system.server_render();
-                //system.render_objects();
             }
         } else {
+            let total_systems_render_time = Instant::now();
             for system in &mut SYSTEMS {
                 let render_time_intant = Instant::now();
                 system.client_render(framework);
-                let client_render_time = render_time_intant.elapsed();
                 system.render_objects(framework);
+                let client_render_time = render_time_intant.elapsed();
 
                 let system_id = system.system_id().to_string();
-                framework.last_frame_systems_update_time.insert(system_id + "'s client_render()", client_render_time);
+                framework.last_frame_systems_update_time
+                    .insert(system_id + "'s client_render & render_objects", client_render_time);
             }
+
+            let update_time_value_name = 
+                "Total client_render + render_objects time".to_string();
+            let total_systems_render_time =
+                total_systems_render_time.elapsed();
+            framework.last_frame_systems_update_time
+                .insert(update_time_value_name, total_systems_render_time);
         }
     }
 }

@@ -1,23 +1,33 @@
-use std::collections::HashMap;
+use std::{char::from_u32, collections::HashMap};
 
 use glam::{Mat4, Vec3};
 use glium::{draw_parameters, dynamic_uniform, framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, texture::DepthTexture2d, uniform, uniforms::{MagnifySamplerFilter, MinifySamplerFilter, Sampler, UniformBuffer}, BackfaceCullingMode, Display, DrawParameters, Program, Surface, Texture2d};
 use rapier3d::parry::transformation::utils::transform;
 
-use crate::managers::render::{AABB, RenderLayer, is_aabb_inside_frustum_aabb};
+use crate::managers::{render::{AABB, RenderLayer, is_aabb_inside_frustum_aabb}, systems::render};
 
 use super::{assets::AssetManager, debugger, render::{Instance, RenderCamera, RenderObjectData, RenderPointLight, RenderShadowCamera, RenderUniformValue}};
 
 pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, far_framebuffer: &mut SimpleFrameBuffer,
         instanced_positions: &HashMap<String, Vec<Mat4>>, shadow_camera: &RenderShadowCamera,
         objects_list: &HashMap<u128, HashMap<String, Vec<RenderObjectData>>>, display: &Display<WindowSurface>, program: &Program,
-        instanced_program: &Program) {
+        instanced_program: &Program, far_frustum_aabb: &AABB) {
 
     for (_, render_objects_list) in objects_list {
         for (_, render_node) in render_objects_list {
             for render_object in render_node {
                 if !render_object.transparent && render_object.cast_shadows {
-                    shadow_draw_objects(true, close_framebuffer, instanced_positions, &shadow_camera, render_object, display, program, instanced_program);
+                    shadow_draw_objects(
+                        true,
+                        close_framebuffer,
+                        instanced_positions,
+                        &shadow_camera,
+                        render_object,
+                        display,
+                        program,
+                        instanced_program,
+                        far_frustum_aabb
+                    );
                 } 
             }
         }
@@ -27,7 +37,17 @@ pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, f
         for (_, render_node) in render_objects_list {
             for render_object in render_node {
                 if !render_object.transparent && render_object.cast_shadows {
-                    shadow_draw_objects(false, far_framebuffer, instanced_positions, &shadow_camera, render_object, display, program, instanced_program);
+                    shadow_draw_objects(
+                        false,
+                        far_framebuffer,
+                        instanced_positions,
+                        &shadow_camera,
+                        render_object,
+                        display,
+                        program,
+                        instanced_program,
+                        far_frustum_aabb
+                    );
                 } 
             }
         }
@@ -36,7 +56,14 @@ pub(crate) fn shadow_render_objects(close_framebuffer: &mut SimpleFrameBuffer, f
 
 fn shadow_draw_objects(is_close: bool, framebuffer: &mut SimpleFrameBuffer, instanced_positions: &HashMap<String, Vec<Mat4>>,
         shadow_camera: &RenderShadowCamera, render_object: &RenderObjectData, display: &Display<WindowSurface>, program: &Program,
-        instanced_program: &Program) {
+        instanced_program: &Program, frustum_aabb: &AABB) {
+    if let None = render_object.instanced_master_name {
+        if is_aabb_inside_frustum_aabb(render_object.model_object_transform, &render_object.aabb, frustum_aabb) == false {
+            return
+        }
+    }
+
+
     let joints = UniformBuffer::new(display, render_object.joint_matrices)
         .expect("UniformBuffer::new() failed (joints) - object_render.rs");
     let inverse_bind_matrices =
@@ -60,7 +87,11 @@ fn shadow_draw_objects(is_close: bool, framebuffer: &mut SimpleFrameBuffer, inst
 
     match &render_object.instanced_master_name {
         Some(master_name) => {
+            let model_aabb = &render_object.aabb;
             if let Some(transforms) = instanced_positions.get(master_name) {
+                let mut transforms = transforms.clone();
+                transforms.retain(|transform| is_aabb_inside_frustum_aabb(*transform, model_aabb, frustum_aabb));
+
                 let per_instance_data: Vec<Instance> = transforms.iter()
                     .map(|model| Instance { model: model.to_cols_array_2d() }).collect();
                 let per_instance_buffer =
@@ -130,6 +161,10 @@ pub(crate) fn render_objects(layer_1: &mut SimpleFrameBuffer, layer_2: &mut Simp
             for render_object in render_node {
                 let translation = render_object.transform.to_scale_rotation_translation().2;
                 let distance_to_camera = camera.translation.distance(translation);
+                if distance_to_camera > 600.0 {
+                    continue
+                }
+
                 if render_object.transparent {
                     transparent_distance_objects.push((distance_to_camera, render_object));
                 } else {

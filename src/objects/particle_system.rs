@@ -67,7 +67,6 @@ impl Object for ParticleSystem {
     fn render(&mut self, framework: &mut Framework) {
         let delta_time = framework.delta_time().as_secs_f32();
 
-
         if let Some(render) = &mut framework.render {
             let max_distance_squared = match self.max_particle_distance {
                 Some(max_distance) => Some(max_distance * max_distance),

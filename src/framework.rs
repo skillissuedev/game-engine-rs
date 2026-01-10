@@ -3,7 +3,7 @@ use crate::{
         self, assets::{AssetManager, ModelAssetId, ShaderAssetId, SoundAssetId, TextureAssetId, get_full_asset_path}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
     }, objects::{Transform, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}
 };
-use egui_glium::egui_winit::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Id, Shadow, Stroke, Style, Window};
+use egui_glium::egui_winit::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Id, Shadow, Stroke, Window};
 use ez_al::{EzAl, SoundSourceType};
 use glam::{Vec2, Vec3};
 use glium::{
@@ -171,7 +171,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
                                 });
 
                                 systems::render(&mut framework); // Don't mind me, "beautiful" Rust code going on here
-
 
                                 {
                                     let render = framework.render.as_mut().unwrap();

@@ -1,5 +1,5 @@
 use std::{collections::HashMap, time::Instant};
-use egui_glium::{EguiGlium, egui_winit::egui::gui_zoom::zoom_in};
+use egui_glium::EguiGlium;
 use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use glium::{framebuffer::SimpleFrameBuffer, glutin::surface::WindowSurface, implement_vertex, index::{NoIndices, PrimitiveType}, texture::DepthTexture2d, uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Surface, Texture2d, VertexBuffer};
 use crate::{assets::shader_asset::ShaderAsset, managers::assets::ShaderAssetId, math_utils::deg_to_rad};
@@ -181,6 +181,11 @@ impl RenderManager {
         far_shadow_framebuffer.clear_depth(1.0);
         self.shadow_camera = RenderShadowCamera::new(&self.camera, self.directional_light_dir);
 
+        let mut frustum_corners = 
+            self.get_min_max_world_frustum_corners();
+        // do this so the objects right outside the view would also cast shadows
+        frustum_corners.min -= Vec3::new(50.0, 500.0, 50.0);
+        frustum_corners.max += Vec3::new(50.0, 500.0, 50.0);
         object_render::shadow_render_objects(
             &mut close_shadow_framebuffer,
             &mut far_shadow_framebuffer,
@@ -189,13 +194,15 @@ impl RenderManager {
             &self.objects,
             &self.display,
             &self.shadow_map_shader,
-            &self.instanced_shadow_map_shader
+            &self.instanced_shadow_map_shader,
+            &frustum_corners
         );
 
 
         // 3. Rendering objects
         let frustum_corners = 
             self.get_min_max_world_frustum_corners();
+
         object_render::render_objects(
             &mut layer1_framebuffer,
             &mut layer2_framebuffer,
@@ -492,7 +499,7 @@ impl RenderShadowCamera {
         let far_shadow_proj = Self::shadow_proj(&far_corners_1);
         //let far_shadow_proj = Self::shadow_proj(&far_corners);
         let close_shadow_view = Self::shadow_view(light_dir, &close_corners);
-        let far_shadow_view = Self::shadow_view(light_dir, &far_corners);
+        let far_shadow_view = Self::shadow_view(light_dir, &far_corners_1);
 
         RenderShadowCamera {
             close_shadow_proj,
@@ -555,7 +562,6 @@ impl RenderShadowCamera {
 
         let light_right = Vec3::Y.cross(light_dir).normalize();
         let light_up = light_dir.cross(light_right);
-        //Mat4::look_at_rh(center + Vec3::new(0.0, 30.0, 0.0) - light_dir, center, light_up)
         Mat4::look_at_rh(center - light_dir, center, light_up)
     }
 

@@ -89,23 +89,6 @@ pub trait System {
         self.objects_list_mut()
             .into_iter()
             .for_each(|object| object.render_children(framework));
-        self.objects_list_mut()
-            .into_iter()
-            .for_each(|object| object.debug_render(framework));
-    }
-
-    fn shadow_render_objects(
-        &mut self,
-        render: &mut RenderManager,
-        assets: &AssetManager,
-        //cascade: &CurrentCascade,
-    ) {
-        /*self.objects_list_mut()
-            .into_iter()
-            .for_each(|object| object.shadow_render(render, assets, cascade));
-        self.objects_list_mut()
-            .into_iter()
-            .for_each(|object| object.shadow_render_children(render, assets, cascade));*/
     }
 
     fn destroy_system(&mut self) {
