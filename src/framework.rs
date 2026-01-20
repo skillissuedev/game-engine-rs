@@ -1,6 +1,6 @@
 use crate::{
     Args, assets::{shader_asset::{ShaderAsset, ShaderAssetPath}, sound_asset::SoundAsset, texture_asset::TextureAsset}, game::game_main, managers::{
-        self, assets::{AssetManager, ModelAssetId, ShaderAssetId, SoundAssetId, TextureAssetId, get_full_asset_path}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::UiManager
+        self, assets::{AssetManager, ModelAssetId, ShaderAssetId, SoundAssetId, TextureAssetId, get_full_asset_path}, debugger, input::{self, InputManager}, navigation::NavigationManager, networking, physics::{self, BodyColliderType, CollisionGroups, PhysicsManager}, render::{RenderLayer, RenderManager}, saves::SavesManager, sound::set_listener_transform, systems::{self, SystemValue}, ui::{UiManager, set_default_visuals}
     }, objects::{Transform, character_controller::CharacterController, empty_object::EmptyObject, instanced_model_object::InstancedModelObject, instanced_model_transform_holder::InstancedModelTransformHolder, master_instanced_model_object::MasterInstancedModelObject, model_object::ModelObject, nav_object::{NavObject, NavObjectData}, nav_obstacle::NavObstacle, navmesh::NavigationGround, particle_system::ParticleSystem, ray::Ray, sound_emitter::SoundEmitter, trigger::Trigger}
 };
 use egui_glium::egui_winit::egui::{self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Id, Shadow, Stroke, Window};
@@ -46,9 +46,6 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         .insert("Oswald".into(), FontData::from_static(&FONT).into());
     fonts
         .font_data
-        .insert("JetBrains Mono".into(), FontData::from_static(&MONOSPACE_FONT).into());
-    fonts
-        .font_data
         .insert("Oswald Bold".into(), FontData::from_static(&BOLD_FONT).into());
 
     fonts
@@ -60,23 +57,9 @@ pub fn start_game_with_render(args: Args, debug_mode: DebugMode) {
         .families
         .insert(FontFamily::Name("Oswald Bold".into()), vec!["Oswald Bold".into()]);
 
-    fonts
-        .families
-        .get_mut(&FontFamily::Monospace)
-        .unwrap()
-        .insert(0, "JetBrains Mono".into());
-
     egui_glium.egui_ctx().set_fonts(fonts);
 
-
-    let mut ui_visuals = egui::Visuals::default();
-    ui_visuals.window_fill = Color32::from_rgb(217, 217, 217);
-    ui_visuals.window_corner_radius = CornerRadius::same(110);
-    ui_visuals.window_shadow = Shadow::NONE;
-    ui_visuals.widgets.open.bg_fill = Color32::from_rgb(30, 30, 30);
-    ui_visuals.widgets.open.fg_stroke = Stroke::new(1.0, Color32::from_rgb(217, 217, 217));
-    ui_visuals.widgets.open.fg_stroke = Stroke::new(1.0, Color32::from_rgb(217, 217, 217));
-    egui_glium.egui_ctx().set_visuals(ui_visuals);
+    set_default_visuals(egui_glium.egui_ctx());
 
     let mut ui_state = managers::ui::UiState::default();
 
@@ -780,6 +763,15 @@ impl Framework {
             Some(ui) => ui.add_button(window_id, widget_id, contents, size, parent),
             None => {
                 debugger::error("Framework error!\nCan't use UI (add_button) while running server");
+            },
+        }
+    }
+
+    pub fn add_separator(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        match &mut self.ui {
+            Some(ui) => ui.add_separator(window_id, widget_id, size, parent),
+            None => {
+                debugger::error("Framework error!\nCan't use UI (add_separator) while running server");
             },
         }
     }

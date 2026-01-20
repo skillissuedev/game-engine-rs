@@ -2183,6 +2183,12 @@ impl UserData for Framework {
             }
         );
 
+        methods.add_method_mut("add_separator",
+            |_, framework, (window_id, widget_id, size, parent): (String, String, [f32; 2], Option<String>)| {
+                Ok(framework.add_separator(&window_id, &widget_id, size.into(), parent.as_deref()))
+            }
+        );
+
         methods.add_method_mut("add_button",
             |_, framework, (window_id, widget_id, contents, size, parent): (String, String, String, [f32; 2], Option<String>)| {
                 Ok(framework.add_button(&window_id, &widget_id, &contents, size.into(), parent.as_deref()))

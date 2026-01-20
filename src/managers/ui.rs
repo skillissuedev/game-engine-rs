@@ -1,5 +1,5 @@
-use std::{collections::HashMap, thread::current};
-use egui_glium::egui_winit::egui::{self, scroll_area::ScrollBarVisibility, Button, Checkbox, Color32, ColorImage, ComboBox, Context, FontFamily, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Slider, TextEdit, TextureHandle, Ui, Visuals, Window};
+use std::collections::HashMap;
+use egui_glium::egui_winit::egui::{self, Button, Checkbox, Color32, ColorImage, ComboBox, Context, CornerRadius, CursorIcon, FontFamily, Frame, Image, Label, ProgressBar, Response, RichText, ScrollArea, Sense, Shadow, Slider, Stroke, TextEdit, TextureHandle, Ui, Visuals, Window, scroll_area::ScrollBarVisibility};
 use ez_al::{EzAl, SoundSource};
 use glam::{Vec2, Vec3};
 use image::GenericImageView;
@@ -37,6 +37,7 @@ pub enum WidgetData {
     HorizontalScroll,
     Vertical,
     VerticalScroll,
+    Separator,
     Scroll,
     SinglelineTextEdit(String),
     MultilineTextEdit(String),
@@ -301,6 +302,7 @@ impl UiManager {
         last_hovered_widget: &mut Option<String>,
         textures: &HashMap<String, TextureHandle>, ctx: &Context, ui: &mut Ui, widget: &mut Widget, themes: &HashMap<String, Visuals>) {
 
+        /* disabling the theming for now
         let theme = match &widget.theme {
             Some(theme_id) => {
                 match themes.get(theme_id) {
@@ -310,34 +312,65 @@ impl UiManager {
             },
             None => Visuals::default(),
         };
-        *ui.visuals_mut() = theme;
+        *ui.visuals_mut() = theme;*/
 
         let size = egui::Vec2::new(widget.size.x, widget.size.y);
         ui.spacing_mut().item_spacing.x = widget.spacing;
         ui.spacing_mut().item_spacing.y = widget.spacing;
 
         let egui_widget: Option<Response> = match &mut widget.widget_data {
-            WidgetData::Button(contents) => Some(ui.add_sized(size, Button::new(contents.as_str()).sense(Sense::click_and_drag()))),
+            WidgetData::Button(contents) => {
+                set_visuals_for_dark_bg_widgets(ui.visuals_mut());
+                let response = ui.add_sized(
+                    size, Button::new(contents.as_str()).sense(Sense::click_and_drag())
+                );
+                set_visuals_to_default(ui.visuals_mut());
+
+                Some(response)
+            }
             WidgetData::TextButton(contents, font_size, bold) => {
+                set_visuals_for_dark_bg_widgets(ui.visuals_mut());
+                let response;
                 match bold {
                     true => {
-                        Some(ui.add_sized(size, Button::new(RichText::new(contents.clone())
-                                .font(egui::FontId::new(*font_size, FontFamily::Name("Oswald Bold".into()))))
-                                .sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap)
-                            )
-                        )
+                        response = ui.add_sized(size, Button::new(RichText::new(contents.clone())
+                            .font(egui::FontId::new(*font_size, FontFamily::Name("Oswald Bold".into()))))
+                            .sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap)
+                        );
                     },
                     false => {
-                        Some(ui.add_sized(size, Button::new(RichText::new(contents.clone()).size(*font_size)).sense(Sense::click_and_drag())))
+                        response = 
+                            ui.add_sized(size, Button::new(RichText::new(contents.clone())
+                                .size(*font_size))
+                                .sense(Sense::click_and_drag())
+                            )
                     },
                 }
+                set_visuals_to_default(ui.visuals_mut());
+
+                Some(response)
             }
-            WidgetData::Label(contents, text_size) => 
-                Some(ui.add_sized(size, Label::new(RichText::new(contents.clone()).size(*text_size)).sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap))),
-            WidgetData::BoldLabel(contents, text_size) => 
-                Some(ui.add_sized(size, Label::new(RichText::new(contents.clone()).font(egui::FontId::new(*text_size, FontFamily::Name("Oswald Bold".into()))))
-                        .sense(Sense::click_and_drag()).wrap_mode(egui::TextWrapMode::Wrap))
-                    ),
+            WidgetData::Label(contents, text_size) => {
+                Some(ui.add_sized(size, 
+                        Label::new(RichText::new(contents.clone())
+                            .size(*text_size))
+                        .selectable(false)
+                        .sense(Sense::click_and_drag())
+                        .wrap_mode(egui::TextWrapMode::Extend))
+                    .on_hover_cursor(CursorIcon::PointingHand)
+                )
+            },
+            WidgetData::BoldLabel(contents, text_size) =>
+                Some(
+                    ui.add_sized(size, Label::new(RichText::new(contents.clone())
+                            .font(
+                                egui::FontId::new(*text_size, FontFamily::Name("Oswald Bold".into()))
+                            ))
+                        .selectable(false)
+                        .wrap_mode(egui::TextWrapMode::Wrap)
+                        .sense(Sense::click_and_drag()))
+                    .on_hover_cursor(CursorIcon::PointingHand)
+                ),
             WidgetData::Horizontal => {
                 Some(ui.horizontal(|ui| {
                     for widget in &mut widget.children {
@@ -377,6 +410,7 @@ impl UiManager {
                 });
                 None
             },
+            WidgetData::Separator => Some(ui.separator()),
             WidgetData::SinglelineTextEdit(contents) => Some(ui.add_sized(size, TextEdit::singleline(contents))),
             WidgetData::MultilineTextEdit(contents) => Some(ui.add_sized(size, TextEdit::multiline(contents))),
             WidgetData::Checkbox(value, text) => Some(ui.add_sized(size, Checkbox::new(value, text.as_str()))),
@@ -1147,6 +1181,20 @@ impl UiManager {
         self.add_widget("add_button", window_id, widget_id, widget, parent)
     }
 
+    pub fn add_separator(&mut self, window_id: &str, widget_id: &str, size: Vec2, parent: Option<&str>) {
+        let widget = Widget {
+            id: widget_id.into(),
+            size,
+            widget_data: WidgetData::Separator,
+            children: Vec::new(),
+            play_click_sound: false,
+            play_hover_sound: false,
+            ..Default::default()
+        };
+
+        self.add_widget("add_separator", window_id, widget_id, widget, parent)
+    }
+
     pub fn add_text_button(&mut self, window_id: &str, widget_id: &str, contents: &str, font_size: f32, bold: bool, size: Vec2, parent: Option<&str>) {
         let widget = Widget {
             id: widget_id.into(),
@@ -1806,4 +1854,41 @@ pub fn draw_update_time(framework: &Framework, ui: &mut Ui) {
             }
         });
     });
+}
+
+fn set_visuals_to_default(visuals: &mut Visuals) {
+    visuals.widgets.inactive.fg_stroke = Stroke::new(0.0, Color32::from_rgb(30, 30, 30));
+    visuals.widgets.active.fg_stroke = Stroke::new(0.0, Color32::from_rgb(30, 30, 30));
+}
+
+fn set_visuals_for_dark_bg_widgets(visuals: &mut Visuals) {
+    visuals.widgets.inactive.fg_stroke = Stroke::new(0.0, Color32::from_rgb(217, 217, 217));
+    visuals.widgets.active.fg_stroke = Stroke::new(0.0, Color32::from_rgb(217, 217, 217));
+    visuals.widgets.noninteractive.fg_stroke = Stroke::new(0.0, Color32::from_rgb(217, 217, 217));
+    visuals.widgets.hovered.fg_stroke = Stroke::new(0.0, Color32::from_rgb(233, 233, 233));
+}
+
+pub fn set_default_visuals(egui_context: &Context) {
+    let mut ui_visuals = egui::Visuals::default();
+    ui_visuals.window_fill = Color32::from_rgb(217, 217, 217);
+    ui_visuals.window_corner_radius = CornerRadius::same(110);
+    ui_visuals.window_shadow = Shadow::NONE;
+
+    ui_visuals.widgets.inactive.fg_stroke = Stroke::new(0.0, Color32::from_rgb(30, 30, 30));
+    ui_visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.inactive.bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.inactive.corner_radius = CornerRadius::same(113);
+
+    ui_visuals.widgets.active.fg_stroke = Stroke::new(0.0, Color32::from_rgb(30, 30, 30));
+    ui_visuals.widgets.active.weak_bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.active.bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.active.corner_radius = CornerRadius::same(113);
+
+    ui_visuals.widgets.hovered.fg_stroke = Stroke::new(0.0, Color32::from_rgb(0, 0, 0));
+    ui_visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.hovered.bg_fill = Color32::from_rgb(30, 30, 30);
+    ui_visuals.widgets.hovered.corner_radius = CornerRadius::same(113);
+    ui_visuals.widgets.hovered.expansion = 2.0;
+
+    egui_context.set_visuals(ui_visuals);
 }
