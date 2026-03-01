@@ -1409,8 +1409,23 @@ impl UiManager {
     }
 }
 
+// makes the text on buttons/other widgets with a BG readable
+fn inspector_visuals(visuals: &mut Visuals) {
+    visuals.widgets.noninteractive.weak_bg_fill = Color32::from_rgb(186, 186, 186);
+    visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(186, 186, 186);
+    visuals.widgets.active.weak_bg_fill = Color32::from_rgb(186, 186, 186);
+    visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(186, 186, 186);
+
+    visuals.widgets.noninteractive.bg_fill = Color32::from_rgb(186, 186, 186);
+    visuals.widgets.inactive.bg_fill = Color32::from_rgb(186, 186, 186);
+    visuals.widgets.hovered.bg_fill = Color32::from_rgb(186, 186, 186);
+    visuals.widgets.active.bg_fill = Color32::from_rgb(186, 186, 186);
+}
+
 // inspector
 pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_state: &mut UiState) {
+    inspector_visuals(ui.visuals_mut());
+
     ui.label(format!("fps: {}", fps));
     ui.checkbox(&mut ui_state.full_debug_checkbox_val, "full debug");
     handle_full_debug_checkbox_value(framework, ui_state.full_debug_checkbox_val);
@@ -1452,6 +1467,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
             Some(system) => {
                 match system.find_object_mut(&selected_object.current_selected_object_name) {
                     Some(object) => {
+                        inspector_visuals(ui.visuals_mut());
                         ui.heading(format!("object '{}'", object.name()));
                         ui.label(format!("type: {}", object.object_type()));
                         ui.separator();
@@ -1500,6 +1516,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                             }
                         });
 
+                        inspector_visuals(ui.visuals_mut());
                         ui.label("local position:");
                         if let Some(pos) = draw_vec3_editor_inspector(
                             ui,
@@ -1509,6 +1526,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                         ) {
                             object.set_position(framework, pos, true);
                         }
+                        inspector_visuals(ui.visuals_mut());
                         ui.label("local rotation:");
                         if let Some(rot) = draw_vec3_editor_inspector(
                             ui,
@@ -1518,6 +1536,7 @@ pub fn draw_inspector(framework: &mut Framework, ui: &mut Ui, fps: &usize, ui_st
                         ) {
                             object.set_rotation(framework, rot, true);
                         }
+                        inspector_visuals(ui.visuals_mut());
                         ui.label("local scale:");
                         if let Some(sc) = draw_vec3_editor_inspector(
                             ui,

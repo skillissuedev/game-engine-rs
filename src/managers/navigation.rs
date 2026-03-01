@@ -236,9 +236,6 @@ impl NavigationManager {
                         let y = velocity.y;
                         velocity.y = velocity.z;
                         velocity.z = y;
-                        /*dbg!(velocity);
-                        dbg!(agent.current_target);
-                        dbg!(agent.state());*/
                         Some(velocity)
                     },
                     None => {
