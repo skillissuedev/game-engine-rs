@@ -1860,15 +1860,18 @@ pub fn draw_vec3_editor_inspector(
 }
 
 pub fn draw_update_time(framework: &Framework, ui: &mut Ui) {
+    let mut sorted_time = framework.last_frame_systems_update_time.iter().collect::<Vec<_>>();
+    sorted_time.sort_by(|a, b| a.1.cmp(&b.1));
+
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
-            for (name, _) in &framework.last_frame_systems_update_time {
+            for (name, _) in sorted_time.clone() {
                 ui.label(name.to_owned() + ": ");
             }
         });
 
         ui.vertical(|ui| {
-            for (_, duration) in &framework.last_frame_systems_update_time {
+            for (_, duration) in sorted_time {
                 ui.label((duration.as_secs_f64() * 1000.0).to_string() + " ms");
             }
         });

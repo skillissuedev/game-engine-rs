@@ -2,6 +2,7 @@ use std::{collections::HashMap, time::Instant};
 use egui_glium::egui_winit::egui;
 use glam::{Mat4, Quat, Vec3};
 use rand::Rng;
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use super::{gen_object_id, Object, ObjectGroup, Transform};
 use crate::{framework::Framework, managers::physics::ObjectBodyParameters, math_utils::deg_vec_to_rad};
 
@@ -25,10 +26,10 @@ pub struct ParticleSystem {
     max_particle_distance: Option<f32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParticleData {
     position: Vec3,
-    rotation: Vec3,
+    rotation: Quat,
     gravity: f32,
     scale: Vec3,
     velocity: Vec3,
@@ -65,18 +66,28 @@ impl Object for ParticleSystem {
     fn update(&mut self, _: &mut Framework) {}
 
     fn render(&mut self, framework: &mut Framework) {
+        let timer = Instant::now();
         let delta_time = framework.delta_time().as_secs_f32();
 
         if let Some(render) = &mut framework.render {
+            // update their positions
+            {
+                for particle in &mut self.particles {
+                    particle.position.x += particle.velocity.x * delta_time;
+                    particle.position.y += (particle.velocity.y + particle.gravity) * delta_time;
+                    particle.position.z += particle.velocity.z * delta_time;
+                }
+            }
+
+            // leave only particles for which the life time hasn't passed yet and those that aren't
+            // too far away
+            let camera_position = render.camera_position();
             let max_distance_squared = match self.max_particle_distance {
                 Some(max_distance) => Some(max_distance * max_distance),
                 None => None,
             };
-            let camera_position = render.camera_position();
 
-            // leave only particles for which the life time hasn't passed yet and those that aren't
-            // too far away
-            self.particles.retain(|particle| {
+            let _ = self.particles.par_iter_mut().filter(|particle| {
                 let are_alive = particle.life_timer.elapsed().as_secs_f32() < self.life_seconds;
                 let are_close_enough = match max_distance_squared {
                     Some(max_distance_squared) => {
@@ -89,26 +100,16 @@ impl Object for ParticleSystem {
                     None => true,
                 };
 
-                are_alive && are_close_enough
+                are_close_enough && are_alive
             });
 
-            // update their positions
-            for particle in &mut self.particles {
-                particle.position.x += particle.velocity.x * delta_time;
-                particle.position.y += (particle.velocity.y + particle.gravity) * delta_time;
-                particle.position.z += particle.velocity.z * delta_time;
-            }
 
             // update their positions in a RenderManager
             match render.instanced_positions.get_mut(&self.master_object) {
                 Some(instanced_positions) => {
                     for particle in &self.particles {
-                        let rotation_rads = deg_vec_to_rad(particle.rotation);
-                        let rotation_quat = 
-                            Quat::from_euler(glam::EulerRot::XYZ, rotation_rads.x, rotation_rads.y, rotation_rads.z);
-
                         let transform = Mat4::from_scale_rotation_translation(
-                            particle.scale, rotation_quat, particle.position,
+                            particle.scale, particle.rotation, particle.position,
                         );
 
                         instanced_positions.push(transform);
@@ -117,12 +118,8 @@ impl Object for ParticleSystem {
                 None => {
                     let mut instanced_positions = Vec::new();
                     for particle in &self.particles {
-                        let rotation_rads = deg_vec_to_rad(particle.rotation);
-                        let rotation_quat = 
-                            Quat::from_euler(glam::EulerRot::XYZ, rotation_rads.x, rotation_rads.y, rotation_rads.z);
-
                         let transform = Mat4::from_scale_rotation_translation(
-                            particle.scale, rotation_quat, particle.position,
+                            particle.scale, particle.rotation, particle.position,
                         );
 
                         instanced_positions.push(transform);
@@ -208,7 +205,8 @@ impl Object for ParticleSystem {
 impl ParticleSystem {
     pub fn start_particles(&mut self, base_velocity: Vec3, random_velocity_scale: f32) {
         let position = self.global_transform().position;
-        let rotation = self.global_transform().rotation;
+        let rotation_rads = deg_vec_to_rad(self.global_transform().rotation);
+        let rotation = Quat::from_euler(glam::EulerRot::XYZ, rotation_rads.x, rotation_rads.y, rotation_rads.z);
         let scale = self.global_transform().scale.x;
 
         for _ in 0..self.particle_count {

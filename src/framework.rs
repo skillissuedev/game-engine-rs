@@ -258,9 +258,9 @@ fn update_game(framework: &mut Framework, delta_time: Duration) {
     let total_update_time = Instant::now();
     framework.delta_time = delta_time;
     let physics_and_navigation_update_time = Instant::now();
-    std::thread::scope(|scope| {
-        scope.spawn(|| framework.physics.update());
-        scope.spawn(|| framework.navigation.update(delta_time.as_secs_f32()));
+    rayon::scope(|scope| {
+        scope.spawn(|_| framework.physics.update());
+        scope.spawn(|_| framework.navigation.update(delta_time.as_secs_f32()));
     });
     let physics_and_navigation_update_time = physics_and_navigation_update_time.elapsed();
     
